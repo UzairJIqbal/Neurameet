@@ -12,3 +12,25 @@ export function onJoin(callDetails: Call) {
   navigator.clipboard.writeText(MeetingLink);
   toast("Link has been copied");
 }
+
+export function getMeetingIdFromLink(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return "";
+
+  try {
+    const url = new URL(trimmedValue);
+    const meetingIndex = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .indexOf("meeting");
+    if (meetingIndex === -1) return "";
+
+    return url.pathname.split("/").filter(Boolean)[meetingIndex + 1] ?? "";
+  } catch {
+    const parts = trimmedValue.split("/").filter(Boolean);
+    const meetingIndex = parts.indexOf("meeting");
+    if (meetingIndex !== -1) return parts[meetingIndex + 1] ?? "";
+
+    return trimmedValue;
+  }
+}

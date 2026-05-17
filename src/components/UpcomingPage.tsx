@@ -46,7 +46,7 @@ const UpcomingPage = () => {
 	// Show "No meetings" message only when data is loaded and there are truly no upcoming meetings
 	if (getUpcomingMeetings.length === 0) {
 		return (
-			<section className="flex size-full flex-col gap-5 text-white">
+			<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
 				<LampContainer>
 					<motion.h1
 						initial={{ opacity: 0.5, y: 100 }}
@@ -57,10 +57,10 @@ const UpcomingPage = () => {
 							ease: "easeInOut",
 						}}
 					></motion.h1>
-					<div className="flex flex-col items-center justify-center h-[303px] w-full rounded-[20px]">
+					<div className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[20px] sm:min-h-[260px]">
 						<SideTitles type="upcgSideTitle" />
 					</div>
-					<div className="flex flex-col items-center justify-center w-full h-96">
+					<div className="flex min-h-[16rem] w-full flex-col items-center justify-center px-2 text-center">
 						<TypewriterEffectSmooth words={words} />
 					</div>
 				</LampContainer>
@@ -70,7 +70,7 @@ const UpcomingPage = () => {
 
 	// Show upcoming meetings
 	return (
-		<section className="flex size-full flex-col gap-5 text-white">
+		<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
 			<LampContainer>
 				<motion.h1
 					initial={{ opacity: 0.5, y: 100 }}
@@ -81,17 +81,17 @@ const UpcomingPage = () => {
 						ease: "easeInOut",
 					}}
 				></motion.h1>
-				<div className="flex flex-col items-center justify-center h-[303px] w-full rounded-[20px]">
+				<div className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[20px] sm:min-h-[260px]">
 					<SideTitles type="upcgSideTitle" />
 				</div>
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
+				<div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-1 sm:grid-cols-2 lg:grid-cols-3">
 					{getUpcomingMeetings.map(
 						(getUpcomingMeeting: Call, index: number) => (
-							<CardContainer className="inter-var overflow-hidden" key={index}>
-								<CardBody className="bg-dark-3 relative group/card  dark:hover:shadow-2xl dark:hover:shadow-emerald-500/[0.1] dark:bg-black dark:border-white border-black w-auto sm:w-[30rem] h-auto rounded-xl p-6 border overflow-hidden">
+							<CardContainer className="inter-var w-full overflow-hidden" key={index}>
+								<CardBody className="relative h-full w-full overflow-hidden rounded-lg border border-black bg-dark-3 p-4 group/card dark:border-white dark:bg-black dark:hover:shadow-2xl dark:hover:shadow-emerald-500/[0.1] sm:p-6">
 									<CardItem
 										translateZ="50"
-										className="text-xl font-bold text-slate-100 dark:text-white"
+										className="break-words text-lg font-bold text-slate-100 dark:text-white sm:text-xl"
 									>
 										{(
 											getUpcomingMeeting as Call
@@ -113,11 +113,11 @@ const UpcomingPage = () => {
 											src="/icons/previous_meeting.png"
 											height="800"
 											width=""
-											className="h-60 w-full object-cover rounded-3xl group-hover/card:shadow-xl"
+											className="h-44 w-full rounded-lg object-cover group-hover/card:shadow-xl sm:h-56"
 											alt="thumbnail"
 										/>
 									</CardItem>
-									<div className="flex justify-end items-center mt-20 gap-1">
+									<div className="mt-6 flex flex-wrap items-center justify-end gap-2 sm:mt-10">
 										<CardItem
 											onClick={() =>
 												router.push(

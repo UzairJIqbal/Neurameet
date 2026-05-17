@@ -18,7 +18,7 @@ const HomeLayout = ({ children }: Readonly<{ children: ReactNode }>) => {
     return (
         <main className="relative">
             <Navbar />
-            <section className="flex-1 flex flex-col min-h-screen px-6 pb-6 pt-28 max-md:pb-14 sm:px-14">
+            <section className="flex min-h-screen flex-1 flex-col px-3 pb-6 pt-20 sm:px-6 sm:pt-24 lg:px-10">
                 <div className="w-full">{children}</div>
             </section>
         </main >

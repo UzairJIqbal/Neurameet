@@ -43,6 +43,40 @@
   height: 40px;
 }
 
+.str-video__video-preview-container {
+  width: 100%;
+  max-width: 760px;
+}
+
+.str-video__video-preview {
+  width: 100%;
+  max-height: min(52vh, 420px);
+  object-fit: cover;
+}
+
+.str-video__speaker-layout,
+.str-video__paginated-grid-layout {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .str-video__call-controls {
+    gap: 0.375rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .str-video__call-controls__button {
+    height: 36px;
+    min-width: 36px;
+  }
+
+  .str-video__participant-list {
+    max-height: calc(100vh - 12rem);
+    overflow-y: auto;
+  }
+}
+
 .glassmorphism {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(4px);

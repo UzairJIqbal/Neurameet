@@ -30,8 +30,8 @@ export const Sidebar_Com = ({ type }: { type: SidebarPagesTypes }) => {
 	return (
 		<div
 			className={cn(
-				"mx-auto flex w-full max-w-full flex-1 flex-col overflow-hidden rounded-md border-none bg-dark-2 md:flex-row dark:border-neutral-700 dark:bg-neutral-800",
-				"min-h-screen scroll mt-0 left-0",
+				"mx-auto flex w-full max-w-full flex-1 flex-col rounded-md border-none bg-dark-2 md:flex-row dark:border-neutral-700 dark:bg-neutral-800",
+				"min-h-screen mt-0 left-0 overflow-x-hidden",
 			)}
 		>
 			<Sidebar open={open} setOpen={setOpen}>
@@ -113,7 +113,7 @@ const HomePage = () => {
 		dateStyle: "full",
 	});
 	return (
-		<section className="flex size-full flex-col gap-5 text-white">
+		<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
 			<LampContainer>
 				<motion.h1
 					initial={{ opacity: 0.5, y: 100 }}
@@ -124,12 +124,12 @@ const HomePage = () => {
 						ease: "easeInOut",
 					}}
 				>
-					<div className="h-[303px] w-full rounded-[20px] bg-cover">
-						<div className="flex h-full flex-col justify-between max-md:px-5 max-md:py-8 lg:p-11">
-							<h2 className="glassmorphism max-w-[273px] rounded py-2 text-center text-base font-normal sm:text-2xl mb-7 text-white">
+					<div className="min-h-[220px] w-full rounded-[20px] bg-cover sm:min-h-[303px]">
+						<div className="flex h-full min-h-[220px] flex-col justify-between px-4 py-6 sm:min-h-[303px] sm:px-6 lg:p-11">
+							<h2 className="glassmorphism mb-7 max-w-full rounded px-3 py-2 text-center text-sm font-normal text-white sm:max-w-[360px] sm:text-xl">
 								Upcoming Meeting at:{" "}
 								{getUpcomingMeetings.map((meeting: Call, index: number) => (
-									<span key={index} className="sm:text-sm">
+									<span key={index} className="block break-words text-xs sm:text-sm">
 										{meeting.state.startsAt?.toLocaleString() ||
 											"Date went missing—try again!"}
 									</span>
@@ -137,15 +137,15 @@ const HomePage = () => {
 							</h2>
 
 							<div className="flex flex-col gap-2">
-								<h1 className="text-4xl font-extrabold lg:text-7xl">{time}</h1>
-								<p className="text-lg font-medium text-sky-1 lg:text-2xl">
+								<h1 className="text-4xl font-extrabold sm:text-5xl lg:text-7xl">{time}</h1>
+								<p className="text-base font-medium text-sky-1 sm:text-lg lg:text-2xl">
 									{date}
 								</p>
 							</div>
 						</div>
 					</div>
 				</motion.h1>
-				<div className="relative flex h-[25rem] w-full items-center justify-center bg-dark-2 dark:bg-white mt-20">
+				<div className="relative mt-8 flex min-h-[28rem] w-full items-start justify-center overflow-visible bg-dark-2 dark:bg-white sm:mt-12 lg:mt-20 lg:min-h-[25rem] lg:items-center">
 					<div
 						className={cn(
 							"absolute inset-0",
@@ -155,7 +155,7 @@ const HomePage = () => {
 						)}
 					/>
 					<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-dark-2 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)] dark:bg-black"></div>
-					<div className="relative z-0 bg-dark-2 bg-clip-text py-8 text-4xl font-bold text-transparent sm:text-sm sm:mt-2 sm:overflow-y-auto sm:h-full md:overflow-y-auto md:overflow-hidden lg:h-auto lg:mt-[-100px]">
+					<div className="relative z-0 w-full bg-dark-2 bg-clip-text py-6 text-transparent lg:mt-[-100px]">
 						<MeetingTypeLists />
 					</div>
 				</div>

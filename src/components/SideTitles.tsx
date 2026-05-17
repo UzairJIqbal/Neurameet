@@ -64,7 +64,7 @@ const presTitle = [
 
 const SideTitles = ({ type }: { type: sideTitleTypes }) => {
 
-    return <div className="flex flex-col items-center justify-center h-[40rem]  ">
+    return <div className="flex min-h-[12rem] w-full flex-col items-center justify-center px-2 text-center sm:min-h-[18rem] lg:min-h-[28rem]">
         <TypewriterEffectSmooth words={
             type === 'presSideTitle' ? presTitle
                 : type === 'recsSideTitle' ? recTitle

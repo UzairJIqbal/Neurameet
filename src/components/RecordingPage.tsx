@@ -35,12 +35,6 @@ const RecordingPage = () => {
 				}
 
 				const data = await res.json();
-				// Debug: log full payload so we can see what the client actually received
-				console.log("DEBUG /api/recordings response:", data);
-				console.log(
-					"✅ Recordings loaded:",
-					Array.isArray(data.recordings) ? data.recordings.length : 0,
-				);
 
 				setRecordings(data.recordings ?? []);
 			} catch (err) {
@@ -73,15 +67,15 @@ const RecordingPage = () => {
 	// EMPTY STATE
 	if (!isLoading && recordings.length === 0) {
 		return (
-			<section className="flex size-full flex-col gap-5 text-white">
+			<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
 				<LampContainer>
 					<motion.h1 />
 
-					<div className="flex flex-col items-center justify-center h-[303px] w-full rounded-[20px]">
+					<div className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[20px] sm:min-h-[260px]">
 						<SideTitles type="recsSideTitle" />
 					</div>
 
-					<div className="flex flex-col items-center justify-center w-full h-96">
+					<div className="flex min-h-[16rem] w-full flex-col items-center justify-center px-2 text-center">
 						<TypewriterEffectSmooth words={words} />
 					</div>
 				</LampContainer>
@@ -91,23 +85,23 @@ const RecordingPage = () => {
 
 	// MAIN UI
 	return (
-		<section className="flex size-full flex-col gap-5 text-white">
+		<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
 			<LampContainer>
 				<motion.h1 />
 
-				<div className="flex flex-col items-center justify-center h-[303px] w-full rounded-[20px]">
+				<div className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[20px] sm:min-h-[260px]">
 					<SideTitles type="recsSideTitle" />
 				</div>
 
 				{/* GRID (same as UpcomingPage style) */}
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
+				<div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-1 sm:grid-cols-2 lg:grid-cols-3">
 					{recordings.map((recording: any) => (
 						<CardContainer
 							key={recording?.id || recording?.url}
-							className="inter-var overflow-hidden"
+							className="inter-var w-full overflow-hidden"
 						>
-							<CardBody className="bg-dark-3 relative group/card dark:bg-black dark:border-white border-black w-auto sm:w-[30rem] h-auto rounded-xl p-6 border overflow-hidden">
-								<CardItem className="text-xl font-bold text-slate-100 dark:text-white">
+							<CardBody className="relative h-full w-full overflow-hidden rounded-lg border border-black bg-dark-3 p-4 group/card dark:border-white dark:bg-black sm:p-6">
+								<CardItem className="break-words text-lg font-bold text-slate-100 dark:text-white sm:text-xl">
 									{recording?.filename?.substring(0, 30) || "No title"}
 								</CardItem>
 
@@ -120,13 +114,13 @@ const RecordingPage = () => {
 								<CardItem translateZ="100" className="w-full mt-4">
 									<img
 										src="/icons/recording.png"
-										className="h-60 w-full object-cover rounded-3xl"
+									className="h-44 w-full rounded-lg object-cover sm:h-56"
 										alt="thumbnail"
 									/>
 								</CardItem>
 
 								{/* ACTIONS */}
-								<div className="flex justify-end items-center mt-20 gap-2">
+								<div className="mt-6 flex items-center justify-end gap-2 sm:mt-10">
 									<CardItem
 										onClick={() => handlePlay(recording)}
 										className="px-4 py-2 rounded-xl bg-black dark:bg-white dark:text-black text-white text-xs font-bold"

@@ -48,10 +48,14 @@ export const ModalBody = ({
 
     useEffect(() => {
         if (open) {
-            document.body.style.overflow = "auto";
-        } else {
             document.body.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "auto";
         }
+
+        return () => {
+            document.body.style.overflow = "auto";
+        };
     }, [open]);
 
     const modalRef = useRef<HTMLDivElement>(null);
@@ -73,14 +77,14 @@ export const ModalBody = ({
                         opacity: 0,
                         backdropFilter: "blur(0px)",
                     }}
-                    className="fixed [perspective:800px] [transform-style:preserve-3d] inset-0 h-full w-full  flex items-center justify-center z-50"
+                    className="fixed inset-0 z-50 flex h-full w-full items-center justify-center px-3 py-4 [perspective:800px] [transform-style:preserve-3d] sm:px-6"
                 >
                     <Overlay />
 
                     <motion.div
                         ref={modalRef}
                         className={cn(
-                            "min-h-[50%] max-h-[90%] md:max-w-[40%] bg-dark-2 dark:text-white border border-transparent dark:border-neutral-800 md:rounded-2xl relative z-50 flex flex-col flex-1 overflow-hidden",
+                            "relative z-50 flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-transparent bg-dark-2 dark:text-white dark:border-neutral-800 lg:max-w-[42rem]",
                             className,
                         )}
                         initial={{
@@ -122,7 +126,7 @@ export const ModalContent = ({
     className?: string;
 }) => {
     return (
-        <div className={cn("flex flex-col flex-1 p-8 md:p-10", className)}>
+        <div className={cn("flex flex-1 flex-col overflow-y-auto p-4 sm:p-6 md:p-8", className)}>
             {children}
         </div>
     );
@@ -138,7 +142,7 @@ export const ModalFooter = ({
     return (
         <div
             className={cn(
-                "flex justify-end p-4 bg-gray-100 dark:bg-neutral-900",
+                "flex flex-wrap justify-end gap-3 bg-gray-100 p-4 dark:bg-neutral-900",
                 className,
             )}
         >

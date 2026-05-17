@@ -10,9 +10,9 @@ import { Button } from "./ui/stateful-button";
 import toast from "react-hot-toast";
 
 const Table = ({ title, description }: { title: string, description: string }) => {
-    return <div>
-        <h1>{title}</h1>
-        <p>{description}</p>
+    return <div className="rounded-lg bg-dark-3 p-4">
+        <h1 className="text-sm font-semibold text-slate-300 sm:text-base">{title}</h1>
+        <p className="mt-2 break-all text-sm text-white sm:text-base">{description}</p>
     </div >
 }
 
@@ -31,14 +31,19 @@ const PersonalRoomPage = () => {
             const call = client?.call('default', meetingId as string)
             await call?.getOrCreate({
                 data: {
-                    starts_at: new Date().toISOString()
+                    starts_at: new Date().toISOString(),
+                    members: [{ user_id: user?.id as string }],
+                    custom: {
+                        description: `${topicName}'s Meeting Room`,
+                        owner_id: user?.id as string,
+                    },
                 }
             })
         }
         router.push(`/meeting/${meetingId}`)
     }
-    return <div className='flex size-full flex-col gap-10 text-white'>
-        <h1 className='text-3xl font-bold'>
+    return <div className='flex min-h-screen w-full flex-col gap-6 overflow-x-hidden text-white sm:gap-10'>
+        <h1 className='text-2xl font-bold sm:text-3xl'>
             Personal Meeting Room
         </h1>
         <div className="flex w-full flex-col gap-8 xl:max-w-[900px]">
@@ -46,12 +51,12 @@ const PersonalRoomPage = () => {
             <Table title="Meeting ID" description={meetingId as string} />
             <Table title="Invite Link" description={inviteLink} />
         </div>
-        <div className="flex gap-5">
-            <Button className="bg-blue-1" onClick={createMeeting}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-5">
+            <Button className="w-full bg-blue-1 sm:w-auto" onClick={createMeeting}>
                 Start Meeting
             </Button>
             <Button
-                className="bg-dark-3"
+                className="w-full bg-dark-3 sm:w-auto"
                 onClick={() => {
                     navigator.clipboard.writeText(inviteLink);
                     toast(

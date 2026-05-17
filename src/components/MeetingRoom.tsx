@@ -55,13 +55,13 @@ const MeetingRoom = () => {
 	};
 
 	return (
-		<section>
-			<div className="relative flex size-full items-center justify-center mt-2">
-				<div className="flex size-full max-w-[1000px] items-center">
+		<section className="min-h-screen w-full overflow-hidden pb-28 text-white sm:pb-24">
+			<div className="relative mt-2 flex min-h-[calc(100vh-170px)] w-full items-center justify-center px-2 sm:px-4">
+				<div className="flex h-[calc(100vh-190px)] w-full max-w-[1000px] items-center sm:h-[calc(100vh-170px)]">
 					<CallLayout />
 				</div>
 				<div
-					className={cn("h-[calc(100vh-86px)] hidden ml-2", {
+					className={cn("fixed inset-y-20 right-2 z-40 hidden w-[calc(100vw-1rem)] max-w-[350px] sm:static sm:ml-2 sm:h-[calc(100vh-86px)]", {
 						"show-block": showParticipants,
 					})}
 				>
@@ -69,7 +69,7 @@ const MeetingRoom = () => {
 				</div>
 			</div>
 
-			<div className="fixed bottom-0 flex w-full items-center justify-center gap-5 flex-wrap">
+			<div className="fixed inset-x-0 bottom-0 z-50 flex w-full flex-wrap items-center justify-center gap-2 bg-dark-1/95 px-2 py-3 backdrop-blur sm:gap-4">
 				<CallControls onLeave={OnLeave} />
 				<DropdownMenu>
 					<DropdownMenuTrigger className="cursor-pointer rounded-2xl bg-[#19232d] px-4 py-2 hover:bg-[#4c535b]  ">
@@ -92,7 +92,7 @@ const MeetingRoom = () => {
 				<CallStatsButton />
 				<Button
 					onClick={() => setShowParticipants((prev) => !prev)}
-					className="cursor-pointer rounded-2xl bg-[#19232d] px-4 py-2 hover:bg-[#4c535b]"
+					className="cursor-pointer rounded-2xl bg-[#19232d] px-3 py-2 hover:bg-[#4c535b] sm:px-4"
 				>
 					<Users size={20} className="text-white" />
 				</Button>

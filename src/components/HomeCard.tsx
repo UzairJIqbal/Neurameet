@@ -7,7 +7,7 @@ import { ModalProvider } from "./ui/animated-modal";
 
 
 const HomeCard = () => {
-    return <div className="max-w-5xl mx-auto px-8">
+    return <div className="mx-auto w-full max-w-5xl px-2 sm:px-4 lg:px-8">
         <ModalProvider>
             <HoverEffect items={meetingCardDetails} />
         </ModalProvider>

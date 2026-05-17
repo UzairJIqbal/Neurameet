@@ -45,7 +45,7 @@ const PreviousPage = () => {
 
 	if (getPreviousMeetings.length === 0) {
 		return (
-			<div className="text-2xl font-bold text-white">
+			<div className="px-2 text-center text-xl font-bold text-white sm:text-2xl">
 				<TypewriterEffectSmooth words={words} />
 			</div>
 		);
@@ -54,7 +54,7 @@ const PreviousPage = () => {
 	return (
 		<>
 			{getPreviousMeetings && getPreviousMeetings.length > 0 ? (
-				<section className="flex size-full flex-col gap-5 text-white">
+				<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
 					<LampContainer>
 						<motion.h1
 							initial={{ opacity: 0.5, y: 100 }}
@@ -65,20 +65,20 @@ const PreviousPage = () => {
 								ease: "easeInOut",
 							}}
 						></motion.h1>
-						<div className="flex flex-col items-center justify-center h-[303px] w-full rounded-[20px]">
+						<div className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[20px] sm:min-h-[260px]">
 							<SideTitles type="presSideTitle" />
 						</div>
-						<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
+						<div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-1 sm:grid-cols-2 lg:grid-cols-3">
 							{getPreviousMeetings.map(
 								(getPreviousMeeting: Call, index: number) => (
 									<CardContainer
-										className="inter-var overflow-hidden"
+										className="inter-var w-full overflow-hidden"
 										key={index}
 									>
-										<CardBody className="bg-dark-3 relative group/card  dark:hover:shadow-2xl dark:hover:shadow-emerald-500/[0.1] dark:bg-black dark:border-white border-black w-auto sm:w-[30rem] h-auto rounded-xl p-6 border overflow-hidden">
+										<CardBody className="relative h-full w-full overflow-hidden rounded-lg border border-black bg-dark-3 p-4 group/card dark:border-white dark:bg-black dark:hover:shadow-2xl dark:hover:shadow-emerald-500/[0.1] sm:p-6">
 											<CardItem
 												translateZ="50"
-												className="text-xl font-bold text-slate-100 dark:text-white"
+												className="break-words text-lg font-bold text-slate-100 dark:text-white sm:text-xl"
 											>
 												{(
 													getPreviousMeeting as Call
@@ -100,7 +100,7 @@ const PreviousPage = () => {
 													src="/icons/previous_meeting.png"
 													height="800"
 													width=""
-													className="h-60 w-full object-cover rounded-3xl group-hover/card:shadow-xl"
+													className="h-44 w-full rounded-lg object-cover group-hover/card:shadow-xl sm:h-56"
 													alt="thumbnail"
 												/>
 											</CardItem>
@@ -112,7 +112,7 @@ const PreviousPage = () => {
 					</LampContainer>
 				</section>
 			) : (
-				<div className="text-2xl font-bold text-white">
+				<div className="px-2 text-center text-xl font-bold text-white sm:text-2xl">
 					<TypewriterEffectSmooth words={words} />
 				</div>
 			)}

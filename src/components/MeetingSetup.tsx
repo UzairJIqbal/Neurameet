@@ -130,45 +130,32 @@ const MeetingSetup = ({
 	useEffect(() => {
 		if (!microphone) return;
 		const switchingMic = async () => {
-			switch (audioType) {
-				case "podcasts":
-					try {
-						await microphone.setAudioBitrateProfile(
-							SfuModels.AudioBitrateProfile.VOICE_HIGH_QUALITY,
-						);
-					} catch (error) {
-						toast(
-							"Podcasts microphone settings is not available yet, switching to standard settings",
-						);
-						microphone.setAudioBitrateProfile(
-							SfuModels.AudioBitrateProfile.VOICE_STANDARD_UNSPECIFIED,
-						);
-						console.error("The podcasts microphone :", error);
-					}
-					break;
-				case "music calls":
-					try {
-						await microphone.setAudioBitrateProfile(
-							SfuModels.AudioBitrateProfile.MUSIC_HIGH_QUALITY,
-						);
-					} catch (error) {
-						toast(
-							"Musics microphone settings is not available yet, switching to standard settings",
-						);
-						microphone.setAudioBitrateProfile(
-							SfuModels.AudioBitrateProfile.VOICE_STANDARD_UNSPECIFIED,
-						);
-						console.error("The music microphone :", error);
-					}
-				default:
-					microphone.setAudioBitrateProfile(
-						SfuModels.AudioBitrateProfile.VOICE_STANDARD_UNSPECIFIED,
-					);
-					break;
+			const hifiAudioEnabled = call.state.settings?.audio.hifi_audio_enabled;
+
+			if (!hifiAudioEnabled) {
+				if (audioType !== "voice calls") {
+					toast("Enhanced audio is not available for this meeting. Using standard voice audio.");
+					setAudioType("voice calls");
+				}
+				return;
+			}
+
+			try {
+				const profile =
+					audioType === "podcasts"
+						? SfuModels.AudioBitrateProfile.VOICE_HIGH_QUALITY
+						: audioType === "music calls"
+							? SfuModels.AudioBitrateProfile.MUSIC_HIGH_QUALITY
+							: SfuModels.AudioBitrateProfile.VOICE_STANDARD_UNSPECIFIED;
+
+				await microphone.setAudioBitrateProfile(profile);
+			} catch {
+				toast("Audio settings could not be changed. Using standard voice audio.");
+				setAudioType("voice calls");
 			}
 		};
 		switchingMic();
-	}, [microphone, audioType]);
+	}, [call.state.settings?.audio.hifi_audio_enabled, microphone, audioType]);
 
 	//Setting selected microphone and getting it from local storage
 	useEffect(() => {
@@ -206,20 +193,35 @@ const MeetingSetup = ({
 		}
 	}, [call?.camera, call?.microphone, isMicCamToggleOn]);
 
-	const handleClick = () => {
-		call?.join();
-		setisSetupCompleted(true);
+	const handleClick = async () => {
+		try {
+			const res = await fetch(`/api/meetings/${call.id}/members`, {
+				method: "POST",
+			});
+
+			if (!res.ok) {
+				throw new Error("Unable to join this meeting");
+			}
+
+			await call.join({ create: false });
+			setisSetupCompleted(true);
+		} catch (error) {
+			console.error("Failed to join meeting:", error);
+			toast.error("Unable to join this meeting. Please check the link.");
+		}
 	};
 
 	return (
-		<div className="flex h-screen w-full flex-col items-center justify-center gap-3 text-white overflow-hidden">
-			<div className="h-[40rem] flex flex-col justify-center items-center px-4">
-				<span className="mt-2 text-2xl font-bold">Set your</span>
+		<div className="flex min-h-screen w-full flex-col items-center justify-center gap-4 overflow-x-hidden px-3 py-6 text-white">
+			<div className="flex w-full max-w-3xl flex-col items-center justify-center px-1 sm:px-4">
+				<span className="mt-2 text-xl font-bold sm:text-2xl">Set your</span>
 				<FlipWords words={words} className="text-2xl" /> <br />
-				<VideoPreview />
+				<div className="w-full overflow-hidden rounded-lg">
+					<VideoPreview />
+				</div>
 			</div>
-			<div className="flex h-16 items-center justify-center gap-3">
-				<label className="flex items-center justify-center gap-2 font-medium">
+			<div className="flex w-full max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row">
+				<label className="flex items-center justify-center gap-2 text-sm font-medium sm:text-base">
 					<input
 						type="checkbox"
 						checked={isMicCamToggleOn}
@@ -251,8 +253,8 @@ const MeetingSetup = ({
 					</DropdownMenu>
 				</div>
 			</div>
-			<div className="flex h-40 w-full items-center justify-center">
-				<Button onClick={handleClick}>Join Meeting</Button>
+			<div className="flex w-full max-w-3xl items-center justify-center pt-2 sm:pt-6">
+				<Button className="w-full sm:w-auto" onClick={handleClick}>Join Meeting</Button>
 			</div>
 		</div>
 	);

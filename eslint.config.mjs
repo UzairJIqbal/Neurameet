@@ -16,6 +16,9 @@ const eslintConfig = [
     ignores: [
       "node_modules/**",
       ".next/**",
+      ".claude/**",
+      ".claude-flow/**",
+      ".vercel/**",
       "out/**",
       "build/**",
       "next-env.d.ts",

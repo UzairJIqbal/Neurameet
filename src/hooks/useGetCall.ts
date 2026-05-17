@@ -69,8 +69,6 @@ export const useGetCall = () => {
 		});
 	}, [calls, now]);
 
-	console.log("Get all calls", calls);
-
 	return {
 		upcomingCalls,
 		previousCalls,
