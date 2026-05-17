@@ -6,6 +6,7 @@ bun.lock
 out
 dist
 .next
+.vercel
 *.tgz
 
 # code coverage
@@ -45,3 +46,4 @@ CLAUDE.md
 .mcp.json
 .zshrc
 ruvector.db
+.vercel
