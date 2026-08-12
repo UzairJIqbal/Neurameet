@@ -21,7 +21,7 @@ export default function Meeting() {
             <div className="flex min-h-screen w-full items-center justify-center px-4 text-center text-white">
                 <div>
                     <h1 className="text-2xl font-bold">Meeting not available</h1>
-                    <p className="mt-3 text-sm text-slate-300">
+                    <p className="mt-3 text-sm text-sky-1">
                         Check that the meeting link is correct and that the meeting still exists.
                     </p>
                 </div>

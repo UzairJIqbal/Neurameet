@@ -28,7 +28,7 @@ const words = [
 	},
 	{
 		text: "Available.",
-		className: "text-blue-500 dark:text-blue-500",
+		className: "text-blue-1 dark:text-blue-1",
 	},
 ];
 
@@ -101,7 +101,7 @@ const UpcomingPage = () => {
 									<CardItem
 										as="p"
 										translateZ="60"
-										className="text-slate-200 text-sm max-w-sm mt-2 dark:text-neutral-300"
+										className="text-sky-1 text-sm max-w-sm mt-2 dark:text-neutral-300"
 									>
 										{(
 											getUpcomingMeeting as Call

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NeuraMeet - AI Meeting Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-fixed": "#eddcff",
+                        "secondary": "#525b8e",
+                        "background": "#161925", // Overridden based on prompt
+                        "tertiary": "#7b3500",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "surface-container-low": "#1C1F2E", // Overridden based on prompt
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#8000f6",
+                        "secondary-container": "#bbc3fd",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-tertiary-container": "#ffd4bf",
+                        "on-error": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#C9DDFF", // Overridden based on prompt
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "surface-variant": "#e0e1f3",
+                        "on-secondary-container": "#464f81",
+                        "inverse-surface": "#2d303d",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "surface": "#1C1F2E", // Overridden based on prompt
+                        "on-secondary-fixed": "#0d1647",
+                        "primary-container": "#830ef9",
+                        "primary": "#830EF9", // Overridden based on prompt
+                        "outline-variant": "#cec2d9",
+                        "on-tertiary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "on-surface": "#ffffff", // Overridden based on prompt
+                        "on-primary-fixed": "#280056",
+                        "surface-container-high": "#e6e7f8",
+                        "on-background": "#ffffff", // Overridden based on prompt
+                        "surface-container-highest": "#e0e1f3",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#d7baff",
+                        "surface-bright": "#faf8ff",
+                        "on-primary-container": "#e9d5ff",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#331200",
+                        "secondary-fixed": "#dee0ff",
+                        "surface-dim": "#d7d9ea",
+                        "inverse-on-surface": "#eff0ff",
+                        "outline": "#7d7388",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "primary-fixed-dim": "#d7baff",
+                        "on-error-container": "#93000a",
+                        // Custom for this specific design mapping
+                        "brand-bg": "#161925",
+                        "brand-surface": "#1C1F2E",
+                        "brand-border": "rgba(255,255,255,0.1)",
+                        "brand-muted": "#C9DDFF"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "1rem", // 16px mapped here
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "headline-sm": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "display-lg-mobile": ["26px", { lineHeight: "32px", fontWeight: "700" }],
+                        "label-mono": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }],
+                        "display-lg": ["48px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }], // Adjusted for hero
+                        "headline-sm": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }], // Adjusted for subtext
+                        "label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #161925;
+            color: #ffffff;
+            font-family: 'Hanken Grotesk', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .nav-scrolled {
+            background-color: rgba(22, 25, 37, 0.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .glass-card {
+            background: linear-gradient(180deg, rgba(28, 31, 46, 1) 0%, rgba(22, 25, 37, 1) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #830EF9 0%, #B25AFF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .glow-effect {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: #830EF9;
+            filter: blur(150px);
+            opacity: 0.15;
+            z-index: 0;
+            border-radius: 50%;
+        }
+        
+        /* Interactive button styles */
+        .btn-primary {
+            background-color: #830EF9;
+            color: white;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: #6a0ad1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(131, 14, 249, 0.3);
+        }
+        
+        .btn-secondary {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            transition: all 0.2s ease;
+        }
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+        .border-subtle {
+            border-color: rgba(236, 240, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="relative min-h-screen overflow-x-hidden selection:bg-primary selection:text-white">
+<!-- Global Nav -->
+<nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-4 px-6 md:px-12" id="navbar">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span class="font-headline-md text-headline-md font-bold tracking-tight">NeuraMeet</span>
+</div>
+<div class="hidden md:flex items-center gap-8 font-body-md text-brand-muted">
+<a class="hover:text-white transition-colors" href="#">Product</a>
+<a class="hover:text-white transition-colors" href="#">Features</a>
+<a class="hover:text-white transition-colors" href="#">Pricing</a>
+<a class="hover:text-white transition-colors" href="#">Docs</a>
+</div>
+<div class="flex items-center gap-4">
+<a class="hidden sm:block font-body-md text-brand-muted hover:text-white transition-colors" href="#">Sign in</a>
+<a class="btn-primary px-5 py-2.5 rounded-xl font-body-md font-medium" href="#">Get Started</a>
+</div>
+</div>
+</nav>
+<main class="relative z-10 pt-32 pb-24">
+<!-- Background Ambient Glow -->
+<div class="glow-effect top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] opacity-20"></div>
+<!-- Hero Section -->
+<section class="max-w-7xl mx-auto px-6 md:px-12 text-center pt-16 pb-24 relative">
+<h1 class="font-display-lg text-display-lg max-w-4xl mx-auto mb-6">
+                Revolutionize Your Meetings <br/>
+<span class="text-primary">With AI Intelligence</span>
+</h1>
+<p class="font-body-lg text-body-lg text-brand-muted max-w-2xl mx-auto mb-10">
+                Automate summaries, action items, and follow-ups in real-time. Turn every conversation into actionable data with enterprise-grade security.
+            </p>
+<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+<a class="btn-primary w-full sm:w-auto px-8 py-3.5 rounded-xl font-body-md font-medium flex items-center justify-center gap-2" href="#">
+                    Get Started <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+<a class="btn-secondary w-full sm:w-auto px-8 py-3.5 rounded-xl font-body-md font-medium flex items-center justify-center gap-2" href="#">
+<span class="material-symbols-outlined text-sm">play_circle</span> Watch Demo
+                </a>
+</div>
+<!-- Dashboard Preview Placeholder -->
+<div class="mt-20 relative mx-auto max-w-5xl">
+<div class="absolute inset-0 bg-gradient-to-t from-brand-bg to-transparent z-10 top-1/2"></div>
+<div class="glass-card rounded-xl p-2 relative z-0">
+<div class="h-10 bg-[#161925] rounded-t-lg border-b border-white/5 flex items-center px-4 gap-2">
+<div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+<div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+<div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+</div>
+<div class="h-[400px] bg-[#161925]/50 rounded-b-lg overflow-hidden relative">
+<div class="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-luminosity" data-alt="A sleek, futuristic dashboard interface displaying complex data visualizations, charts, and AI analysis metrics in a dark mode aesthetic with vibrant purple and blue accents, representing advanced meeting intelligence software." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAUCdne7rfACp_88WyECL_4p8uoe1JmHlM7MvwMd2QP07_8qB--kc_UhRKhiEQKbfeeV42z33O0TANa6xMc1LsdtG4egNXhAaCSoliHBTLgQtNUSM-IUXqXm5R9o2qrVyPJF7whnPhZniHa0QNnohBTL2O6Hfp5DX4uVi6DtyiPXl4Ita3QlNjs_d2tYtgGxhXihKT_1pKCglUk3DbhYJvrcAALrrrxZBDFsQmTS9Di9KBWDMG2m2_oSA')"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Feature Grid -->
+<section class="max-w-7xl mx-auto px-6 md:px-12 py-24 relative">
+<div class="text-center mb-16">
+<h2 class="font-headline-md text-headline-md mb-4">Everything you need for perfect meetings</h2>
+<p class="font-body-md text-brand-muted max-w-2xl mx-auto">Powerful AI models working in the background to capture every detail.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Feature 1 -->
+<div class="glass-card rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+<div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 border border-primary/20">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">videocam</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm mb-3">Real-Time Meetings</h3>
+<p class="font-body-md text-brand-muted leading-relaxed">
+                        Transcribe and analyze conversations as they happen with sub-second latency across all major platforms.
+                    </p>
+</div>
+<!-- Feature 2 -->
+<div class="glass-card rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+<div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 border border-primary/20">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">psychology</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm mb-3">AI Meeting Intelligence</h3>
+<p class="font-body-md text-brand-muted leading-relaxed">
+                        Extract key insights, detect sentiment, and automatically generate executive summaries without human intervention.
+                    </p>
+</div>
+<!-- Feature 3 -->
+<div class="glass-card rounded-xl p-8 hover:-translate-y-1 transition-transform duration-300">
+<div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 border border-primary/20">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">assignment</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm mb-3">Smart Follow-ups</h3>
+<p class="font-body-md text-brand-muted leading-relaxed">
+                        Auto-generate action items, assign them to team members, and push them directly to your project management tools.
+                    </p>
+</div>
+</div>
+</section>
+<!-- Social Proof Strip -->
+<section class="max-w-7xl mx-auto px-6 md:px-12 py-24 border-t border-subtle">
+<div class="text-center mb-12">
+<h2 class="font-headline-md text-headline-md text-white mb-4">Trusted by innovative teams</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="glass-card rounded-xl p-6 border border-subtle flex flex-col justify-between">
+<p class="font-body-md text-brand-muted mb-6">"NeuraMeet completely changed how we handle remote standups. We save hours every week."</p>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary/20"></div>
+<div>
+<div class="font-headline-sm text-sm font-semibold text-white">Sarah Jenkins</div>
+<div class="font-body-md text-xs text-brand-muted">CTO, TechFlow</div>
+</div>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex flex-col justify-between">
+<p class="font-body-md text-brand-muted mb-6">"The automated action items are incredibly accurate. It feels like having a dedicated project manager in every call."</p>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary/20"></div>
+<div>
+<div class="font-headline-sm text-sm font-semibold text-white">David Chen</div>
+<div class="font-body-md text-xs text-brand-muted">VP Engineering, ScaleUp</div>
+</div>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex flex-col justify-between">
+<p class="font-body-md text-brand-muted mb-6">"Security was our main concern, but their enterprise features and on-prem options gave us total peace of mind."</p>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary/20"></div>
+<div>
+<div class="font-headline-sm text-sm font-semibold text-white">Elena Rodriguez</div>
+<div class="font-body-md text-xs text-brand-muted">CISO, GlobalData</div>
+</div>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex flex-col justify-between">
+<p class="font-body-md text-brand-muted mb-6">"Integrating it into our existing workflow took minutes. The API is beautifully designed and documented."</p>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary/20"></div>
+<div>
+<div class="font-headline-sm text-sm font-semibold text-white">Michael Chang</div>
+<div class="font-body-md text-xs text-brand-muted">Lead Developer, Nexus</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Detailed Section: Built on modern AI -->
+<section class="max-w-7xl mx-auto px-6 md:px-12 py-24 border-t border-subtle">
+<div class="flex flex-col lg:flex-row items-center gap-12">
+<div class="lg:w-1/2">
+<h2 class="font-display-lg text-4xl font-bold mb-6">Built on modern AI architecture</h2>
+<p class="font-body-lg text-brand-muted mb-6 leading-relaxed">
+                NeuraMeet leverages advanced Large Language Models (LLMs) to understand context, nuance, and domain-specific terminology. Our proprietary models are fine-tuned for conversational dynamics, ensuring high accuracy even with multiple speakers, technical jargon, or heavy accents.
+            </p>
+<ul class="space-y-4 font-body-md text-brand-muted">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-0.5" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span>Real-time processing with sub-500ms latency.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-0.5" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span>Customizable vocabulary for industry-specific terms.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary mt-0.5" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span>Continuous learning loop improves accuracy over time.</span>
+</li>
+</ul>
+</div>
+<div class="lg:w-1/2 w-full">
+<div class="glass-card rounded-xl p-8 border border-subtle h-80 flex flex-col justify-center items-center relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-3xl rounded-full"></div>
+<div class="text-center z-10">
+<div class="text-6xl font-bold text-white mb-2">+45%</div>
+<div class="font-headline-sm text-brand-muted">Meeting Efficiency</div>
+<div class="mt-6 w-full max-w-xs mx-auto h-2 bg-brand-surface rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[75%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Expanded Features/Infrastructure Grid -->
+<section class="max-w-7xl mx-auto px-6 md:px-12 py-24 border-t border-subtle">
+<div class="text-center mb-16">
+<h2 class="font-headline-md text-headline-md mb-4">Enterprise-grade infrastructure</h2>
+<p class="font-body-md text-brand-muted max-w-2xl mx-auto">Built to scale with your organization, securely and reliably.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="glass-card rounded-xl p-6 border border-subtle flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">shield</span>
+<div>
+<h4 class="font-headline-sm text-base mb-1">Enterprise Security</h4>
+<p class="font-body-md text-sm text-brand-muted">SOC2 Type II certified. Data encrypted at rest and in transit.</p>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">cloud_done</span>
+<div>
+<h4 class="font-headline-sm text-base mb-1">99.9% Uptime</h4>
+<p class="font-body-md text-sm text-brand-muted">High availability architecture backed by enterprise SLAs.</p>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">public</span>
+<div>
+<h4 class="font-headline-sm text-base mb-1">Global Edge Network</h4>
+<p class="font-body-md text-sm text-brand-muted">Low latency processing nodes deployed worldwide.</p>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">extension</span>
+<div>
+<h4 class="font-headline-sm text-base mb-1">Custom Integrations</h4>
+<p class="font-body-md text-sm text-brand-muted">Connect with Slack, Jira, Notion, and 50+ other tools.</p>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">code</span>
+<div>
+<h4 class="font-headline-sm text-base mb-1">Developer APIs</h4>
+<p class="font-body-md text-sm text-brand-muted">Comprehensive REST APIs and webhooks for custom workflows.</p>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border border-subtle flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">group</span>
+<div>
+<h4 class="font-headline-sm text-base mb-1">Team Management</h4>
+<p class="font-body-md text-sm text-brand-muted">Granular RBAC, SSO integration, and detailed audit logs.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Large Feature Deep-Dive -->
+<section class="max-w-7xl mx-auto px-6 md:px-12 py-24 border-t border-subtle">
+<div class="flex flex-col-reverse lg:flex-row items-center gap-16">
+<div class="lg:w-1/3">
+<h2 class="font-display-lg text-3xl font-bold mb-6">Your meeting history, categorized and searchable</h2>
+<p class="font-body-lg text-brand-muted mb-8">
+                Never lose context again. NeuraMeet automatically organizes all your meeting intelligence into a central, secure repository.
+            </p>
+<ul class="space-y-6">
+<li>
+<h4 class="font-headline-sm text-white mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-primary text-sm">search</span> Universal Search</h4>
+<p class="font-body-md text-brand-muted">Find specific decisions, quotes, or action items across thousands of hours of meetings instantly.</p>
+</li>
+<li>
+<h4 class="font-headline-sm text-white mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-primary text-sm">filter_list</span> Smart Filtering</h4>
+<p class="font-body-md text-brand-muted">Filter by date, participants, project tags, or meeting type (e.g., standup, client call).</p>
+</li>
+<li>
+<h4 class="font-headline-sm text-white mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-primary text-sm">insights</span> Instant Insights</h4>
+<p class="font-body-md text-brand-muted">Jump straight to the AI-generated summaries and decisions without watching the whole recording.</p>
+</li>
+</ul>
+</div>
+<div class="lg:w-2/3 w-full">
+<div class="glass-card rounded-xl p-2 relative">
+<div class="h-8 bg-[#161925] rounded-t-lg border-b border-white/5 flex items-center px-4 gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
+</div>
+<div class="bg-surface-container-lowest text-on-surface rounded-b-lg overflow-hidden shadow-lg border border-surface-variant">
+<!-- Dashboard Mockup (Visual reference to SCREEN_15) -->
+<div class="p-6">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xl font-bold text-gray-900">Meeting Intelligence</h3>
+<div class="flex gap-2">
+<div class="bg-gray-100 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm text-gray-600 border border-gray-200">
+<span class="material-symbols-outlined text-sm">search</span> Search meetings...
+                                </div>
+<div class="bg-gray-100 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm text-gray-600 border border-gray-200">
+<span class="material-symbols-outlined text-sm">filter_list</span> Filter
+                                </div>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Row 1 -->
+<div class="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:bg-gray-50">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 rounded bg-purple-100 flex items-center justify-center text-purple-600">
+<span class="material-symbols-outlined text-sm">event</span>
+</div>
+<span class="font-medium text-gray-800">Sprint Planning</span>
+</div>
+<div class="text-gray-500 text-sm">Jul 29, 2024</div>
+<div class="text-purple-600 text-sm font-medium flex items-center gap-1">Open Insights <span class="material-symbols-outlined text-xs">arrow_forward</span></div>
+</div>
+<!-- Row 2 -->
+<div class="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:bg-gray-50">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 rounded bg-blue-100 flex items-center justify-center text-blue-600">
+<span class="material-symbols-outlined text-sm">group</span>
+</div>
+<span class="font-medium text-gray-800">Client Discussion</span>
+</div>
+<div class="text-gray-500 text-sm">Jul 28, 2024</div>
+<div class="text-purple-600 text-sm font-medium flex items-center gap-1">Open Insights <span class="material-symbols-outlined text-xs">arrow_forward</span></div>
+</div>
+<!-- Row 3 -->
+<div class="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:bg-gray-50">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 rounded bg-orange-100 flex items-center justify-center text-orange-600">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+</div>
+<span class="font-medium text-gray-800">Weekly Standup</span>
+</div>
+<div class="text-gray-500 text-sm">Jul 26, 2024</div>
+<div class="text-purple-600 text-sm font-medium flex items-center gap-1">Open Insights <span class="material-symbols-outlined text-xs">arrow_forward</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Final CTA Band -->
+<section class="py-32 relative text-center border-t border-subtle overflow-hidden">
+<div class="glow-effect top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] opacity-10"></div>
+<div class="max-w-4xl mx-auto px-6 md:px-12 relative z-10">
+<h2 class="font-display-lg text-4xl md:text-5xl font-bold mb-6">Ready to revolutionize your meetings?</h2>
+<p class="font-body-lg text-brand-muted mb-10 max-w-2xl mx-auto">
+            Join thousands of teams who have already upgraded their meeting workflow. Start for free, upgrade when you need to.
+        </p>
+<a class="btn-primary inline-flex items-center justify-center gap-2 px-10 py-4 rounded-xl font-body-md font-bold text-lg" href="#">
+            Get Started Now
+        </a>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="border-t border-subtle bg-[#161925] pt-20 pb-10 px-6 md:px-12 relative z-10">
+<div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-8 mb-16">
+<div class="col-span-2">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span class="font-headline-md font-bold text-white tracking-tight">NeuraMeet</span>
+</div>
+<p class="font-body-md text-brand-muted max-w-sm mb-6">
+                AI-powered meeting intelligence for modern teams. Capture, analyze, and act on every conversation.
+            </p>
+<div class="flex gap-4">
+<a class="text-brand-muted hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined">share</span> <!-- Placeholder for Twitter -->
+</a>
+<a class="text-brand-muted hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined">code</span> <!-- Placeholder for GitHub -->
+</a>
+<a class="text-brand-muted hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined">work</span> <!-- Placeholder for LinkedIn -->
+</a>
+</div>
+</div>
+<div>
+<h4 class="font-headline-sm text-white mb-4">Product</h4>
+<ul class="space-y-3 font-body-md text-brand-muted">
+<li><a class="hover:text-white transition-colors" href="#">Features</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Integrations</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Pricing</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Changelog</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-headline-sm text-white mb-4">Resources</h4>
+<ul class="space-y-3 font-body-md text-brand-muted">
+<li><a class="hover:text-white transition-colors" href="#">Documentation</a></li>
+<li><a class="hover:text-white transition-colors" href="#">API Reference</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Blog</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Community</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-headline-sm text-white mb-4">Company</h4>
+<ul class="space-y-3 font-body-md text-brand-muted">
+<li><a class="hover:text-white transition-colors" href="#">About</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Careers</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Contact</a></li>
+<li><a class="hover:text-white transition-colors" href="#">Partners</a></li>
+</ul>
+</div>
+</div>
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-brand-muted font-body-md border-t border-subtle pt-8">
+<p>© 2024 NeuraMeet Inc. All rights reserved.</p>
+<div class="flex gap-6 mt-4 md:mt-0">
+<a class="hover:text-white transition-colors" href="#">Privacy Policy</a>
+<a class="hover:text-white transition-colors" href="#">Terms of Service</a>
+</div>
+</div>
+</footer>
+<script>
+        // Simple scroll effect for navbar
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 20) {
+                nav.classList.add('nav-scrolled');
+            } else {
+                nav.classList.remove('nav-scrolled');
+            }
+        });
+    </script>
+</body></html>

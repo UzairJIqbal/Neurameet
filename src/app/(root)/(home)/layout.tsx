@@ -16,12 +16,12 @@ export const metadata: Metadata = {
 
 const HomeLayout = ({ children }: Readonly<{ children: ReactNode }>) => {
     return (
-        <main className="relative">
+        <main className="relative flex flex-col h-full">
             <Navbar />
-            <section className="flex min-h-screen flex-1 flex-col px-3 pb-6 pt-20 sm:px-6 sm:pt-24 lg:px-10">
-                <div className="w-full">{children}</div>
+            <section className="flex-1 min-h-0 flex flex-col px-3 pb-6 pt-20 sm:px-6 sm:pt-24 lg:px-10 overflow-hidden">
+                <div className="w-full flex-1 min-h-0">{children}</div>
             </section>
-        </main >
+        </main>
     )
 }
 

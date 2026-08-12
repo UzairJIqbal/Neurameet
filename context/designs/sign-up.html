@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sign Up - NeuraMeet</title>
+<!-- Google Fonts: Hanken Grotesk & JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&amp;family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#faf8ff",
+                    "secondary-fixed": "#dee0ff",
+                    "primary-fixed-dim": "#d7baff",
+                    "secondary-fixed-dim": "#bbc3fd",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed-variant": "#6100bd",
+                    "on-tertiary-fixed": "#331200",
+                    "surface-container": "#ebedfe",
+                    "on-tertiary-fixed-variant": "#763300",
+                    "surface-container-low": "#f3f2ff",
+                    "on-tertiary-container": "#ffd4bf",
+                    "surface-variant": "#e0e1f3",
+                    "on-primary-fixed": "#280056",
+                    "on-secondary": "#ffffff",
+                    "surface-tint": "#8000f6",
+                    "surface": "#faf8ff",
+                    "tertiary-fixed": "#ffdbca",
+                    "secondary-container": "#bbc3fd",
+                    "surface-dim": "#d7d9ea",
+                    "primary-fixed": "#eddcff",
+                    "on-background": "#181b27",
+                    "outline": "#7d7388",
+                    "on-secondary-container": "#464f81",
+                    "outline-variant": "#cec2d9",
+                    "background": "#faf8ff",
+                    "on-primary-container": "#e9d5ff",
+                    "surface-container-highest": "#e0e1f3",
+                    "surface-container-lowest": "#ffffff",
+                    "tertiary": "#7b3500",
+                    "secondary": "#525b8e",
+                    "tertiary-container": "#a04700",
+                    "on-surface": "#181b27",
+                    "on-secondary-fixed-variant": "#3a4375",
+                    "primary-container": "#830ef9",
+                    "surface-container-high": "#e6e7f8",
+                    "on-secondary-fixed": "#0d1647",
+                    "on-tertiary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "inverse-on-surface": "#eff0ff",
+                    "primary": "#6500c4",
+                    "error": "#ba1a1a",
+                    "tertiary-fixed-dim": "#ffb68e",
+                    "on-error": "#ffffff",
+                    "inverse-primary": "#d7baff",
+                    "inverse-surface": "#2d303d",
+                    "error-container": "#ffdad6",
+                    "on-surface-variant": "#4c4356"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "md": "16px",
+                    "gutter": "24px",
+                    "xl": "32px",
+                    "sm": "12px",
+                    "lg": "24px",
+                    "container-margin": "40px",
+                    "xs": "8px"
+            },
+            "fontFamily": {
+                    "headline-md": [
+                            "Hanken Grotesk"
+                    ],
+                    "label-caps": [
+                            "Hanken Grotesk"
+                    ],
+                    "label-mono": [
+                            "JetBrains Mono"
+                    ],
+                    "display-lg": [
+                            "Hanken Grotesk"
+                    ],
+                    "body-lg": [
+                            "Hanken Grotesk"
+                    ],
+                    "display-lg-mobile": [
+                            "Hanken Grotesk"
+                    ],
+                    "headline-sm": [
+                            "Hanken Grotesk"
+                    ],
+                    "body-md": [
+                            "Hanken Grotesk"
+                    ]
+            },
+            "fontSize": {
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-mono": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.02em",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "display-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "display-lg-mobile": [
+                            "26px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-sm": [
+                            "20px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+</head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col md:flex-row font-body-lg">
+<!-- Left Panel: Sign Up Form (40% width on desktop) -->
+<main class="w-full md:w-[40%] flex flex-col justify-between min-h-screen bg-surface-container-lowest px-lg py-xl md:px-container-margin md:py-container-margin relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.04)]">
+<!-- Logo Header -->
+<header>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[28px] text-primary" style="font-variation-settings: 'FILL' 1;">
+                    neurology
+                </span>
+<span class="font-headline-md text-headline-md font-black text-primary">
+                    NeuraMeet
+                </span>
+</div>
+</header>
+<!-- Form Content -->
+<div class="flex-1 flex flex-col justify-center max-w-md w-full mx-auto my-xl">
+<h1 class="font-display-lg text-display-lg text-on-surface mb-base hidden md:block">Get Started</h1>
+<h1 class="font-display-lg-mobile text-display-lg-mobile text-on-surface mb-base md:hidden">Get Started</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-xl">Create your account to start optimizing meetings.</p>
+<form action="#" class="space-y-md" method="POST">
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface block uppercase tracking-wider" for="fullName">Full Name</label>
+<input class="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-md py-sm font-body-md text-body-md text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 transition-all duration-200" id="fullName" name="fullName" placeholder="Jane Doe" required="" type="text"/>
+</div>
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface block uppercase tracking-wider" for="email">Email Address</label>
+<input class="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-md py-sm font-body-md text-body-md text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 transition-all duration-200" id="email" name="email" placeholder="jane@company.com" required="" type="email"/>
+</div>
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface block uppercase tracking-wider" for="password">Password</label>
+<input class="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-md py-sm font-body-md text-body-md text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 transition-all duration-200" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+</div>
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface block uppercase tracking-wider" for="confirmPassword">Confirm Password</label>
+<input class="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-md py-sm font-body-md text-body-md text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 transition-all duration-200" id="confirmPassword" name="confirmPassword" placeholder="••••••••" required="" type="password"/>
+</div>
+<button class="w-full bg-primary-container text-on-primary rounded-lg py-sm font-headline-sm text-headline-sm mt-lg flex justify-center items-center gap-xs hover:bg-surface-tint hover:shadow-[0_4px_14px_rgba(131,14,249,0.25)] transition-all duration-200 transform hover:scale-[1.01] active:scale-95" type="submit">
+                    Create Account
+                    <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</form>
+<p class="text-center mt-xl font-body-md text-body-md text-on-surface-variant">
+                Already have an account? 
+                <a class="text-primary-container font-semibold hover:underline underline-offset-4 transition-all" href="#">Sign in</a>
+</p>
+</div>
+<!-- Empty footer area for spacing balance -->
+<div class="text-center font-label-caps text-label-caps text-outline">
+            © 2024 NeuraMeet AI
+        </div>
+</main>
+<!-- Right Panel: Testimonial/Brand (60% width on desktop) -->
+<aside class="hidden md:flex md:w-[60%] bg-on-background relative overflow-hidden flex-col justify-center items-center px-container-margin xl:px-32">
+<!-- Abstract Background Elements -->
+<div class="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-inverse-surface/40 to-transparent pointer-events-none"></div>
+<div class="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] rounded-full bg-primary-container/5 blur-[120px] pointer-events-none"></div>
+<div class="absolute -bottom-[20%] -left-[10%] w-[500px] h-[500px] rounded-full bg-secondary-fixed/5 blur-[100px] pointer-events-none"></div>
+<!-- Decorative Quote Icon -->
+<div class="absolute top-32 left-32 opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-[120px] text-surface-container" style="font-variation-settings: 'FILL' 1;">
+                format_quote
+            </span>
+</div>
+<!-- Testimonial Content -->
+<div class="relative z-10 max-w-2xl text-center space-y-xl">
+<h2 class="font-display-lg text-display-lg text-on-primary leading-tight">
+                "The automated action items are incredibly accurate. It feels like having a dedicated project manager in every call."
+            </h2>
+<div class="flex flex-col items-center gap-sm pt-md">
+<div class="w-16 h-16 rounded-full border-2 border-primary-container p-[2px]">
+<img class="w-full h-full rounded-full object-cover" data-alt="A professional headshot of a confident male executive in his early 40s. He has a warm smile and is wearing a modern, well-tailored navy blue blazer over a crisp white shirt. The background is a slightly blurred, high-end corporate office environment with cool, modern lighting that perfectly complements the sleek SaaS aesthetic of the interface. The image is bright, high-contrast, and exudes intelligence and reliability, fitting for a VP of Engineering." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1oLTOHTOXFnsez_UXTrta583MyRIZCCYynwRq6buRvk2DsH9YeOKT2vehnTNHn0Vw8aISEMfhIfX6k2-ri5w5YZzJhXdSiKs2vOMAvs9KkVf7KBl8XAIhzXmeZji_fXqvpFWiwpNzt-Fi-iyS9u61i4in8UcVQcvtKb4drzvyaAdAMYr36M6HV_xzKLx6TWgtmiK_JKqE0WAzRXBn8MhWVXRUGrzkaHUuY8jcjoSoDj8hMyioQ9Z0pQ"/>
+</div>
+<div>
+<div class="font-headline-sm text-headline-sm text-on-primary">David Chen</div>
+<div class="font-body-md text-body-md text-secondary-fixed-dim uppercase tracking-wider text-[11px] mt-1">VP Engineering at ScaleUp</div>
+</div>
+</div>
+</div>
+<!-- Subtle Grid Pattern Overlay -->
+<div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] pointer-events-none" style="mask-image: radial-gradient(circle at center, black, transparent 80%); -webkit-mask-image: radial-gradient(circle at center, black, transparent 80%);"></div>
+</aside>
+</body></html>

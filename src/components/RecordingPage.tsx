@@ -20,7 +20,7 @@ const RecordingPage = () => {
 		{ text: "No" },
 		{ text: "recordings" },
 		{ text: "are" },
-		{ text: "Available.", className: "text-blue-500 dark:text-blue-500" },
+		{ text: "Available.", className: "text-blue-1 dark:text-blue-1" },
 	];
 
 	// ✅ Fetch recordings from server-side API (uses Node SDK with secret key)
@@ -105,7 +105,7 @@ const RecordingPage = () => {
 									{recording?.filename?.substring(0, 30) || "No title"}
 								</CardItem>
 
-								<CardItem className="text-slate-200 text-sm mt-2 dark:text-neutral-300">
+								<CardItem className="text-sky-1 text-sm mt-2 dark:text-neutral-300">
 									{recording?.start_time
 										? new Date(recording.start_time).toLocaleString()
 										: "No date available"}

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meeting Details - Action Items</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    fontFamily: {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "headline-sm": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
+                        "label-mono": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }],
+                        "display-lg-mobile": ["26px", { lineHeight: "32px", fontWeight: "700" }],
+                        "headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-inverse-surface dark:bg-on-surface text-on-surface-variant fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 shadow-xl py-lg transition-all duration-300 transform md:translate-x-0 -translate-x-full" id="mobile-sidebar">
+<div class="px-lg mb-8 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[20px]" data-icon="hub">hub</span>
+</div>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-primary tracking-tight">NeuraMeet</h1>
+<p class="text-label-caps font-label-caps text-on-surface-variant">AI Intelligence</p>
+</div>
+</div>
+<button class="md:hidden text-on-surface-variant hover:text-on-primary" onclick="document.getElementById('mobile-sidebar').classList.toggle('-translate-x-full')">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto px-xs flex flex-col gap-1">
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-colors duration-200 rounded-lg hover:bg-on-secondary-fixed-variant/50" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-label-sm font-label-sm">Dashboard</span>
+</a>
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all rounded-r-lg translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="text-label-sm font-label-sm font-semibold">Meeting Intelligence</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-colors duration-200 rounded-lg hover:bg-on-secondary-fixed-variant/50" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="text-label-sm font-label-sm">AI Chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-colors duration-200 rounded-lg hover:bg-on-secondary-fixed-variant/50" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="text-label-sm font-label-sm">Recordings</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-colors duration-200 rounded-lg hover:bg-on-secondary-fixed-variant/50" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="text-label-sm font-label-sm">Follow-ups</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-colors duration-200 rounded-lg hover:bg-on-secondary-fixed-variant/50" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-label-sm font-label-sm">Settings</span>
+</a>
+</div>
+<div class="mt-auto px-lg pt-4 border-t border-on-surface-variant/20">
+<div class="flex items-center gap-3 hover:bg-on-secondary-fixed-variant/50 p-2 rounded-lg cursor-pointer transition-colors">
+<img alt="Waqas Ahmad" class="w-10 h-10 rounded-full object-cover border border-surface-variant" data-alt="A professional headshot of a corporate executive in a modern, well-lit office setting, conveying trust and intelligence. The lighting is soft and natural, emphasizing a clean, modern aesthetic with a color palette leaning towards cool blues and crisp whites. High-quality corporate portrait style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnyG_z3FWJEmIFN1wD_lgDsapOVJZ3NryWWVaZihA9CMr6ZTsR6y6EY6UzCN2JDakD5nDb_BvlPbqRRKIiocH-nMnHAAq97v1yjthXP1xtbG9EaNF39FMsd85yHseJdHgB1SRQ8zLcYLbDCIZdoiPOSVFH3XrdOoUbphL_2rzyZR2DLNGbQzflfL-JzrpK-3ITyNwQErdscKgYTnkgGwbqa2MemI5a1Mg4Jm2dX_Z0EPziByllDzlctw"/>
+<div class="flex-1 min-w-0">
+<p class="text-label-sm font-label-sm font-semibold text-on-primary truncate">Waqas Ahmad</p>
+<p class="text-label-caps font-label-caps text-on-surface-variant truncate">waqas@example.com</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col md:ml-[260px] h-full overflow-hidden">
+<!-- TopAppBar (Simplified for Context) -->
+<header class="bg-surface border-b border-surface-variant px-lg py-md flex items-center justify-between shrink-0">
+<div class="flex items-center gap-4">
+<button class="md:hidden text-on-surface" onclick="document.getElementById('mobile-sidebar').classList.toggle('-translate-x-full')">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform">arrow_back</span>
+<span class="text-label-sm font-label-sm">Back to Overview</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-lg hover:bg-surface-container-low flex items-center justify-center text-on-surface-variant transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border border-surface"></span>
+</button>
+</div>
+</header>
+<!-- Meeting Details Canvas -->
+<div class="flex-1 overflow-y-auto p-lg bg-background">
+<div class="max-w-7xl mx-auto space-y-lg">
+<!-- Meeting Header Context -->
+<div class="bg-surface-container-lowest rounded-xl p-lg border border-surface-variant shadow-sm flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h2 class="text-display-lg md:text-display-lg font-display-lg text-on-surface mb-2">Sprint Planning</h2>
+<div class="flex flex-wrap items-center gap-4 text-body-md font-body-md text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">calendar_today</span> Jul 29, 2024</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> 52 min</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">group</span> 6 Participants</span>
+<span class="bg-secondary-container/20 text-secondary px-2 py-1 rounded-full text-label-caps font-label-caps flex items-center gap-1 border border-secondary-container">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> AI Analysis Complete
+                            </span>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="bg-primary-container hover:bg-on-primary-fixed-variant text-on-primary px-4 py-2 rounded-lg text-label-sm font-label-sm transition-colors flex items-center gap-2 font-semibold shadow-sm">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span> Ask AI About This Meeting
+                        </button>
+<button class="w-10 h-10 border border-surface-variant rounded-lg flex items-center justify-center hover:bg-surface-container-low text-on-surface transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<div class="flex items-center gap-8 border-b border-surface-variant px-4">
+<a class="text-on-surface-variant hover:text-on-surface py-3 text-label-sm font-label-sm transition-colors" href="#">Overview</a>
+<a class="text-on-surface-variant hover:text-on-surface py-3 text-label-sm font-label-sm transition-colors" href="#">Summary</a>
+<a class="text-primary border-b-2 border-primary py-3 text-label-sm font-label-sm font-bold scale-95 origin-bottom transition-all" href="#">Action Items</a>
+<a class="text-on-surface-variant hover:text-on-surface py-3 text-label-sm font-label-sm transition-colors" href="#">Recording</a>
+<a class="text-on-surface-variant hover:text-on-surface py-3 text-label-sm font-label-sm transition-colors" href="#">Category</a>
+</div>
+<!-- Action Items Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-lg">
+<!-- Left Column: Action Items Checklist -->
+<div class="lg:col-span-7 bg-surface-container-lowest rounded-xl border border-surface-variant shadow-sm p-lg">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-headline-sm font-headline-sm text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">task_alt</span> Action Items
+                            </h3>
+<span class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full text-label-caps font-label-caps border border-surface-variant">3 Items</span>
+</div>
+<div class="space-y-4">
+<!-- Item 1 -->
+<div class="group flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container-low transition-colors border border-transparent hover:border-surface-variant">
+<label class="flex items-center mt-1 cursor-pointer">
+<input class="w-5 h-5 rounded border-outline text-primary focus:ring-primary focus:ring-offset-0 bg-surface" type="checkbox"/>
+</label>
+<div class="flex-1">
+<p class="text-body-md font-body-md text-on-surface font-medium mb-1">Complete API Integration</p>
+<div class="flex items-center gap-4 text-label-sm font-label-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<div class="w-5 h-5 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container text-[10px] font-bold">AH</div>
+<span>Ali Hassan</span>
+</div>
+</div>
+</div>
+<div class="shrink-0 pt-1">
+<span class="bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/30 px-2.5 py-1 rounded-md text-label-caps font-label-caps flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Due Aug 5
+                                    </span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="group flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container-low transition-colors border border-transparent hover:border-surface-variant">
+<label class="flex items-center mt-1 cursor-pointer">
+<input class="w-5 h-5 rounded border-outline text-primary focus:ring-primary focus:ring-offset-0 bg-surface" type="checkbox"/>
+</label>
+<div class="flex-1">
+<p class="text-body-md font-body-md text-on-surface font-medium mb-1">Prepare Client Demo</p>
+<div class="flex items-center gap-4 text-label-sm font-label-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<div class="w-5 h-5 rounded-full bg-surface-tint/20 text-surface-tint flex items-center justify-center text-[10px] font-bold">SK</div>
+<span>Sara Khan</span>
+</div>
+</div>
+</div>
+<div class="shrink-0 pt-1">
+<span class="bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/30 px-2.5 py-1 rounded-md text-label-caps font-label-caps flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Due Aug 7
+                                    </span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="group flex items-start gap-4 p-4 rounded-lg hover:bg-surface-container-low transition-colors border border-transparent hover:border-surface-variant">
+<label class="flex items-center mt-1 cursor-pointer">
+<input class="w-5 h-5 rounded border-outline text-primary focus:ring-primary focus:ring-offset-0 bg-surface" type="checkbox"/>
+</label>
+<div class="flex-1">
+<p class="text-body-md font-body-md text-on-surface font-medium mb-1">Design Authentication Flow</p>
+<div class="flex items-center gap-4 text-label-sm font-label-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<div class="w-5 h-5 rounded-full bg-on-secondary-fixed/20 text-on-secondary-fixed flex items-center justify-center text-[10px] font-bold">UT</div>
+<span>Usman Tariq</span>
+</div>
+</div>
+</div>
+<div class="shrink-0 pt-1">
+<span class="bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/30 px-2.5 py-1 rounded-md text-label-caps font-label-caps flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Due Aug 3
+                                    </span>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-surface-variant">
+<h4 class="text-body-md font-body-md font-bold text-on-surface mb-4">Key Points Discussed</h4>
+<ul class="space-y-2 text-body-md font-body-md text-on-surface-variant list-disc pl-5">
+<li>Discussed sprint goals and deliverables</li>
+<li>API integration approach finalized</li>
+<li>User authentication flow decided</li>
+<li>Testing strategy defined</li>
+<li>Deployment timeline set</li>
+</ul>
+</div>
+</div>
+<!-- Right Column: Decisions -->
+<div class="lg:col-span-5 space-y-lg">
+<div class="bg-surface-container-lowest rounded-xl border border-surface-variant shadow-sm p-lg">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-headline-sm font-headline-sm text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">fact_check</span> Decisions
+                                </h3>
+</div>
+<ul class="space-y-4">
+<li class="flex items-start gap-3 p-3 bg-surface-container-low rounded-lg border border-surface-variant/50">
+<span class="material-symbols-outlined text-secondary mt-0.5">check_circle</span>
+<p class="text-body-md font-body-md text-on-surface">OAuth flow will be implemented for authentication.</p>
+</li>
+<li class="flex items-start gap-3 p-3 bg-surface-container-low rounded-lg border border-surface-variant/50">
+<span class="material-symbols-outlined text-secondary mt-0.5">check_circle</span>
+<p class="text-body-md font-body-md text-on-surface">Deployment scheduled for Friday evening.</p>
+</li>
+<li class="flex items-start gap-3 p-3 bg-surface-container-low rounded-lg border border-surface-variant/50">
+<span class="material-symbols-outlined text-secondary mt-0.5">check_circle</span>
+<p class="text-body-md font-body-md text-on-surface">Sprint duration set to strictly 3 weeks.</p>
+</li>
+</ul>
+</div>
+<!-- Mini Insights Card -->
+<div class="bg-primary-fixed/30 rounded-xl border border-primary/10 shadow-sm p-lg relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+<h4 class="text-body-md font-body-md font-bold text-on-primary-fixed flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-[18px]">lightbulb</span> AI Suggestion
+                             </h4>
+<p class="text-label-sm font-label-sm text-on-surface-variant">Based on the discussion, consider scheduling a brief follow-up sync specifically for the 'Design Authentication Flow' as it had the most back-and-forth dialogue.</p>
+<button class="mt-4 text-primary text-label-sm font-label-sm font-semibold hover:underline flex items-center gap-1">
+                                 Draft Follow-up Invite <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

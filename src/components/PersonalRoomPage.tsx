@@ -11,7 +11,7 @@ import toast from "react-hot-toast";
 
 const Table = ({ title, description }: { title: string, description: string }) => {
     return <div className="rounded-lg bg-dark-3 p-4">
-        <h1 className="text-sm font-semibold text-slate-300 sm:text-base">{title}</h1>
+        <h1 className="text-sm font-semibold text-sky-1 sm:text-base">{title}</h1>
         <p className="mt-2 break-all text-sm text-white sm:text-base">{description}</p>
     </div >
 }

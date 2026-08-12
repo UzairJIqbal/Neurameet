@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NeuraMeet - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; background-color: #faf8ff; }
+        .card-shadow { box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.04); }
+    </style>
+</head>
+<body class="text-on-background flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 bg-inverse-surface shadow-xl py-lg">
+<div class="px-lg mb-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container text-display-lg" data-icon="hub">hub</span>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</h1>
+<p class="text-label-sm font-label-caps text-on-surface-variant uppercase tracking-wider">AI Intelligence</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2 px-sm">
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all rounded-r-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-label-sm font-label-caps">Dashboard</span>
+</a>
+<a class="text-outline hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="text-label-sm font-label-caps">Meeting Intelligence</span>
+</a>
+<a class="text-outline hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="text-label-sm font-label-caps">AI Chat</span>
+</a>
+<a class="text-outline hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="text-label-sm font-label-caps">Recordings</span>
+</a>
+<a class="text-outline hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="text-label-sm font-label-caps">Follow-ups</span>
+</a>
+<a class="text-outline hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-label-sm font-label-caps">Settings</span>
+</a>
+</nav>
+<div class="mt-auto px-sm">
+<div class="text-outline hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all cursor-pointer rounded-lg hover:bg-on-secondary-fixed-variant/50">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="A small circular avatar placeholder image showing a professional headshot in a bright, modern corporate setting, suitable for a light-mode SaaS application profile picture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAz7YGfQ6nS_72f7oF923nciZzduI-ZJwJaB1paSta10Z7IDskkQfVID6xtDEgPENf3hUHEzOo01wcGhBfxdl0O7wMNybfVD8mk7YNoaLKnPORue3qM2FL14DiuZOIo1p-gbTu-QkWI8Fz2Eqh4o2h4Xw5Mp5q2p3nKYhemniTIAKcSV-W8aKrw9Jjf1DMeDCQTFz0xosTzs4MMqNBXWZnpsaypMGvDITkOlQYXpNFPMgf3RhhW1BeX5g"/>
+<div>
+<p class="text-label-sm font-label-caps text-on-primary">Waqas Ahmad</p>
+<p class="text-[10px] text-outline">waqas@example.com</p>
+</div>
+<span class="material-symbols-outlined ml-auto text-sm" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-[260px] flex-1 flex flex-col">
+<!-- TopAppBar (Simplified for Dashboard) -->
+<header class="flex justify-between items-center px-lg py-md bg-surface z-30 sticky top-0">
+<div>
+<h2 class="text-display-lg font-display-lg text-on-surface">Good Morning, Waqas! 👋</h2>
+<p class="text-body-md font-body-md text-on-surface-variant mt-1">You have 2 meetings today and 1 follow-up.</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm" data-icon="search">search</span>
+<input class="pl-9 pr-4 py-2 bg-surface-container-low border border-surface-variant rounded-full text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none w-64 transition-all" placeholder="Search anything..." type="text"/>
+</div>
+<button class="bg-primary-container hover:bg-on-primary-fixed-variant text-on-primary px-4 py-2 rounded-lg text-label-sm font-label-caps flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="auto_awesome">auto_awesome</span>
+                    Ask NeuraMeet AI
+                </button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+</div>
+</header>
+<div class="p-lg grid grid-cols-12 gap-gutter flex-1 overflow-y-auto">
+<!-- Quick Actions -->
+<div class="col-span-12">
+<h3 class="text-headline-sm font-headline-sm text-on-surface mb-4">Quick Actions</h3>
+<div class="grid grid-cols-4 gap-md">
+<button class="bg-surface-container-lowest border border-surface-variant rounded-xl p-md flex flex-col items-center justify-center gap-2 hover:border-primary-container hover:shadow-md transition-all card-shadow group">
+<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center group-hover:bg-primary-container/20 transition-colors">
+<span class="material-symbols-outlined text-primary-container" data-icon="add">add</span>
+</div>
+<span class="text-body-md font-bold text-on-surface">New Meeting</span>
+<span class="text-xs text-on-surface-variant">Create a new meeting</span>
+</button>
+<button class="bg-surface-container-lowest border border-surface-variant rounded-xl p-md flex flex-col items-center justify-center gap-2 hover:border-primary-container hover:shadow-md transition-all card-shadow group">
+<div class="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center group-hover:bg-secondary-container/50 transition-colors">
+<span class="material-symbols-outlined text-secondary" data-icon="videocam">videocam</span>
+</div>
+<span class="text-body-md font-bold text-on-surface">Join Meeting</span>
+<span class="text-xs text-on-surface-variant">Join with a code</span>
+</button>
+<button class="bg-surface-container-lowest border border-surface-variant rounded-xl p-md flex flex-col items-center justify-center gap-2 hover:border-primary-container hover:shadow-md transition-all card-shadow group">
+<div class="w-12 h-12 rounded-full bg-tertiary-fixed/50 flex items-center justify-center group-hover:bg-tertiary-fixed transition-colors">
+<span class="material-symbols-outlined text-tertiary" data-icon="upload_file">upload_file</span>
+</div>
+<span class="text-body-md font-bold text-on-surface">Upload Transcript</span>
+<span class="text-xs text-on-surface-variant">Analyze transcript</span>
+</button>
+<button class="bg-surface-container-lowest border border-surface-variant rounded-xl p-md flex flex-col items-center justify-center gap-2 hover:border-primary-container hover:shadow-md transition-all card-shadow group">
+<div class="w-12 h-12 rounded-full bg-primary-fixed-dim/30 flex items-center justify-center group-hover:bg-primary-fixed-dim/50 transition-colors">
+<span class="material-symbols-outlined text-primary" data-icon="psychology">psychology</span>
+</div>
+<span class="text-body-md font-bold text-on-surface">Ask AI</span>
+<span class="text-xs text-on-surface-variant">Chat with AI</span>
+</button>
+</div>
+</div>
+<!-- Meeting Intelligence -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<h3 class="text-headline-sm font-headline-sm text-on-surface">Meeting Intelligence</h3>
+<a class="text-primary-container text-body-md flex items-center gap-1 hover:underline" href="#">View All <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span></a>
+</div>
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl card-shadow overflow-hidden flex-1">
+<div class="grid grid-cols-12 px-lg py-3 border-b border-surface-variant bg-surface-container-low text-label-caps text-on-surface-variant uppercase tracking-wider">
+<div class="col-span-6">Meeting Title</div>
+<div class="col-span-3">Date</div>
+<div class="col-span-3 text-right">Action</div>
+</div>
+<div class="divide-y divide-surface-variant">
+<div class="grid grid-cols-12 px-lg py-4 items-center hover:bg-surface-container-low/50 transition-colors">
+<div class="col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-sm" data-icon="event">event</span>
+</div>
+<span class="text-body-md font-bold text-on-surface">Sprint Planning</span>
+</div>
+<div class="col-span-3 text-body-md text-on-surface-variant">Jul 29, 2024</div>
+<div class="col-span-3 text-right">
+<button class="text-primary-container text-sm font-medium border border-primary-container/30 px-3 py-1.5 rounded-lg hover:bg-primary-container/5 transition-colors">Open Insights</button>
+</div>
+</div>
+<div class="grid grid-cols-12 px-lg py-4 items-center hover:bg-surface-container-low/50 transition-colors">
+<div class="col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-secondary-container/30 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="group">group</span>
+</div>
+<span class="text-body-md font-bold text-on-surface">Client Discussion</span>
+</div>
+<div class="col-span-3 text-body-md text-on-surface-variant">Jul 28, 2024</div>
+<div class="col-span-3 text-right">
+<button class="text-primary-container text-sm font-medium border border-primary-container/30 px-3 py-1.5 rounded-lg hover:bg-primary-container/5 transition-colors">Open Insights</button>
+</div>
+</div>
+<div class="grid grid-cols-12 px-lg py-4 items-center hover:bg-surface-container-low/50 transition-colors">
+<div class="col-span-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-tertiary-fixed/50 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="calendar_today">calendar_today</span>
+</div>
+<span class="text-body-md font-bold text-on-surface">Weekly Standup</span>
+</div>
+<div class="col-span-3 text-body-md text-on-surface-variant">Jul 26, 2024</div>
+<div class="col-span-3 text-right">
+<button class="text-primary-container text-sm font-medium border border-primary-container/30 px-3 py-1.5 rounded-lg hover:bg-primary-container/5 transition-colors">Open Insights</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Meeting Follow-ups -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<h3 class="text-headline-sm font-headline-sm text-on-surface">Meeting Follow-ups</h3>
+<a class="text-primary-container text-body-md flex items-center gap-1 hover:underline" href="#">View All <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span></a>
+</div>
+<div class="flex flex-col gap-3">
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-4 card-shadow flex gap-4 items-start">
+<div class="w-10 h-10 rounded bg-error-container text-on-error-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined" data-icon="warning">warning</span>
+</div>
+<div class="flex-1">
+<h4 class="text-body-md font-bold text-on-surface">API integration is due in 2 days</h4>
+<p class="text-xs text-on-surface-variant mt-1">From Sprint Planning</p>
+<div class="mt-3 flex justify-end">
+<button class="text-primary-container text-xs font-medium hover:underline flex items-center gap-1">View Task <span class="material-symbols-outlined text-[10px]" data-icon="arrow_forward">arrow_forward</span></button>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-4 card-shadow flex gap-4 items-start">
+<div class="w-10 h-10 rounded bg-secondary-container/50 text-on-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+</div>
+<div class="flex-1">
+<h4 class="text-body-md font-bold text-on-surface">2 action items need assignee</h4>
+<p class="text-xs text-on-surface-variant mt-1">From Client Discussion</p>
+<div class="mt-3 flex justify-end">
+<button class="text-primary-container text-xs font-medium hover:underline flex items-center gap-1">Review <span class="material-symbols-outlined text-[10px]" data-icon="arrow_forward">arrow_forward</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

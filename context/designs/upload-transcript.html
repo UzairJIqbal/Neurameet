@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NeuraMeet - Upload Transcript</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    fontFamily: {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "headline-sm": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
+                        "label-mono": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }],
+                        "display-lg-mobile": ["26px", { lineHeight: "32px", fontWeight: "700" }],
+                        "headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased flex">
+<!-- SideNavBar (Shared Component) -->
+<nav class="fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 bg-inverse-surface shadow-xl py-lg">
+<!-- Brand -->
+<div class="px-lg pb-md flex items-center gap-3">
+<span class="material-symbols-outlined text-on-primary text-[32px]">hub</span>
+<div class="flex flex-col">
+<span class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</span>
+<span class="text-label-sm font-label-sm text-outline-variant">AI Intelligence</span>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<div class="flex-1 mt-md flex flex-col gap-1">
+<!-- Active Tab Intent Logic: The user is uploading a transcript. This is closest to "Dashboard" actions or "Meeting Intelligence". Since it's a utility action often launched from Dashboard, we will keep Dashboard active, or it could be an independent flow where no nav is active. The prompt says "Minimalist utility screen". We will highlight Dashboard as the entry point. -->
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-label-sm font-label-sm">Dashboard</span>
+</a>
+<a class="text-outline-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="text-label-sm font-label-sm">Meeting Intelligence</span>
+</a>
+<a class="text-outline-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="text-label-sm font-label-sm">AI Chat</span>
+</a>
+<a class="text-outline-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="text-label-sm font-label-sm">Recordings</span>
+</a>
+<a class="text-outline-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-label-sm font-label-sm">Follow-ups</span>
+</a>
+<a class="text-outline-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-sm font-label-sm">Settings</span>
+</a>
+</div>
+<!-- Footer -->
+<div class="px-lg pt-md mt-auto border-t border-outline/20">
+<div class="flex items-center gap-3 cursor-pointer hover:bg-on-secondary-fixed-variant/50 p-2 rounded-lg transition-colors duration-200">
+<span class="material-symbols-outlined text-outline-variant text-[32px]">account_circle</span>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-on-primary">Waqas Ahmad</span>
+<span class="text-label-mono font-label-mono text-outline-variant text-xs">waqas@example.com</span>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-[260px] flex-1 min-h-screen flex flex-col bg-background">
+<!-- Header (Contextual back to dashboard) -->
+<header class="flex items-center p-lg h-[80px]">
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+<span class="text-label-sm font-label-sm">Back to Dashboard</span>
+</a>
+</header>
+<!-- Canvas -->
+<div class="flex-1 flex flex-col items-center justify-center p-lg">
+<div class="w-full max-w-2xl bg-surface-container-lowest rounded-xl border border-surface-variant shadow-[0px_4px_20px_rgba(0,0,0,0.04)] p-xl flex flex-col items-center text-center">
+<h1 class="text-display-lg font-display-lg text-on-surface mb-xs">Upload Transcript</h1>
+<p class="text-body-lg font-body-lg text-on-surface-variant mb-xl">Upload your meeting transcript to generate AI insights.</p>
+<!-- Drag and Drop Zone -->
+<div class="w-full border-2 border-dashed border-outline-variant rounded-xl p-xl flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer group mb-xl h-[240px]">
+<div class="w-[64px] h-[64px] rounded-full bg-surface-container-highest flex items-center justify-center mb-md group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[32px] text-primary">upload</span>
+</div>
+<span class="text-headline-sm font-headline-sm text-on-surface mb-xs">Drag and drop file here</span>
+<span class="text-body-md font-body-md text-on-surface-variant mb-sm">or click to browse</span>
+<span class="text-label-mono font-label-mono text-outline">Supports: .txt, .docx, .pdf</span>
+</div>
+<!-- Action Button -->
+<button class="bg-primary-container text-on-primary px-xl py-3 rounded-lg text-label-sm font-label-sm font-bold hover:bg-primary transition-colors shadow-sm w-full max-w-[280px]">
+                    Upload &amp; Analyze
+                </button>
+</div>
+</div>
+</main>
+</body></html>

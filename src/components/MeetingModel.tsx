@@ -129,7 +129,7 @@ const MeetingModel = ({ type, onClose, }: { type: MeetingType, onClose: () => vo
                         {
                             callDetails && type === 'isScheduleMeeting' && "Meeting"
                         }
-                        <span className="px-1 py-0.5 rounded-md bg-gray-500 dark:bg-neutral-800 dark:border-neutral-700 border border-gray-100">
+                        <span className="px-1 py-0.5 rounded-md bg-dark-3 dark:bg-neutral-800 dark:border-neutral-700 border border-sky-2">
                             {type === 'isInstantMeeting' ? "NOW"
                                 : type === 'isJoinMeeting' ? "LINK"
                                     : ''}
@@ -159,7 +159,7 @@ const MeetingModel = ({ type, onClose, }: { type: MeetingType, onClose: () => vo
                                         rotate: 0,
                                         zIndex: 100,
                                     }}
-                                    className="mt-2 shrink-0 overflow-hidden rounded-lg border border-neutral-100 bg-white p-1 dark:border-neutral-700 dark:bg-neutral-800 sm:-mr-4 sm:mt-4 sm:rounded-xl"
+                                    className="mt-2 shrink-0 overflow-hidden rounded-lg border border-sky-2 bg-surface p-1 dark:border-neutral-700 dark:bg-neutral-800 sm:-mr-4 sm:mt-4 sm:rounded-xl"
                                 >
                                     <Image
                                         src={image}
@@ -174,7 +174,7 @@ const MeetingModel = ({ type, onClose, }: { type: MeetingType, onClose: () => vo
                     }
                     {
                         type === "isJoinMeeting" &&
-                        <div className="mt-8 flex w-full flex-col items-center justify-center text-black sm:mt-12">
+                        <div className="mt-8 flex w-full flex-col items-center justify-center text-dark-2 sm:mt-12">
                             <PlaceholdersAndVanishInput
                                 placeholders={placeholders}
                                 onChange={(e) => {
@@ -214,8 +214,8 @@ const MeetingModel = ({ type, onClose, }: { type: MeetingType, onClose: () => vo
 
                         callDetails && type === 'isScheduleMeeting' &&
                         <>
-                            <div className="mt-8 flex flex-col items-center justify-center px-2 text-center text-black sm:mt-12">
-                                <div className="mx-auto text-lg font-normal text-neutral-400 dark:text-neutral-600 sm:text-2xl">
+                            <div className="mt-8 flex flex-col items-center justify-center px-2 text-center text-dark-2 sm:mt-12">
+                                <div className="mx-auto text-lg font-normal text-sky-1 dark:text-neutral-600 sm:text-2xl">
                                     Copy
                                     <FlipWords words={flipWords} /> <br />
                                     of your schedule meeting
@@ -225,7 +225,7 @@ const MeetingModel = ({ type, onClose, }: { type: MeetingType, onClose: () => vo
                     }
                 </ModalContent>
 
-                <ModalFooter className="bg-slate-300">
+                <ModalFooter className="bg-dark-2">
                     <button
                         className="w-full rounded-md border border-gray-300 bg-gray-200 px-2 py-2 text-sm text-black dark:border-black dark:bg-black dark:text-white sm:w-28"
                         onClick={() => onClose()}>

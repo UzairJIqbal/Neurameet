@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NeuraMeet - New Meeting</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; background-color: #faf8ff; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .icon-fill { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-on-surface bg-background">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 bg-inverse-surface dark:bg-on-surface shadow-xl py-lg">
+<div class="px-6 mb-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container dark:text-primary-fixed-dim text-3xl icon-fill">hub</span>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</h1>
+<p class="text-label-caps font-label-caps text-on-surface-variant">AI Intelligence</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-2">
+<!-- Dashboard (Active) -->
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 rounded-r-lg transition-all translate-x-1 duration-150 shadow-md" href="#">
+<span class="material-symbols-outlined icon-fill">dashboard</span>
+<span class="text-label-sm font-label-sm font-semibold">Dashboard</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="text-label-sm font-label-sm">Meeting Intelligence</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="text-label-sm font-label-sm">AI Chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="text-label-sm font-label-sm">Recordings</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 rounded-lg transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-label-sm font-label-sm">Follow-ups</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary hover:bg-on-secondary-fixed-variant/50 px-4 py-3 flex items-center gap-3 rounded-lg transition-colors duration-200 mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-sm font-label-sm">Settings</span>
+</a>
+</nav>
+<div class="px-6 mt-auto pt-6 border-t border-on-secondary-fixed-variant/50 flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden flex-shrink-0">
+<img alt="Waqas Ahmad" class="w-full h-full object-cover" data-alt="A professional headshot of a young man with dark hair, wearing a smart casual outfit, set against a neutral studio background. Soft lighting, high resolution, modern corporate aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvpRO3mFUzjgq6KuZSx62pUJZHXZZhzhBWSXFuRCLqIiXgL6DaHcik5Jleu4OKSxX5HnXmH16J3GMSZvytXyPbayVr9No0HJfw_tEesGSuY-vLwzzLe2r5-pPNQYpMvbewMf1kE-jzWfZT7kazTMYjLDKdxeRRInZBDx5g652AQsxwkCDq9kJBrqi-2joPUZojYwlDdAvrR1vPwMbmTDMHslLDFtEbYdYPnh7yoTWhpKkkyXtT4zScwg"/>
+</div>
+<div class="overflow-hidden">
+<p class="text-body-md font-body-md font-semibold text-on-primary truncate">Waqas Ahmad</p>
+<p class="text-label-caps font-label-caps text-on-surface-variant truncate">waqas@example.com</p>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[260px] flex-1 flex flex-col h-full bg-background relative overflow-y-auto">
+<!-- Minimal Top Nav / Back Action -->
+<header class="w-full flex items-center justify-between px-lg py-md bg-transparent">
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+                Back to Dashboard
+            </a>
+</header>
+<!-- Centered Modal Form -->
+<div class="flex-1 flex items-center justify-center p-6 pb-20">
+<div class="bg-surface-container-lowest w-full max-w-2xl rounded-xl shadow-[0px_10px_30px_rgba(0,0,0,0.08)] p-8 relative overflow-hidden">
+<!-- Subtle Gradient Accent Top -->
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-container to-secondary-container"></div>
+<div class="mb-8">
+<h2 class="text-display-lg font-display-lg text-on-surface mb-2">New Meeting</h2>
+<p class="text-body-lg font-body-lg text-on-surface-variant">Schedule a new session or create an instant meeting room.</p>
+</div>
+<form class="space-y-6">
+<!-- Title -->
+<div>
+<label class="block text-body-md font-body-md font-semibold text-on-surface mb-2" for="meetingTitle">Meeting Title</label>
+<input class="w-full bg-surface-container-lowest border border-surface-variant text-on-surface text-body-md rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-container focus:border-transparent transition-all placeholder:text-outline-variant shadow-sm" id="meetingTitle" placeholder="e.g. Q3 Roadmap Review" type="text"/>
+</div>
+<!-- Description -->
+<div>
+<label class="block text-body-md font-body-md font-semibold text-on-surface mb-2" for="meetingDesc">Description <span class="text-on-surface-variant font-normal">(Optional)</span></label>
+<textarea class="w-full bg-surface-container-lowest border border-surface-variant text-on-surface text-body-md rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-container focus:border-transparent transition-all placeholder:text-outline-variant shadow-sm resize-none" id="meetingDesc" placeholder="Add agenda or details..." rows="3"></textarea>
+</div>
+<!-- Grid for Date/Time & Duration/Privacy -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Date & Time -->
+<div class="space-y-4">
+<label class="block text-body-md font-body-md font-semibold text-on-surface">Date &amp; Time</label>
+<div class="flex gap-4">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">calendar_today</span>
+<input class="w-full bg-surface-container-lowest border border-surface-variant text-on-surface text-body-md rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-container focus:border-transparent transition-all shadow-sm" type="text" value="07/31/2024"/>
+</div>
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">schedule</span>
+<input class="w-full bg-surface-container-lowest border border-surface-variant text-on-surface text-body-md rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-container focus:border-transparent transition-all shadow-sm" type="text" value="10:00 AM"/>
+</div>
+</div>
+</div>
+<!-- Duration & Privacy -->
+<div class="flex gap-6">
+<div class="flex-1">
+<label class="block text-body-md font-body-md font-semibold text-on-surface mb-2" for="duration">Duration</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-lowest border border-surface-variant text-on-surface text-body-md rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-primary-container focus:border-transparent transition-all shadow-sm cursor-pointer" id="duration">
+<option>30 min</option>
+<option selected="">60 min</option>
+<option>90 min</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="flex-1">
+<label class="block text-body-md font-body-md font-semibold text-on-surface mb-2" for="privacy">Privacy</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-lowest border border-surface-variant text-on-surface text-body-md rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-primary-container focus:border-transparent transition-all shadow-sm cursor-pointer" id="privacy">
+<option selected="">Public</option>
+<option>Private</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="pt-6 mt-8 border-t border-surface-variant flex justify-end gap-4">
+<button class="px-6 py-3 rounded-lg text-body-md font-body-md font-semibold text-on-surface border border-surface-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors shadow-sm" type="button">
+                            Cancel
+                        </button>
+<button class="px-8 py-3 rounded-lg text-body-md font-body-md font-semibold text-on-primary bg-primary-container hover:bg-on-primary-fixed-variant transition-colors shadow-sm flex items-center gap-2" type="submit">
+<span>Create Meeting</span>
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+</main>
+</body></html>

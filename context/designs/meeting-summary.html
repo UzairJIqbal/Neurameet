@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meeting Details - Summary</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    fontFamily: {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-inverse-surface dark:bg-on-surface fixed left-0 top-0 h-full w-[260px] flex-col z-40 shadow-xl py-lg">
+<div class="px-lg pb-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-headline-md font-headline-md font-bold text-on-primary">hub</span>
+<div class="flex flex-col">
+<span class="text-headline-sm font-headline-sm text-on-primary">NeuraMeet</span>
+<span class="text-label-caps font-label-caps text-on-primary/70 tracking-widest">AI Intelligence</span>
+</div>
+</div>
+<div class="flex-1 px-4 space-y-2">
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-label-sm font-label-sm">Dashboard</span>
+</a>
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all translate-x-1 duration-150 rounded-r-lg" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="text-label-sm font-label-sm">Meeting Intelligence</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="text-label-sm font-label-sm">AI Chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="text-label-sm font-label-sm">Recordings</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-label-sm font-label-sm">Follow-ups</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-sm font-label-sm">Settings</span>
+</a>
+</div>
+<div class="px-4 pt-4 border-t border-on-surface-variant/30 mt-auto">
+<div class="flex items-center gap-3 p-3 rounded-lg hover:bg-on-secondary-fixed-variant/50 transition-colors cursor-pointer text-on-surface-variant hover:text-on-primary">
+<span class="material-symbols-outlined">account_circle</span>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-on-primary">Waqas Ahmad</span>
+<span class="text-label-caps font-label-caps opacity-70">waqas@example.com</span>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 ml-0 md:ml-[260px] flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="hidden md:flex bg-surface dark:bg-background border-b border-surface-variant fixed top-0 right-0 w-[calc(100%-260px)] z-30 justify-between items-center px-lg py-md">
+<div class="flex items-center gap-2 text-on-surface-variant hover:text-on-surface cursor-pointer transition-colors group">
+<span class="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
+<span class="text-label-sm font-label-sm">Back to Overview</span>
+</div>
+<nav class="flex gap-6">
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-lg transition-colors px-3 py-2 text-label-sm font-label-sm" href="#">Overview</a>
+<a class="text-primary border-b-2 border-primary pb-2 font-bold px-3 py-2 text-label-sm font-label-sm scale-95 duration-100" href="#">Summary</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-lg transition-colors px-3 py-2 text-label-sm font-label-sm" href="#">Action Items</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-lg transition-colors px-3 py-2 text-label-sm font-label-sm" href="#">Recording</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-lg transition-colors px-3 py-2 text-label-sm font-label-sm" href="#">Category</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors p-2 rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<!-- Page Canvas -->
+<main class="flex-1 pt-[80px] p-container-margin md:p-gutter max-w-7xl mx-auto w-full">
+<!-- Header Section -->
+<div class="mb-xl">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h1 class="text-display-lg md:text-display-lg font-display-lg text-on-surface mb-2">Sprint Planning</h1>
+<div class="flex items-center gap-4 text-on-surface-variant text-label-sm font-label-sm">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span>
+<span>Jul 29, 2024</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span>52 min</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">group</span>
+<span>6 Participants</span>
+</div>
+<span class="px-2 py-1 bg-surface-container-high text-primary rounded-full text-label-caps font-label-caps ml-2">AI Analysis Complete</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Content Card -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-lg shadow-sm">
+<h2 class="text-headline-sm font-headline-sm text-on-surface mb-6">AI Summary</h2>
+<div class="prose prose-sm max-w-none text-on-surface-variant font-body-lg">
+<p class="mb-4">
+                        The team discussed sprint goals, task prioritization, API integration plan and timeline for the upcoming sprint.
+                    </p>
+<p class="mb-2 font-medium text-on-surface">The discussion focused on:</p>
+<ul class="list-disc pl-5 space-y-2 mb-4">
+<li>Sprint goals and deliverables</li>
+<li>API integration approach</li>
+<li>Authentication flow update</li>
+<li>Testing strategy and timeline</li>
+<li>Deployment plan</li>
+</ul>
+</div>
+</div>
+</main>
+</div>
+</body></html>

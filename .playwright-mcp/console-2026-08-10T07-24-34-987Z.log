@@ -1,0 +1,41 @@
+[    1379ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/sign-in:0
+[    1393ms] [LOG] %c Console Ninja extension is connected to Next.js browser, background: rgb(30,30,30); color: rgb(255,213,92) see https://tinyurl.com/2vt8jxzw for more info. @ :0
+[    1530ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(pages-dir-browser)/./node_modules/react-dom/cjs/react-dom-client.development.js:24868
+[    1578ms] Error: Cannot find module './vendor-chunks/@clerk.js'
+Require stack:
+- /Users/UzairIqbal/Projects/neurameet/.next/server/webpack-runtime.js
+- /Users/UzairIqbal/Projects/neurameet/.next/server/app/(auth)/sign-in/[[...sign-in]]/page.js
+- /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/require.js
+- /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/load-components.js
+- /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/build/utils.js
+- /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/dev/static-paths-worker.js
+- /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/compiled/jest-worker/processChild.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1568:15)
+    at <unknown> (file:///Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/require-hook.js:57:36)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1122:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1146:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1173:12)
+    at Module._load (node:internal/modules/cjs/loader:1345:5)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:260:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1689:12)
+    at mod.require (file:///Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/require-hook.js:68:28)
+    at require (node:internal/modules/helpers:191:16)
+[    1577ms] [LOG] [HMR] connected @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:45
+[   40168ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:59750/' failed:  @ :0
+[   40168ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:59750/' failed:  @ :0
+[   40168ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed:  @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   41171ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   42174ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   43177ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   44180ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   45183ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   50185ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:88
+[   55193ms] [LOG] [HMR] connected @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:45
+[   55205ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/webpack/6b080b455f3d612e.webpack.hot-update.json:0
+[   55205ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:347
+[   55742ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/webpack/6b080b455f3d612e.webpack.hot-update.json:0
+[   55742ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:347
+[   56772ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:206
+[   58161ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:206
+[   58164ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/webpack/6b080b455f3d612e.webpack.hot-update.json:0
+[   58164ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:347

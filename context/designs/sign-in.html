@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NeuraMeet - Sign In</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#faf8ff",
+                        "secondary-fixed": "#dee0ff",
+                        "primary-fixed-dim": "#d7baff",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "on-tertiary-fixed": "#331200",
+                        "surface-container": "#ebedfe",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "surface-container-low": "#f3f2ff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "surface-variant": "#e0e1f3",
+                        "on-primary-fixed": "#280056",
+                        "on-secondary": "#ffffff",
+                        "surface-tint": "#8000f6",
+                        "surface": "#faf8ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "secondary-container": "#bbc3fd",
+                        "surface-dim": "#d7d9ea",
+                        "primary-fixed": "#eddcff",
+                        "on-background": "#181b27",
+                        "outline": "#7d7388",
+                        "on-secondary-container": "#464f81",
+                        "outline-variant": "#cec2d9",
+                        "background": "#faf8ff",
+                        "on-primary-container": "#e9d5ff",
+                        "surface-container-highest": "#e0e1f3",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#7b3500",
+                        "secondary": "#525b8e",
+                        "tertiary-container": "#a04700",
+                        "on-surface": "#181b27",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "primary-container": "#830ef9",
+                        "surface-container-high": "#e6e7f8",
+                        "on-secondary-fixed": "#0d1647",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "inverse-on-surface": "#eff0ff",
+                        "primary": "#6500c4",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "on-error": "#ffffff",
+                        "inverse-primary": "#d7baff",
+                        "inverse-surface": "#2d303d",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#4c4356"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "md": "16px",
+                        "gutter": "24px",
+                        "xl": "32px",
+                        "sm": "12px",
+                        "lg": "24px",
+                        "container-margin": "40px",
+                        "xs": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-sm": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="h-full bg-surface-bright font-sans text-on-surface antialiased overflow-hidden">
+<!-- Transactional page: Nav shell suppressed -->
+<div class="flex h-full w-full flex-col md:flex-row">
+<!-- Left Panel: Form (40% width on Desktop) -->
+<div class="flex-1 md:flex-none md:w-[40%] bg-surface-container-lowest flex flex-col justify-center px-lg py-xl sm:px-container-margin z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+<div class="mx-auto w-full max-w-[400px]">
+<!-- Logo -->
+<div class="mb-xl">
+<span class="font-headline-md text-headline-md font-black text-primary-container tracking-tight">NeuraMeet</span>
+</div>
+<!-- Header -->
+<div class="mb-gutter">
+<h1 class="font-display-lg text-display-lg md:font-display-lg md:text-display-lg text-on-surface mb-xs">Welcome back</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Sign in to your account</p>
+</div>
+<!-- OAuth Buttons -->
+<div class="space-y-sm mb-gutter">
+<button class="w-full flex items-center justify-center gap-sm bg-surface-container-lowest border border-surface-variant rounded-lg py-[10px] px-md hover:bg-surface-container-low transition-colors group" type="button">
+<svg aria-hidden="true" class="h-5 w-5" viewbox="0 0 24 24">
+<path d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z" fill="#EA4335"></path>
+<path d="M23.49 12.275C23.49 11.49 23.415 10.73 23.3 10H12V14.51H18.47C18.18 15.99 17.34 17.25 16.08 18.1L19.945 21.1C22.2 19.01 23.49 15.92 23.49 12.275Z" fill="#4285F4"></path>
+<path d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.275 6.60986C0.46 8.22986 0 10.0599 0 11.9999C0 13.9399 0.46 15.7699 1.28 17.3899L5.26498 14.2949Z" fill="#FBBC05"></path>
+<path d="M12.0004 24.0001C15.2404 24.0001 17.9654 22.935 19.9454 21.095L16.0804 18.095C15.0054 18.82 13.6204 19.245 12.0004 19.245C8.8704 19.245 6.21537 17.135 5.2654 14.29L1.27539 17.385C3.25539 21.31 7.3104 24.0001 12.0004 24.0001Z" fill="#34A853"></path>
+</svg>
+<span class="font-body-md text-body-md font-semibold text-on-surface group-hover:text-primary transition-colors">Continue with Google</span>
+</button>
+<button class="w-full flex items-center justify-center gap-sm bg-surface-container-lowest border border-surface-variant rounded-lg py-[10px] px-md hover:bg-surface-container-low transition-colors group" type="button">
+<svg aria-hidden="true" class="h-5 w-5 fill-on-surface" viewbox="0 0 24 24">
+<path clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" fill-rule="evenodd"></path>
+</svg>
+<span class="font-body-md text-body-md font-semibold text-on-surface group-hover:text-primary transition-colors">Continue with GitHub</span>
+</button>
+</div>
+<!-- Divider -->
+<div class="relative mb-gutter">
+<div aria-hidden="true" class="absolute inset-0 flex items-center">
+<div class="w-full border-t border-surface-variant"></div>
+</div>
+<div class="relative flex justify-center text-sm font-medium leading-6">
+<span class="bg-surface-container-lowest px-2 font-label-mono text-label-mono text-outline uppercase tracking-wider">or</span>
+</div>
+</div>
+<!-- Form -->
+<form action="#" class="space-y-md" method="POST">
+<div>
+<label class="block font-label-mono text-label-mono text-on-surface mb-xs" for="email">Email Address</label>
+<div class="relative">
+<input autocomplete="email" class="block w-full rounded-lg border-0 py-2.5 px-md text-on-surface bg-surface-container-lowest shadow-sm ring-1 ring-inset ring-surface-variant placeholder:text-outline-variant focus:ring-2 focus:ring-inset focus:ring-primary-container sm:text-sm sm:leading-6 transition-shadow" id="email" name="email" placeholder="sarah@techflow.io" required="" type="email"/>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between mb-xs">
+<label class="block font-label-mono text-label-mono text-on-surface" for="password">Password</label>
+<a class="font-label-mono text-label-mono text-primary-container hover:text-primary transition-colors" href="#">Forgot password?</a>
+</div>
+<div class="relative group">
+<input autocomplete="current-password" class="block w-full rounded-lg border-0 py-2.5 px-md text-on-surface bg-surface-container-lowest shadow-sm ring-1 ring-inset ring-surface-variant placeholder:text-outline-variant focus:ring-2 focus:ring-inset focus:ring-primary-container sm:text-sm sm:leading-6 transition-shadow pr-10" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute inset-y-0 right-0 flex items-center pr-3 text-outline hover:text-primary transition-colors focus:outline-none" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[20px]" data-icon="visibility">visibility</span>
+</button>
+</div>
+</div>
+<div class="pt-sm">
+<button class="flex w-full justify-center rounded-lg bg-primary-container px-3 py-2.5 font-body-md text-body-md font-semibold text-on-primary shadow-sm hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-container transition-colors" type="submit">Sign in</button>
+</div>
+</form>
+<!-- Footer Text -->
+<p class="mt-gutter text-center font-body-md text-body-md text-on-surface-variant">
+                    Don't have an account?
+                    <a class="font-semibold text-primary-container hover:text-primary transition-colors" href="#">Sign up</a>
+</p>
+</div>
+</div>
+<!-- Right Panel: Testimonial (60% width on Desktop) -->
+<div class="hidden md:flex flex-1 md:w-[60%] bg-[#161925] relative items-center justify-center p-xl lg:p-container-margin overflow-hidden">
+<!-- Abstract Background Elements -->
+<div aria-hidden="true" class="absolute inset-0 opacity-20">
+<div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary-container rounded-full mix-blend-screen filter blur-[100px]"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-secondary rounded-full mix-blend-screen filter blur-[120px]"></div>
+</div>
+<!-- Grid overlay for texture -->
+<div aria-hidden="true" class="absolute inset-0" style="background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: 24px 24px;"></div>
+<!-- Content Container -->
+<div class="relative z-10 max-w-2xl mx-auto flex flex-col items-start">
+<!-- Quote Icon -->
+<div class="mb-lg opacity-40">
+<svg aria-hidden="true" class="h-12 w-12 text-on-primary" fill="currentColor" viewbox="0 0 24 24">
+<path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"></path>
+</svg>
+</div>
+<!-- Testimonial Text -->
+<blockquote class="mb-xl">
+<p class="font-display-lg text-display-lg text-on-primary leading-tight font-semibold">
+                        "NeuraMeet has completely transformed how our team handles meeting intelligence. The AI summaries are a game-changer."
+                    </p>
+</blockquote>
+<!-- Attribution -->
+<div class="flex items-center gap-md">
+<div class="h-12 w-12 rounded-full overflow-hidden border border-surface-variant/30 bg-surface-variant/10">
+<img class="h-full w-full object-cover" data-alt="A professional headshot portrait of a confident female tech executive (CTO) with short dark hair, wearing a dark blazer over a light shirt. The lighting is soft and modern, capturing a friendly yet authoritative expression. The background is a blurred, sleek office environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBd9LseWQtaP9gjxdjY1jh3GUPOyAnLdkkIkFQAM5wr87pIeogDJIvSZ11HylP3pUYPUgzWPMjOBu1Ztsoc5jfEPrCnnCJv7sqwDpFwiPe9ektuGZMqPAMbm68sRAQNuGZokCbnDenvZvwrQsRzfIh2Xz7Y9eXFdOieAcIOWjBLszi_Wbsvg9lJRzjG_nVGo76-NAx7vD9NuZBGDjtB4SXIf-AkzGwbG8DhR5vTbySEcYskhUTOPgNq-Q"/>
+</div>
+<div>
+<div class="font-body-lg text-body-lg font-semibold text-on-primary">Sarah Jenkins</div>
+<div class="font-body-md text-body-md text-secondary-fixed-dim">CTO at TechFlow</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Script to toggle password visibility (Vanilla JS for micro-interaction) -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleButton = document.querySelector('button[type="button"]');
+            const passwordInput = document.getElementById('password');
+            const iconSpan = toggleButton.querySelector('.material-symbols-outlined');
+
+            toggleButton.addEventListener('click', () => {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                
+                // Toggle icon
+                if (type === 'text') {
+                    iconSpan.textContent = 'visibility_off';
+                    iconSpan.setAttribute('data-icon', 'visibility_off');
+                } else {
+                    iconSpan.textContent = 'visibility';
+                    iconSpan.setAttribute('data-icon', 'visibility');
+                }
+            });
+        });
+    </script>
+</body></html>

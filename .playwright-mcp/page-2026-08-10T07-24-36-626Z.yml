@@ -1,0 +1,55 @@
+- generic:
+  - generic [active]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - navigation [ref=e6]:
+          - button [disabled] [ref=e7]:
+            - img "previous" [ref=e8]
+          - generic [ref=e10]:
+            - generic [ref=e11]: 1/
+            - text: "1"
+          - button [disabled] [ref=e12]:
+            - img "next" [ref=e13]
+        - link "Next.js 15.5.18 (outdated) Webpack" [ref=e16] [cursor=pointer]:
+          - /url: https://nextjs.org/docs/messages/version-staleness
+          - generic "An outdated version detected (latest is 16.3.0), upgrade is highly recommended!" [ref=e19]: Next.js 15.5.18 (outdated)
+          - generic [ref=e20]: Webpack
+      - generic [ref=e21]:
+        - dialog "Runtime Error" [ref=e22]:
+          - generic [ref=e25]:
+            - generic [ref=e26]:
+              - generic [ref=e27]:
+                - generic [ref=e28]: Runtime Error
+                - generic [ref=e30]:
+                  - button "Copy Error Info" [ref=e31] [cursor=pointer]
+                  - button "No related documentation found" [disabled] [ref=e34]
+                  - link "Learn more about enabling Node.js inspector for server code with Chrome DevTools" [ref=e37] [cursor=pointer]:
+                    - /url: https://nextjs.org/docs/app/building-your-application/configuring/debugging#server-side-code
+              - generic [ref=e46]:
+                - paragraph [ref=e47]: "Cannot find module './vendor-chunks/@clerk.js' Require stack: - /Users/UzairIqbal/Projects/neurameet/.next/server/webpack-runtime.js - /Users/UzairIqbal/Projects/neurameet/.next/server/app/(auth)/sign-in/[[...sign-in]]/page.js - /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/require.js - /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/load-components.js - /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/build/utils.js - /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/server/dev/static-paths-worker.js - /Users/UzairIqbal/Projects/neurameet/node_modules/next/dist/compiled/jest-worker/processChild.js"
+                - button "Show More" [ref=e49] [cursor=pointer]
+            - generic [ref=e52]:
+              - paragraph [ref=e53]:
+                - text: Call Stack
+                - generic [ref=e54]: "10"
+              - button "Show 10 ignore-listed frame(s)" [ref=e55] [cursor=pointer]
+          - generic [ref=e58]:
+            - generic [ref=e59]: "1"
+            - generic [ref=e60]: "2"
+        - contentinfo [ref=e61]:
+          - region "Error feedback" [ref=e62]:
+            - paragraph [ref=e63]:
+              - link "Was this helpful?" [ref=e64] [cursor=pointer]:
+                - /url: https://nextjs.org/telemetry#error-feedback
+            - button "Mark as helpful" [ref=e65] [cursor=pointer]
+            - button "Mark as not helpful" [ref=e69] [cursor=pointer]
+    - generic [ref=e76] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e77]
+      - generic [ref=e81]:
+        - button "Open issues overlay" [ref=e82]:
+          - generic [ref=e83]:
+            - generic [ref=e84]: "0"
+            - generic [ref=e85]: "1"
+          - generic [ref=e86]: Issue
+        - button "Collapse issues badge" [ref=e87]
+  - alert [ref=e90]

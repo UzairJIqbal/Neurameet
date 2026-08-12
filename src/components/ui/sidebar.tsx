@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import React, { useState, createContext, useContext } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { IconMenu2, IconX } from "@tabler/icons-react";
+import { usePathname } from "next/navigation";
 
 interface Links {
     label: string;
@@ -89,7 +90,7 @@ export const DesktopSidebar = ({
         <>
             <motion.div
                 className={cn(
-                    "h-full px-4 py-4 hidden  md:flex md:flex-col bg-dark-2 dark:bg-white w-[300px] shrink-0",
+                    "h-full px-4 py-4 hidden  md:flex md:flex-col bg-inverse-surface w-[300px] shrink-0",
                     className,
                 )}
                 animate={{
@@ -115,13 +116,13 @@ export const MobileSidebar = ({
         <>
             <div
                 className={cn(
-                    "h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-dark-2 dark:bg-white w-full",
+                    "h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-inverse-surface w-full",
                 )}
                 {...props}
             >
                 <div className="flex justify-end z-20 w-full">
                     <IconMenu2
-                        className="text-white dark:text-neutral-200"
+                        className="text-inverse-on-surface"
                         onClick={() => setOpen(!open)}
                     />
                 </div>
@@ -136,12 +137,12 @@ export const MobileSidebar = ({
                                 ease: "easeInOut",
                             }}
                             className={cn(
-                                "fixed h-full w-full inset-0 bg-dark-2 dark:bg-neutral-900 p-10 z-[100] flex flex-col justify-between",
+                                "fixed h-full w-full inset-0 bg-inverse-surface p-10 z-[100] flex flex-col justify-between",
                                 className,
                             )}
                         >
                             <div
-                                className="absolute right-10 top-10 z-50 text-white dark:text-neutral-200"
+                                className="absolute right-10 top-10 z-50 text-inverse-on-surface"
                                 onClick={() => setOpen(!open)}
                             >
                                 <IconX />
@@ -164,23 +165,32 @@ export const SidebarLink = ({
     className?: string;
 }) => {
     const { open, animate } = useSidebar();
+    const pathname = usePathname();
+    const isActive = pathname === link.href;
+
     return (
         <a
             href={link.href}
             className={cn(
                 "flex items-center justify-start gap-2 group/sidebar py-2",
+                isActive && "bg-primary-container/20 rounded-lg px-3 py-2 font-medium",
                 className,
             )}
             {...props}
         >
-            {link.icon}
+            <span className={cn(isActive ? "text-primary-container" : "text-inverse-on-surface/70")}>
+                {link.icon}
+            </span>
 
             <motion.span
                 animate={{
                     display: animate ? (open ? "inline-block" : "none") : "inline-block",
                     opacity: animate ? (open ? 1 : 0) : 1,
                 }}
-                className="text-white dark:text-neutral-200 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
+                className={cn(
+                    "text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0",
+                    isActive ? "text-inverse-on-surface font-medium" : "text-inverse-on-surface/70",
+                )}
             >
                 {link.label}
             </motion.span>

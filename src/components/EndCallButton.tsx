@@ -20,7 +20,7 @@ const EndCallButton = () => {
             call?.endCall();
             router.push('/')
         }}
-            className="bg-red-500"
+            className="bg-danger"
         >End call for everyone</Button>
     )
 };

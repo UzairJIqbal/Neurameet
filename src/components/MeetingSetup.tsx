@@ -141,12 +141,14 @@ const MeetingSetup = ({
 			}
 
 			try {
-				const profile =
-					audioType === "podcasts"
-						? SfuModels.AudioBitrateProfile.VOICE_HIGH_QUALITY
-						: audioType === "music calls"
-							? SfuModels.AudioBitrateProfile.MUSIC_HIGH_QUALITY
-							: SfuModels.AudioBitrateProfile.VOICE_STANDARD_UNSPECIFIED;
+				let profile: SfuModels.AudioBitrateProfile;
+				if (audioType === "podcasts") {
+					profile = SfuModels.AudioBitrateProfile.VOICE_HIGH_QUALITY;
+				} else if (audioType === "music calls") {
+					profile = SfuModels.AudioBitrateProfile.MUSIC_HIGH_QUALITY;
+				} else {
+					profile = SfuModels.AudioBitrateProfile.VOICE_STANDARD_UNSPECIFIED;
+				}
 
 				await microphone.setAudioBitrateProfile(profile);
 			} catch {

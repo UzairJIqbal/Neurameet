@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meeting Intelligence - NeuraMeet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    },
+                    "boxShadow": {
+                        'level-1': '0px 4px 20px rgba(0, 0, 0, 0.04)',
+                        'level-2': '0px 10px 30px rgba(0, 0, 0, 0.08)',
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="bg-inverse-surface dark:bg-on-surface fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 shadow-xl hidden md:flex text-on-surface-variant font-label-sm">
+<div class="px-lg py-lg flex items-center gap-3">
+<span class="material-symbols-outlined text-headline-md font-bold text-on-primary" style="font-variation-settings: 'FILL' 1;">hub</span>
+<div class="flex flex-col">
+<span class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</span>
+<span class="text-xs text-outline-variant">AI Intelligence</span>
+</div>
+</div>
+<div class="flex flex-col h-full py-lg mt-4 px-2 space-y-1">
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                Dashboard
+            </a>
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all rounded-r-lg translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+                Meeting Intelligence
+            </a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">chat</span>
+                AI Chat
+            </a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">videocam</span>
+                Recordings
+            </a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">assignment</span>
+                Follow-ups
+            </a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+</div>
+<div class="mt-auto px-4 py-lg border-t border-on-secondary-fixed-variant/30 flex items-center gap-3 text-sm">
+<img alt="Waqas Ahmad" class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A small, professional headshot photo of a man named Waqas Ahmad, serving as a user profile avatar in a dark-themed sidebar of a SaaS application. The lighting is soft and corporate." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKLT1z1qMZg0eSRYAKYb04TJziuZ7gFBFNkHhi4tR6cz257lZvFGGek70e8t6v3l9fJL8JiXQr0N083utCQtUIKOo2XJLhtTh8ByM2t8NQpmAuf48HKS7-fuUuj4ya_fFwN3gEESu9VuhD7LF54ZCftqqSvWRd4H448FVcS1j4pepL9iXr4QlmwymH-1sKtyPWI1-5pq9nim0QSCgMs4BoqOADKrAWoxgC48i2uYC93JZTLdc5LsvCyg"/>
+<div class="flex flex-col overflow-hidden">
+<span class="text-on-primary font-bold truncate">Waqas Ahmad</span>
+<span class="text-xs text-outline-variant truncate">waqas@example.com</span>
+</div>
+<span class="material-symbols-outlined ml-auto text-outline-variant hover:text-on-primary cursor-pointer text-sm">unfold_more</span>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 ml-0 md:ml-[260px] flex flex-col min-h-screen">
+<!-- Header area (not TopNavBar from JSON as it's a specific inner page, but a generic header for the list view) -->
+<header class="flex flex-col md:flex-row justify-between items-start md:items-center px-lg py-xl gap-4">
+<h1 class="font-display-lg text-display-lg text-on-surface">Meeting Intelligence</h1>
+<div class="flex items-center gap-3 w-full md:w-auto">
+<div class="relative w-full md:w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
+<input class="w-full pl-9 pr-4 py-2 bg-surface-container-lowest border border-surface-variant rounded-lg text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Search meetings..." type="text"/>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 border border-surface-variant bg-surface-container-lowest rounded-lg hover:bg-surface-container-low transition-colors text-body-md text-on-surface font-medium">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+                    Filter
+                </button>
+</div>
+</header>
+<!-- Content Area -->
+<div class="px-lg pb-xl flex-1">
+<div class="bg-surface-container-lowest rounded-xl border border-surface-variant shadow-level-1 overflow-hidden">
+<!-- Table Header -->
+<div class="grid grid-cols-12 gap-4 px-lg py-4 border-b border-surface-variant bg-surface-container-low/50 text-label-caps text-on-surface-variant uppercase tracking-wider">
+<div class="col-span-6 md:col-span-5">Meeting Title</div>
+<div class="col-span-6 md:col-span-4">Date</div>
+<div class="col-span-12 md:col-span-3 text-right hidden md:block">Action</div>
+</div>
+<!-- Table Rows -->
+<div class="divide-y divide-surface-variant">
+<!-- Row 1 -->
+<div class="grid grid-cols-12 gap-4 px-lg py-4 items-center hover:bg-surface-container-low transition-colors group">
+<div class="col-span-6 md:col-span-5 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm">event</span>
+</div>
+<span class="font-body-md font-medium text-on-surface group-hover:text-primary transition-colors">Sprint Planning</span>
+</div>
+<div class="col-span-6 md:col-span-4 text-body-md text-on-surface-variant flex items-center">
+                            Jul 29, 2024
+                        </div>
+<div class="col-span-12 md:col-span-3 text-left md:text-right mt-2 md:mt-0">
+<a class="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary font-medium border border-surface-variant rounded-lg hover:border-primary hover:bg-primary/5 transition-all" href="#">
+                                Open Insights
+                                <span class="material-symbols-outlined text-xs">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="grid grid-cols-12 gap-4 px-lg py-4 items-center hover:bg-surface-container-low transition-colors group">
+<div class="col-span-6 md:col-span-5 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-secondary-container/30 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-sm">group</span>
+</div>
+<span class="font-body-md font-medium text-on-surface group-hover:text-primary transition-colors">Client Discussion</span>
+</div>
+<div class="col-span-6 md:col-span-4 text-body-md text-on-surface-variant flex items-center">
+                            Jul 28, 2024
+                        </div>
+<div class="col-span-12 md:col-span-3 text-left md:text-right mt-2 md:mt-0">
+<a class="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary font-medium border border-surface-variant rounded-lg hover:border-primary hover:bg-primary/5 transition-all" href="#">
+                                Open Insights
+                                <span class="material-symbols-outlined text-xs">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="grid grid-cols-12 gap-4 px-lg py-4 items-center hover:bg-surface-container-low transition-colors group">
+<div class="col-span-6 md:col-span-5 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-tertiary-fixed/40 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+</div>
+<span class="font-body-md font-medium text-on-surface group-hover:text-primary transition-colors">Weekly Standup</span>
+</div>
+<div class="col-span-6 md:col-span-4 text-body-md text-on-surface-variant flex items-center">
+                            Jul 26, 2024
+                        </div>
+<div class="col-span-12 md:col-span-3 text-left md:text-right mt-2 md:mt-0">
+<a class="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary font-medium border border-surface-variant rounded-lg hover:border-primary hover:bg-primary/5 transition-all" href="#">
+                                Open Insights
+                                <span class="material-symbols-outlined text-xs">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Row 4 -->
+<div class="grid grid-cols-12 gap-4 px-lg py-4 items-center hover:bg-surface-container-low transition-colors group">
+<div class="col-span-6 md:col-span-5 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm">design_services</span>
+</div>
+<span class="font-body-md font-medium text-on-surface group-hover:text-primary transition-colors">Design Review</span>
+</div>
+<div class="col-span-6 md:col-span-4 text-body-md text-on-surface-variant flex items-center">
+                            Jul 25, 2024
+                        </div>
+<div class="col-span-12 md:col-span-3 text-left md:text-right mt-2 md:mt-0">
+<a class="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary font-medium border border-surface-variant rounded-lg hover:border-primary hover:bg-primary/5 transition-all" href="#">
+                                Open Insights
+                                <span class="material-symbols-outlined text-xs">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Row 5 -->
+<div class="grid grid-cols-12 gap-4 px-lg py-4 items-center hover:bg-surface-container-low transition-colors group">
+<div class="col-span-6 md:col-span-5 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-secondary-container/30 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-sm">map</span>
+</div>
+<span class="font-body-md font-medium text-on-surface group-hover:text-primary transition-colors">Product Roadmap</span>
+</div>
+<div class="col-span-6 md:col-span-4 text-body-md text-on-surface-variant flex items-center">
+                            Jul 24, 2024
+                        </div>
+<div class="col-span-12 md:col-span-3 text-left md:text-right mt-2 md:mt-0">
+<a class="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary font-medium border border-surface-variant rounded-lg hover:border-primary hover:bg-primary/5 transition-all" href="#">
+                                Open Insights
+                                <span class="material-symbols-outlined text-xs">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Row 6 -->
+<div class="grid grid-cols-12 gap-4 px-lg py-4 items-center hover:bg-surface-container-low transition-colors group">
+<div class="col-span-6 md:col-span-5 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm">sync</span>
+</div>
+<span class="font-body-md font-medium text-on-surface group-hover:text-primary transition-colors">Marketing Sync</span>
+</div>
+<div class="col-span-6 md:col-span-4 text-body-md text-on-surface-variant flex items-center">
+                            Jul 23, 2024
+                        </div>
+<div class="col-span-12 md:col-span-3 text-left md:text-right mt-2 md:mt-0">
+<a class="inline-flex items-center gap-2 px-4 py-2 text-sm text-primary font-medium border border-surface-variant rounded-lg hover:border-primary hover:bg-primary/5 transition-all" href="#">
+                                Open Insights
+                                <span class="material-symbols-outlined text-xs">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+<!-- Pagination / Footer -->
+<div class="px-lg py-4 border-t border-surface-variant bg-surface-container-lowest flex justify-between items-center text-body-md text-on-surface-variant">
+<span>Showing 1 to 6 of 6 meetings</span>
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded border border-surface-variant opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-surface-variant opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
