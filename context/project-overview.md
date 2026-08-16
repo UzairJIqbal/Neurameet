@@ -88,6 +88,7 @@ Dark left sidebar (existing `Sidebar.tsx`): Dashboard, Meeting Intelligence, AI 
 
 ## Features In Scope
 
+### Core Pipeline (built — Steps 0 to 9 + 9.5)
 - Clerk auth (existing)
 - Sidebar navigation — Dashboard, Meeting Intelligence, AI Chat, Recordings, Follow-ups, Settings
 - New Meeting / Join Meeting / Meeting Room (existing Stream integration, bugs fixed)
@@ -97,7 +98,17 @@ Dark left sidebar (existing `Sidebar.tsx`): Dashboard, Meeting Intelligence, AI 
 - General Ask AI chat (no meeting context)
 - Follow-ups: list + details, generated from action items
 - Recordings library
-- Settings
+- Settings (Account + Preferences)
+
+### Advanced Pipeline (new — Steps A0 to C3, all pending)
+- Functional Settings toggles — AI auto-summary on upload, email notifications, desktop reminders (each made to have a real, zero-cost effect)
+- App-wide UI dead-control repair — audit every dead/non-functional control and fix it (Dashboard "View All" links, "Open Insights" buttons, global search, etc.)
+- Auto Attendance — live participant join/leave/mic/camera tracking via the Stream SDK (zero cost), stored in Supabase, with a downloadable PDF attendance report per meeting (reachable from the Overview tab). PDF library must be free/zero cost.
+- Cross-meeting semantic search across the user's meetings (reuses existing `meeting_chunks` embeddings)
+- Meeting prep suggestions from past related meetings
+- Per-speaker engagement insights (transcript chunks + attendance + existing AI setup)
+
+All Advanced features reuse the existing Gemini primary + Groq fallback and pgvector; no new paid provider, vector store, or PDF service.
 
 ## Features Out of Scope
 

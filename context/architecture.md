@@ -227,6 +227,30 @@ Enable once in Supabase: `create extension if not exists vector;`
 
 ---
 
+## Planned Tables (Advanced Pipeline — filled in at Steps B0/B1)
+
+### `attendance_events` (Auto Attendance — defined at Step B0, created at Step B1)
+One row per join session per participant. Placeholder columns (finalized in the B0 `/architect` pass):
+
+| Column             | Type        | Notes                                                  |
+| ------------------ | ----------- | ------------------------------------------------------ |
+| id                 | uuid        | Primary key                                            |
+| meeting_id         | uuid        | References meetings                                    |
+| user_id            | text        | Clerk user id                                          |
+| participant_email  | text        | Email at session time                                  |
+| session_started_at | timestamptz | Set on join                                            |
+| session_ended_at   | timestamptz | Null until leave; reconnect closes + reopens a row     |
+| talk_time_seconds  | integer     | Computed on leave                                      |
+| mic_toggles        | integer     | Count of mic on/off toggles during the session         |
+| camera_toggles     | integer     | Count of camera on/off toggles during the session      |
+| created_at         | timestamptz |                                                        |
+
+Writes happen server-side only (API route + `supabaseServer()`), never from the browser. Reuses the existing `service_role` GRANT block in `supabase/schema.sql`.
+
+> **Layer 3 (C1–C3) reuses existing tables** — `meeting_chunks` (embeddings for cross-meeting search + prep) and `attendance_events` (speaker engagement talk-time). No additional tables are expected; confirmed at each feature's `/architect` pass.
+
+---
+
 ## Supabase Client Pattern
 
 Two separate instances — never mix them:

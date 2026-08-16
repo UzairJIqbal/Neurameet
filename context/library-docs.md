@@ -28,6 +28,8 @@ Match the real route paths used in `app/(root)/(home)/*` and new routes — neve
 
 ---
 
+**Dev-only setting (must re-enable before Step 10 production deploy):** Email verification is turned OFF in Clerk Dashboard (User & Authentication → Email → "Verify at sign-up") to speed up dev sign-up testing. Re-enable it before deploying to production — the `/verify-email` code already supports it, so this is config-only.
+
 ## Stream Video SDK (existing — one bug to fix)
 
 **Known bug:** `src/actions/stream.actions.ts` computes the token's issued-at timestamp incorrectly:
@@ -140,8 +142,10 @@ import { embed } from "ai";
 import { google } from "@ai-sdk/google";
 
 const { embedding } = await embed({
-  model: google.textEmbeddingModel("text-embedding-004"),
+  model: google.textEmbeddingModel("gemini-embedding-001"),
   value: chunkText,
+  // Pin to 768-dim to match the meeting_chunks.embedding vector(768) column.
+  providerOptions: { google: { outputDimensionality: 768 } },
 });
 ```
 
@@ -154,12 +158,13 @@ const result = streamText({
   system: "Answer only from the provided meeting context. If it's not in the context, say so.",
   messages,
 });
-return result.toDataStreamResponse();
+return result.toUIMessageStreamResponse();
 ```
 
 **Rules:**
 - Never call `google` or `groq` provider functions from a Client Component — API routes only
-- Always wrap in `withFallback` for non-streaming calls; for streaming, catch and retry once with `fallbackModel` before erroring
+- For non-streaming calls, wrap in `withFallback`. For **streaming** (`streamText`), mid-stream provider failover is NOT supported — once tokens reach the client, switching models would duplicate output. Select the provider BEFORE streaming: probe the primary (e.g. a 1-token `generateText`) and use `fallbackModel` only if the probe fails. See `resolveChatModel()` in `src/agent/models.ts`.
+- Streaming response helper in AI SDK v7 is `result.toUIMessageStreamResponse()` (NOT `toDataStreamResponse()`, which was removed). The client uses `@ai-sdk/react`'s `useChat` with a `DefaultChatTransport`.
 - Never exceed free-tier rate limits by batching — process one meeting's extraction as a single request, not per-paragraph
 
 ---

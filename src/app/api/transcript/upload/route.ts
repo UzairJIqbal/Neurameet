@@ -29,11 +29,14 @@ export async function POST(request: Request) {
 
     const supabase = supabaseServer();
 
-    // Create a meeting row to anchor the transcript and insights
+    // Create a meeting row to anchor the transcript and insights.
+    // Uploads have no Stream call, so use a synthetic unique stream_call_id
+    // (schema requires it non-null + unique).
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
       .insert({
         user_id: userId,
+        stream_call_id: `upload_${crypto.randomUUID()}`,
         title: title.trim(),
         status: "ended",
         started_at: new Date().toISOString(),

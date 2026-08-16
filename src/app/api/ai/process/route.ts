@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { generateObject } from "ai";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { withFallback } from "@/agent/models";
+import { sendMeetingReadyEmail } from "@/lib/email";
+import { normalizeDueDate } from "@/lib/normalize-date";
+import { generateStructuredWithFallback } from "@/agent/models";
 import { extractionResultSchema } from "@/agent/types";
 
 export async function POST(request: Request) {
@@ -14,7 +15,10 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { meetingId } = body as { meetingId?: string };
+    const { meetingId, emailNotifications } = body as {
+      meetingId?: string;
+      emailNotifications?: boolean;
+    };
 
     if (!meetingId) {
       return NextResponse.json(
@@ -40,25 +44,31 @@ export async function POST(request: Request) {
       );
     }
 
-    // Run AI extraction via Gemini (with Groq fallback)
-    const { object: result } = await withFallback((model) =>
-      generateObject({
-        model,
-        schema: extractionResultSchema,
-        prompt: `Analyze the following meeting transcript and extract structured insights.
+    // Run AI extraction via Gemini (with Groq fallback).
+    // Groq cannot use response_format json_schema, so the fallback path inside
+    // generateStructuredWithFallback forces loose JSON mode — see models.ts.
+    const { object: result } = await generateStructuredWithFallback({
+      schema: extractionResultSchema,
+      prompt: `Analyze the following meeting transcript and extract structured insights.
 
 Transcript:
 ${transcript.raw_text}
 
-Extract:
-1. A comprehensive summary of the meeting
-2. Key points discussed
-3. Decisions that were made
-4. The meeting category (Product, Engineering, Sales, Design, Operations, or General)
-5. Specific topics detected
-6. Action items with assignee and due date if mentioned`,
-      }),
-    );
+Respond with a SINGLE JSON object only (no markdown, no prose), with exactly this structure:
+{
+  "insights": {
+    "summary": "A comprehensive summary of the meeting",
+    "keyPoints": ["Key point discussed", "Another key point"],
+    "decisions": ["Decision that was made"],
+    "category": "Product | Engineering | Sales | Design | Operations | General",
+    "detectedTopics": ["Specific topic", "Another topic"]
+  },
+  "actionItems": [
+    { "title": "A clear, actionable task", "assignee": "Person responsible or null", "dueDate": "ISO date YYYY-MM-DD or null" }
+  ]
+}
+Extract: a comprehensive summary, key points, decisions made, the meeting category, specific topics detected, and action items with assignee and due date if mentioned.`,
+    });
 
     // Write meeting insights
     const { error: insightsError } = await supabase
@@ -83,20 +93,74 @@ Extract:
 
     // Write action items
     if (result.actionItems.length > 0) {
-      const { error: actionItemsError } = await supabase
+      const {
+        data: insertedItems,
+        error: actionItemsError,
+      } = await supabase
         .from("action_items")
         .insert(
           result.actionItems.map((item) => ({
             meeting_id: meetingId,
             title: item.title,
             assignee: item.assignee ?? null,
-            due_date: item.dueDate ?? null,
+            due_date: normalizeDueDate(item.dueDate),
           })),
-        );
+        )
+        .select("id, meeting_id");
 
       if (actionItemsError) {
         console.error("Failed to write action items:", actionItemsError);
         // Non-fatal — insights are saved, action items can be retried
+      } else if (insertedItems && insertedItems.length > 0) {
+        // Auto-generate a follow-up per action item (Step 7)
+        const { error: followUpError } = await supabase
+          .from("follow_ups")
+          .insert(
+            insertedItems.map((ai) => ({
+              action_item_id: ai.id,
+              meeting_id: ai.meeting_id,
+              status: "pending",
+              priority: "medium",
+              notes: null,
+              updated_at: new Date().toISOString(),
+            })),
+          );
+
+        if (followUpError) {
+          console.error(
+            "Failed to auto-generate follow-ups:",
+            followUpError,
+          );
+          // Non-fatal — insights + action items are already saved
+        }
+      }
+    }
+
+    // Notify the owner by email when the "Email notifications" preference is ON.
+    // Non-fatal: any failure is logged and must not block the processing result.
+    let emailSent = false;
+    if (emailNotifications) {
+      try {
+        const user = await currentUser();
+        const to = user?.primaryEmailAddress?.emailAddress;
+        if (to) {
+          const { data: meeting } = await supabase
+            .from("meetings")
+            .select("title")
+            .eq("id", meetingId)
+            .single();
+          emailSent = await sendMeetingReadyEmail({
+            to,
+            meetingTitle: meeting?.title ?? "Your meeting",
+            meetingId,
+          });
+        } else {
+          console.warn(
+            "[process] No recipient email found; skipping notification.",
+          );
+        }
+      } catch (emailErr) {
+        console.error("[process] Meeting-ready email failed:", emailErr);
       }
     }
 
@@ -104,6 +168,7 @@ Extract:
       success: true,
       insights: result.insights,
       actionItemCount: result.actionItems.length,
+      emailSent,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Processing failed";

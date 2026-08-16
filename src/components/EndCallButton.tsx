@@ -5,24 +5,28 @@ import { Button } from "./ui/stateful-button";
 import { useRouter } from "next/navigation";
 
 const EndCallButton = () => {
-    const { useLocalParticipant } = useCallStateHooks();
-    const currentUser = useLocalParticipant();
-    const router = useRouter()
-    const call = useCall();
-    const MeetingOwner = call?.state.createdBy
-    if (!call) return;
+  const { useLocalParticipant } = useCallStateHooks();
+  const currentUser = useLocalParticipant();
+  const router = useRouter();
+  const call = useCall();
+  const MeetingOwner = call?.state.createdBy;
+  if (!call) return;
 
-    const verifyMeetingOwner = currentUser && MeetingOwner && currentUser.userId === MeetingOwner.id;
-    if (!verifyMeetingOwner) return null;
+  const verifyMeetingOwner =
+    currentUser && MeetingOwner && currentUser.userId === MeetingOwner.id;
+  if (!verifyMeetingOwner) return null;
 
-    return (
-        <Button onClick={() => {
-            call?.endCall();
-            router.push('/')
-        }}
-            className="bg-danger"
-        >End call for everyone</Button>
-    )
+  return (
+    <Button
+      onClick={() => {
+        call?.endCall();
+        router.push("/");
+      }}
+      className="bg-error text-on-primary hover:bg-error/90"
+    >
+      End call for everyone
+    </Button>
+  );
 };
 
 export default EndCallButton;

@@ -1,130 +1,138 @@
-/* eslint-disable prettier/prettier */
-
-/* eslint-disable prettier/prettier */
-
-/* eslint-disable prettier/prettier */
 "use client";
-import React, { useState } from "react";
-import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
-import { motion } from "motion/react";
+import React from "react";
 import { cn } from "@/lib/utils";
 import { sidebarLinks } from "../../constants";
+import { usePathname } from "next/navigation";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { ChevronDown } from "lucide-react";
 import DashboardContent from "@/components/DashboardContent";
 import PreviousPage from "./PreviousPage";
 import RecordingPage from "./RecordingPage";
 import UpcomingPage from "./UpcomingPage";
 import PersonalRoomPage from "./PersonalRoomPage";
-import { useClerk } from "@clerk/nextjs";
+import JoinMeetingPage from "./JoinMeetingPage";
+import MeetingList from "./meeting-intelligence/MeetingList";
+import FollowUpList from "./follow-ups/FollowUpList";
+import SettingsPage from "./SettingsPage";
+import GeneralChat from "./meeting-intelligence/GeneralChat";
+import Navbar from "./Navbar";
 
 export type SidebarPagesTypes =
   | "Home"
   | "upcomingPage"
   | "previousPage"
   | "recordingsPage"
-  | "personalRoom";
+  | "personalRoom"
+  | "joinMeeting"
+  | "meetingIntelligence"
+  | "followUps"
+  | "aiChat"
+  | "settings";
 
-export const Sidebar_Com = ({ type }: { type: SidebarPagesTypes }) => {
-  const [open, setOpen] = useState(false);
+const Sidebar = () => {
+  const pathname = usePathname();
   const { signOut } = useClerk();
+  const { user } = useUser();
+
+  const fullName = user?.fullName ?? "Uzair Iqbal";
+  const email = user?.primaryEmailAddress?.emailAddress ?? "uzair@example.com";
+  const avatar = user?.imageUrl ?? "/icons/images/Uzair Javaid.png";
+
   return (
-    <div
-      className={cn(
-        "mx-auto flex w-full max-w-full flex-1 flex-col rounded-md border-none bg-inverse-surface md:flex-row",
-        "h-full mt-0 left-0 overflow-x-hidden",
-      )}
-    >
-      <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between">
-          <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
-            {open ? <Logo /> : <LogoIcon />}
-            <div className="mt-8 flex flex-col gap-24">
-              {sidebarLinks.map((link, idx) => (
-                <SidebarLink key={idx} link={link} />
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-4 mt-8 border-t border-inverse-on-surface/10 pt-4">
-            <SidebarLink
-              link={{
-                label: "Uzair Iqbal",
-                href: "/",
-                icon: (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src="/icons/images/Uzair Javaid.png"
-                    className="h-7 w-7 shrink-0 rounded-full"
-                    width={50}
-                    height={50}
-                    alt="Avatar"
-                  />
-                ),
-              }}
-            />
-            <button
-              onClick={() => signOut()}
+    <aside className="fixed left-0 top-0 z-40 flex h-full w-[260px] flex-col bg-inverse-surface py-6">
+      {/* Brand */}
+      <div className="mb-8 flex items-center gap-3 px-6">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-container text-[18px] font-bold text-on-primary">
+          N
+        </span>
+        <div>
+          <h1 className="text-headline-md font-bold leading-tight text-on-primary">
+            NeuraMeet
+          </h1>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-inverse-on-surface/60">
+            AI Intelligence
+          </p>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex flex-1 flex-col gap-2 px-3">
+        {sidebarLinks.map((link, idx) => {
+          const isActive = pathname === link.href;
+          return (
+            <a
+              key={idx}
+              href={link.href}
               className={cn(
-                "flex w-full items-center justify-start gap-2 group/sidebar py-2 rounded-lg px-3",
-                "text-inverse-on-surface/70 hover:text-inverse-on-surface hover:bg-inverse-on-surface/5 transition-colors",
+                "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
+                isActive
+                  ? "border-l-4 border-primary-container bg-on-secondary-fixed-variant text-on-primary"
+                  : "text-outline hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary",
               )}
             >
-              <svg
-                width={20}
-                height={20}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="shrink-0"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              {open && (
-                <span className="text-sm whitespace-pre">
-                  Sign Out
-                </span>
-              )}
-            </button>
+              <span className="flex h-5 w-5 items-center justify-center">
+                {link.icon}
+              </span>
+              <span className="text-label-caps">{link.label}</span>
+            </a>
+          );
+        })}
+      </nav>
+
+      {/* User profile + sign out */}
+      <div className="mt-auto px-3">
+        <button
+          type="button"
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={avatar}
+            alt={fullName}
+            className="h-8 w-8 shrink-0 rounded-full object-cover"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-bold text-on-primary">
+              {fullName}
+            </p>
+            <p className="truncate text-[10px] text-outline">{email}</p>
           </div>
-        </SidebarBody>
-      </Sidebar>
-      {type === "Home" && <DashboardContent />}
-      {type === "previousPage" && <PreviousPage />}
-      {type === "recordingsPage" && <RecordingPage />}
-      {type === "upcomingPage" && <UpcomingPage />}
-      {type === "personalRoom" && <PersonalRoomPage />}
-    </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-outline" />
+        </button>
+      </div>
+    </aside>
   );
 };
 
-export const Logo = () => {
+export const Sidebar_Com = ({
+  type,
+  children,
+}: {
+  type: SidebarPagesTypes;
+  children?: React.ReactNode;
+}) => {
   return (
-    <a
-      href="#"
-      className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-inverse-on-surface"
-    >
-      <div className="h-5 w-6 shrink-0 rounded-tl-lg rounded-tr-sm rounded-br-lg rounded-bl-sm bg-primary-container" />
-      <motion.span
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="font-medium whitespace-pre text-inverse-on-surface"
-      >
-        NeuraMeet
-      </motion.span>
-    </a>
-  );
-};
-export const LogoIcon = () => {
-  return (
-    <a
-      href="#"
-      className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-inverse-on-surface"
-    >
-      <div className="h-5 w-6 shrink-0 rounded-tl-lg rounded-tr-sm rounded-br-lg rounded-bl-sm bg-primary-container" />
-    </a>
+    <>
+      <Sidebar />
+      <div className="ml-0 flex min-h-full flex-col bg-surface lg:ml-[260px]">
+        {type !== "Home" && <Navbar />}
+        {children ?? (
+          <>
+            {type === "Home" && <DashboardContent />}
+            {type === "previousPage" && <PreviousPage />}
+            {type === "recordingsPage" && <RecordingPage />}
+            {type === "upcomingPage" && <UpcomingPage />}
+            {type === "personalRoom" && <PersonalRoomPage />}
+            {type === "joinMeeting" && <JoinMeetingPage />}
+            {type === "meetingIntelligence" && <MeetingList />}
+            {type === "followUps" && <FollowUpList />}
+            {type === "aiChat" && <GeneralChat />}
+            {type === "settings" && <SettingsPage />}
+          </>
+        )}
+      </div>
+    </>
   );
 };
 

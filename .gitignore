@@ -39,6 +39,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # clerk configuration (can include secrets)
 /.clerk/
 
+# Playwright saved auth session (signed-in Clerk test state)
+tests/.clerk/
+
 # local assistant/tooling and shell state
 .claude/
 .claude-flow/

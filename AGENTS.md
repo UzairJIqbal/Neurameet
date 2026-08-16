@@ -31,7 +31,19 @@ Read in this exact order before any implementation:
 9. Share exact test steps.
 
 ## Product — In Scope / Out of Scope
-In scope: New Meeting, Join Meeting, Meeting Room (Stream video), Upload Transcript, AI Processing (summary, action items, category), Meeting Intelligence (list + tabs: Overview, Summary, Action Items, Recording, Category, AI Chat), meeting-scoped RAG chat, Follow-ups (list + details, generated from action items), Recordings library, Settings, Clerk auth.
+In scope, in three phases:
+
+Phase 1, Core NeuraMeet Pipeline (built, Steps 0 to 9): New Meeting, Join Meeting, Schedule Meeting, Meeting Room (Stream video), Upload Transcript, AI Processing (summary, action items, category), Meeting Intelligence (list plus tabs Overview, Summary, Action Items, Recording, Category, AI Chat), meeting scoped RAG chat, Follow ups (list and details, generated from action items), Recordings library, Settings, Clerk auth.
+
+Phase 2, Advanced Pipeline Features (new — sequential Steps A0 to C3, after Core + 9.5):
+  Step A0, Functional UI audit: enumerate every dead/non-functional UI control across the app (the source of truth for the A-steps).
+  Steps A1–A3, Settings toggles: make AI auto-summary on upload, email notifications, and desktop reminders functional (each starts with `/architect`; the zero-cost mechanism is decided there).
+  Steps A4–A6, remaining dead UI from the A0 audit: dead Dashboard "View All" links, "Open Insights" buttons, and global search.
+  Steps B0–B5, Auto Attendance: architect data model + zero-cost PDF library (B0), Supabase `attendance_events` schema (B1), Stream SDK join/leave/mic/camera tracking → DB (B2), PDF generation (B3), Overview-tab download wiring (B4), end-to-end verify (B5).
+  Steps C1–C3, AI engagement intelligence: cross-meeting search (C1), meeting prep suggestions (C2), per-speaker engagement insights (C3) — all reusing Gemini/Groq/pgvector, no new paid tool.
+  ZERO-COST RULE (explicit): every Advanced step must use only the free tiers already in use (Supabase, Gemini, Groq, Vercel, Stream, Clerk). No paid API, paid vector DB, paid PDF service, or second provider. Reuse the existing Gemini + Groq + pgvector setup for all new AI features.
+
+Phase 3, Deploy: deploy to Vercel free tier and harden (re-enable Clerk email verification before production, verify every path, confirm no secret leaks, confirm free tier limits). Deploy sits after the Advanced Pipeline Features, not before.
 
 Out of scope (do not build unless explicitly asked): auto-transcription vendor lock-in beyond one provider, multi-tenant/org accounts, payments/billing, mobile app, calendar integrations, live collaborative transcript editing, custom LLM fine-tuning. Do not overbuild.
 
@@ -77,6 +89,8 @@ Small functions. Explicit types, `strict` TypeScript, no `any`. No changes outsi
 - Update `progress-tracker.md` and `ui-registry.md` after every feature
 - Before any third party library — load its installed skill first, then read `context/library-docs.md` for project-specific rules
 - Never use a paid API — Gemini and Groq (both free-tier) only, Supabase only for backend/vector storage
+- Every third party tool in this project, including new features, must be zero cost. No paid API, paid vector DB, paid PDF service, or paid host beyond the free tiers already in use (Supabase, Gemini, Groq, Vercel, Stream, Clerk). Reuse the existing Gemini plus Groq and pgvector setup for all new AI features; add no second provider or vector store.
+  - **Zero-cost clarification (precedent set at Step A2 — do NOT re-litigate):** a free-tier third-party tool that requires **no payment method** (e.g. Resend's free email API — 3,000 emails/month, no card) is acceptable on the same standard as the named free tiers. It is not a "paid API", and an email-only delivery service is not a second AI/vector provider. Resend free tier is therefore an approved tool for transactional email. Apply this same bar to any future free-tier tool: no card required + free tier only = allowed; anything that needs a payment method or bills past free = forbidden.
 - If the same problem persists after one corrective prompt — stop immediately and run /recover
 
 ## Fallback Rule

@@ -21,6 +21,32 @@ export const sidebarLinks = [
     ),
   },
   {
+    label: "Previous Meetings",
+    href: "/previous",
+    icon: (
+      <Image
+        src="/icons/sidebar/Previous.png"
+        alt="Previous Meetings"
+        height={20}
+        width={20}
+        className="invert brightness-0"
+      />
+    ),
+  },
+  {
+    label: "Upcoming Meetings",
+    href: "/upcoming",
+    icon: (
+      <Image
+        src="/icons/sidebar/Upcoming.png"
+        alt="Upcoming Meetings"
+        height={20}
+        width={20}
+        className="invert brightness-0"
+      />
+    ),
+  },
+  {
     label: "Meeting Intelligence",
     href: "/meeting-intelligence",
     icon: (
@@ -53,6 +79,19 @@ export const sidebarLinks = [
       <Image
         src="/icons/sidebar/Recordings.png"
         alt="Recordings"
+        height={20}
+        width={20}
+        className="invert brightness-0"
+      />
+    ),
+  },
+  {
+    label: "Personal Room",
+    href: "/personal-room",
+    icon: (
+      <Image
+        src="/icons/sidebar/Personal.png"
+        alt="Personal Room"
         height={20}
         width={20}
         className="invert brightness-0"

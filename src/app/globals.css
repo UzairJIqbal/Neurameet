@@ -212,5 +212,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif;
   }
+}
+
+/* Design-faithful subtle card shadow (context/designs/dashboard.html) */
+.card-shadow {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }

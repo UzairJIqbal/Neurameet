@@ -72,10 +72,27 @@ const config = {
 				// Background (shadcn compat)
 				"on-background": "#181B27",
 
+				// Sidebar active nav fill (Material 3 token from locked design)
+				"on-secondary-fixed-variant": "#3A4375",
+
 				// Status — keep green-1 for small visual indicators (online dot)
 				green: {
 					1: "#00C48C",
 				},
+			},
+			fontFamily: {
+				sans: ["var(--font-hanken-grotesk)", "ui-sans-serif", "system-ui", "sans-serif"],
+				mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
+			},
+			fontSize: {
+				"display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+				"display-lg-mobile": ["26px", { lineHeight: "32px", fontWeight: "700" }],
+				"headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+				"headline-sm": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+				"body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+				"body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+				"label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
+				"label-mono": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }],
 			},
 			keyframes: {
 				"accordion-down": {
