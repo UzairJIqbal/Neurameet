@@ -71,7 +71,7 @@ No paid APIs anywhere in this stack. No FastAPI/Python backend — Next.js API r
 │   │   └── types.ts                     → Agent-specific TypeScript types
 │   ├── components/
 │   │   ├── ui/                          → existing Aceternity-style kit + shadcn additions
-│   │   ├── MeetingRoom.tsx, MeetingSetup.tsx, MeetingModel.tsx, HomeCard.tsx, Sidebar.tsx (existing)
+│   │   ├── MeetingRoom.tsx, MeetingSetup.tsx, MeetingModel.tsx, Sidebar.tsx (existing)
 │   │   ├── meeting-intelligence/
 │   │   │   ├── MeetingList.tsx
 │   │   │   ├── MeetingTabs.tsx
