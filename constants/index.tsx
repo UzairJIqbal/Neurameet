@@ -126,51 +126,6 @@ export const sidebarLinks = [
   },
 ];
 
-type MeetingCard = {
-  title: string;
-  description: string;
-  LogoImg: string;
-  type:
-    | "isInstantMeeting"
-    | "isScheduleMeeting"
-    | "isJoinMeeting"
-    | "isRecordedMeeting"
-    | "isUploadTranscript";
-};
-
-export const meetingCardDetails: MeetingCard[] = [
-  {
-    title: "Instant Meeting",
-    description: "Start an Instant Meeting",
-    LogoImg: "/icons/instantMeeting.png",
-    type: "isInstantMeeting",
-  },
-  {
-    title: "Join Meeting",
-    description: "Join Meeting via link",
-    LogoImg: "/icons/join.png",
-    type: "isJoinMeeting",
-  },
-  {
-    title: "Get your recordings",
-    description: "Click here to see your recordings",
-    LogoImg: "/icons/rec.png",
-    type: "isRecordedMeeting",
-  },
-  {
-    title: "Schedule Meeting",
-    description: "Schedule a meeting for the upcoming future",
-    LogoImg: "/icons/sch.png",
-    type: "isScheduleMeeting",
-  },
-  {
-    title: "Upload Transcript",
-    description: "Upload a transcript and get AI-powered insights",
-    LogoImg: "/icons/previous_meeting.png",
-    type: "isUploadTranscript",
-  },
-];
-
 export const instantMeetingModelImages = [
   "/icons/images/IM-1.png",
   "/icons/images/IM-2.png",
