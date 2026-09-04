@@ -1,75 +1,64 @@
-# Memory — G3 Guest Admission Mode Workflow Fix
+# Memory — G4 Guest Attendance/Transcript Attribution (completed)
 
 Last updated: 2026-09-04
 
 ## What was built
 
-Fixed the G3 guest admission mode workflow. The toggle ("Anyone can join" / "Approval required") was originally only in `OverviewTab.tsx` (post-meeting Meeting Intelligence tab), forcing the owner to end a call, navigate to Meeting Intelligence, toggle, then navigate back — a broken real-world workflow. Fixed by threading `guestAdmissionMode` through ALL four pre-join creation paths:
+Completed Step G4: made guests attributable in the attendance and transcript pipeline. The root cause was that `useAttendanceTracking` used Clerk's `useUser()` which returns `null` for guests, so `localIdentity` was always `null` and `post()` returned early — guests never got attendance events recorded, appearing as invisible "Speaker <hex>" in transcripts and missing entirely from attendance reports.
 
-- **`src/components/MeetingModel.tsx`** — Added `guestAdmissionMode` state + toggle UI in both `isInstantMeeting` and `isScheduleMeeting` modal views. Passes `guestAdmissionMode` to `createScheduledMeetingRow`.
-- **`src/components/DeviceSetup.tsx`** — Added optional `guestAdmissionMode` prop + toggle section between device controls and Join Meeting button.
-- **`src/components/MeetingSetup.tsx`** — Added `guestAdmissionMode` state, passes it to `<DeviceSetup>`.
-- **`src/components/PersonalRoomPage.tsx`** — Added `guestAdmissionMode` state. Persists mode via `createScheduledMeetingRow` from `@/actions/meetings`.
-- **`src/actions/meetings.ts`** — `createScheduledMeetingRow` accepts optional `guestAdmissionMode` param (added earlier in this session).
-- **`src/app/api/attendance/event/route.ts`** — Lazy-created meeting rows default to `"approval"`.
-- **`src/components/PersonalRoomPage.test.tsx`** — Added `vi.mock("@/actions/meetings", ...)` to fix server-only import crash.
+**Changes across 4 source files + 1 test file:**
+- `src/hooks/useAttendanceTracking.ts` — Added optional `identityOverride` parameter. When `user` is null and override provided, builds `localIdentity` from `localParticipant?.userId` + override name/email instead of returning `null`.
+- `src/components/MeetingRoom.tsx` — Added `guestName`/`guestEmail` props, moved `useLocalParticipant` into `useCallStateHooks` destructuring (was missing), passes override to `useAttendanceTracking`.
+- `src/components/GuestStreamClientProvider.tsx` — Added `guestEmail` prop (typed `string | null`), threaded into `connectUser()` and `useEffect` dependency array.
+- `src/app/(root)/meeting/[id]/guest/page.tsx` — Threaded `guestEmail` from NameModal through `GuestStreamClientProvider` → `GuestCallFlow` → `MeetingRoom`.
+- `src/components/MeetingRoom.test.tsx` — Added `useLocalParticipant` to mock factory.
 
 ## Decisions made
 
-- **Use `createScheduledMeetingRow` for PersonalRoomPage** instead of direct Supabase dynamic import — matches MeetingModel.tsx pattern, avoids `server-only` module error in tests.
-- **Mock `@/actions/meetings` in PersonalRoomPage.test.tsx** — `server-only` import caused "This module cannot be imported from a Client Component module" crash.
-- **Lazy attendance-event path** keeps `"approval"` default since it cannot know the owner's preference at join time.
+- **`identityOverride` approach** — rather than duplicating the hook, added an optional parameter so the same `useAttendanceTracking` function handles both signed-in and guest paths.
+- **`guestEmail` typed `string | null`** in `GuestStreamClientProvider` — the NameModal provides `email || undefined`, but `GuestStreamClientProvider` accepts `null` to match the prop signature.
+- **No changes to `parseStreamUserId`/`resolveSpeakerName`** — the regex `/user_([^_]+)_/` already captures `guest-<8hex>` from recording filenames, and `resolveSpeakerName` already matches `stream_user_id`. These work for guests IF the attendance event exists (which G4 now ensures).
+- **No schema changes needed** — `attendance_events.user_id` was already made nullable via migration in `supabase/schema.sql`.
 
 ## Problems solved
 
-- **G3 workflow broken**: toggle was post-meeting only → moved to pre-join flow across all four creation paths.
-- **`PersonalRoomPage.tsx` TypeScript error**: `const { supabase: supabaseLazy } = await import("@/lib/supabase-server")` failed because `supabaseServer` is a named export, not a property on the module namespace. Fixed by importing `createScheduledMeetingRow` from `@/actions/meetings`.
-- **Test suite crash**: Adding `@/actions/meetings` import to `PersonalRoomPage.tsx` caused server-only crash in tests. Fixed with `vi.mock`.
-
-## Step G4 completed (2026-09-04)
-
-Fixed guest attribution in attendance/transcript pipeline. Root cause: `useAttendanceTracking` used Clerk`s `useUser()` which returns `null` for guests, so `localIdentity` was always `null` and `post()` returned early — guests never got attendance events recorded.
-
-**Changes:**
-- `src/hooks/useAttendanceTracking.ts` — Added optional `identityOverride` parameter; when `user` is null and override provided, builds `localIdentity` from `localParticipant?.userId` + override name/email
-- `src/components/MeetingRoom.tsx` — Added `guestName`/`guestEmail` props, moved `useLocalParticipant` into `useCallStateHooks` destructuring, passes override to `useAttendanceTracking`
-- `src/components/GuestStreamClientProvider.tsx` — Added `guestEmail` prop, threaded into `connectUser()` and dependency array
-- `src/app/(root)/meeting/[id]/guest/page.tsx` — Threaded `guestEmail` from NameModal through `GuestStreamClientProvider` → `GuestCallFlow` → `MeetingRoom`
-- `src/components/MeetingRoom.test.tsx` — Added `useLocalParticipant` to mock
-
-Verified: `npx tsc --noEmit` clean, `npx vitest run` 175/175 green, `npm run build` exit 0.
+- **Guests invisible in attendance/transcripts**: `useAttendanceTracking` returned `null` identity for guests → `post()` skipped → no attendance events. Fixed with `identityOverride`.
+- **`useLocalParticipant` missing from `MeetingRoom.test.tsx` mock**: Adding `useLocalParticipant()` to `MeetingRoom.tsx` broke all 11 MeetingRoom tests because the mock factory didn't include it. Fixed by adding `useLocalParticipant: h.useLocalParticipant` to both the mock factory and the `h` hoisted return object.
+- **Type errors on `userId`**: `localParticipant?.userId` returns `string | undefined`, but `AttendanceIdentity.userId` is typed `string`. Fixed by coalescing to empty string `""`.
 
 ## Current state
 
-- **Verification**: `npx tsc --noEmit` clean, `npx vitest run` 175/175 green, `npx next build` exit 0 — all verified.
+- **Verification**: `npx tsc --noEmit` clean, `npx vitest run` 175/175 green, `npm run build` exit 0 — all verified.
+- **G4 code complete and committed** (commits `c6189bf` and `ea89631`).
 - **G3 code complete** across all four pre-join creation paths.
-- **`src/components/PersonalRoomPage.test.tsx`** — newly untracked file, added `vi.mock` for `@/actions/meetings`.
-- **`context/progress-tracker.md`** — G3 entry updated to reflect pre-join workflow fix.
-- **`memory.md`** — this file.
+- `context/progress-tracker.md`, `docs/scope/scope.md`, `memory.md` all updated to reflect G4 done.
+- **G1.5 live verification** still pending (needs Clerk + Stream credentials).
+- **G3 live verification** still pending (needs Clerk + Stream credentials).
 
 ## Next session starts with
 
 1. **Live browser walk-through** (user's responsibility — needs Clerk + Stream credentials):
    - Verify guest admission toggle works in all four pre-join paths
+   - Verify guests now appear in attendance reports and transcripts by name
    - Owner toggles "Anyone can join" → guest `request-join` returns `waiting: false` → phase jumps to `"admitted"` immediately
    - Owner toggles "Approval required" → guest sees "Waiting for the host" → owner gets Accept/Deny toast → Accept → guest joins
    - Check `guest_admission_mode` column exists in live Supabase DB
-2. **Step G4** — Attendance + transcript compatibility for guests
-3. **Other pending work**: Product Final Polishing steps (P0–P11), G1.5 live verification
+2. **Step G1.5** — Signed-out call room redirect live verification
+3. **Product Final Polishing steps (P0–P11)**
 
 ## Open questions
 
 - Whether `guest_admission_mode` column migration in `supabase/schema.sql` has been applied to the live Supabase DB.
 - Live browser walk-through of the G3 pre-join toggle has NOT been completed.
-- G4 (guest attendance/transcript compatibility) not yet started.
+- Live browser walk-through of G4 guest attribution has NOT been completed.
+- G1.5 live verification pending Clerk + Stream credentials.
 
 ## Key files for continuation
 
-- `src/components/MeetingModel.tsx` — Instant + Schedule meeting modals with admission toggle
-- `src/components/DeviceSetup.tsx` — Pre-join device setup with admission toggle
-- `src/components/MeetingSetup.tsx` — Signed-in device setup wrapper passing admission mode
-- `src/components/PersonalRoomPage.tsx` — Personal room with admission mode persistence
-- `src/actions/meetings.ts` — `createScheduledMeetingRow` with `guestAdmissionMode` param
-- `src/app/api/attendance/event/route.ts` — Lazy meeting rows default to "approval"
+- `src/hooks/useAttendanceTracking.ts` — The core hook fix for guest attribution
+- `src/components/MeetingRoom.tsx` — Receives and forwards guest identity
+- `src/components/GuestStreamClientProvider.tsx` — Threads `guestEmail` to Stream
+- `src/app/(root)/meeting/[id]/guest/page.tsx` — Entry point threading email through
+- `src/components/MeetingRoom.test.tsx` — Updated mock for `useLocalParticipant`
 - `context/progress-tracker.md` — Full project progress
 - `AGENTS.md` — Project instructions, zero-cost rules, data model, API contracts
