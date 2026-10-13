@@ -73,6 +73,7 @@ vi.mock("@stream-io/video-react-sdk", () => ({
 
 vi.mock("@clerk/nextjs", () => ({
   useUser: () => ({ isSignedIn: true, user: { id: "me" } }),
+  useClerk: () => ({ redirectToSignIn: vi.fn() }),
 }));
 
 vi.mock("next/navigation", () => ({

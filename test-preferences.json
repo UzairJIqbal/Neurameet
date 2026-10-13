@@ -1,0 +1,13 @@
+{
+  "tool": "vitest",
+  "testDir": "src",
+  "filePattern": "*.test.{ts,tsx}",
+  "packageManager": "npm",
+  "runCommand": "npx vitest run",
+  "configFile": "vitest.config.mjs",
+  "note": "Unit framework is vitest (config vitest.config.mjs): pure logic + component (jsdom) tests under src/**/*.test.{ts,tsx}, deterministic, no live server, @/* -> src/* alias. Component tests add `// @vitest-environment jsdom` at the top. E2E remains Playwright (see e2eTool) and needs a running next dev server plus live Clerk/Supabase/Gemini/Groq credentials.",
+  "e2eTool": "@playwright/test",
+  "e2eDir": "tests",
+  "e2ePattern": "*.spec.ts",
+  "e2eRunCommand": "npx playwright test"
+}

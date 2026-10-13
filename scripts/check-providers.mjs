@@ -38,7 +38,7 @@ loadEnvFile(resolve(process.cwd(), ".env"));
 const PROBE_TIMEOUT_MS = 8000;
 
 const primaryModel = google("gemini-flash-latest");
-const fallbackModel = groq("llama-3.1-8b-instant");
+const fallbackModel = groq("openai/gpt-oss-20b");
 
 async function probe(label, modelId, model) {
   try {
@@ -61,7 +61,7 @@ async function probe(label, modelId, model) {
 
 const results = [
   await probe("Gemini (primary)", "gemini-flash-latest", primaryModel),
-  await probe("Groq (fallback)", "llama-3.1-8b-instant", fallbackModel),
+  await probe("Groq (fallback)", "openai/gpt-oss-20b", fallbackModel),
 ];
 
 console.log("Provider status:");

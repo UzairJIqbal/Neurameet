@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { CallingState, useCall, useCallStateHooks } from "@stream-io/video-react-sdk";
 import { useUser } from "@clerk/nextjs";
 import { normalizeSpeakerName } from "@/lib/speaker-name";
+import toast from "react-hot-toast";
 
 type AttendanceEventType =
   | "join"
@@ -30,11 +31,11 @@ interface AttendanceIdentity {
  * server-side only; this hook never touches Supabase.
  */
 export function useAttendanceTracking(
-	identityOverride?: {
-		streamUserId: string | null;
-		name: string | null;
-		email: string | null;
-	},
+  identityOverride?: {
+    streamUserId: string | null;
+    name: string | null;
+    email: string | null;
+  },
 ) {
   const call = useCall();
   const {
@@ -60,7 +61,7 @@ export function useAttendanceTracking(
     // streamUserId from the local participant).
     if (!user && identityOverride) {
       return {
-        userId: localParticipant?.userId ?? "",
+        userId: "",
         streamUserId: identityOverride.streamUserId ?? localParticipant?.userId ?? null,
         name: identityOverride.name,
         email: identityOverride.email,
@@ -100,7 +101,7 @@ export function useAttendanceTracking(
   const post = useCallback(
     async (eventType: AttendanceEventType, identity: AttendanceIdentity) => {
       const c = callRef.current;
-      if (!c || !identity.userId) return;
+      if (!c) return; // Allow guests without a userId (guest payloads are valid)
       const payload = JSON.stringify({
         stream_call_id: c.id,
         user_id: identity.userId,
@@ -132,7 +133,8 @@ export function useAttendanceTracking(
         try {
           await attempt();
         } catch {
-          // best effort only; never block the UI
+          // Show a toast error to the user – best effort only.
+          toast.error('Failed to record attendance event.');
         }
       }
     },
@@ -159,16 +161,34 @@ export function useAttendanceTracking(
 
     const onJoined = (event: { participant: { user: { id: string; name?: string | null } } }) => {
       const u = event.participant.user;
-      if (u.id !== identityRef.current?.userId) return;
+      // Match by userId if present, otherwise by streamUserId (guest case).
+      const current = identityRef.current;
+      if (!current) return;
+      if (current.userId) {
+        if (u.id !== current.userId) return;
+      } else if (current.streamUserId) {
+        if (u.id !== current.streamUserId) return;
+      } else {
+        return;
+      }
       if (localJoinHandled.current) return;
       localJoinHandled.current = true;
-      if (identityRef.current) post("join", identityRef.current);
+      post("join", current);
     };
+
     const onLeft = (event: { participant: { user: { id: string; name?: string | null } } }) => {
       const u = event.participant.user;
-      if (u.id !== identityRef.current?.userId) return;
+      const current = identityRef.current;
+      if (!current) return;
+      if (current.userId) {
+        if (u.id !== current.userId) return;
+      } else if (current.streamUserId) {
+        if (u.id !== current.streamUserId) return;
+      } else {
+        return;
+      }
       localJoinHandled.current = false; // allow a reconnect to re-open a row
-      if (identityRef.current) post("leave", identityRef.current);
+      post("leave", current);
     };
 
     const offJoined = c.on("call.session_participant_joined", onJoined);
@@ -179,11 +199,26 @@ export function useAttendanceTracking(
     };
   }, [post, call, user?.id]);
 
+  // Retry join if the identity lacked a userId initially but later resolves (guest race).
+  useEffect(() => {
+    if (callingState !== CallingState.JOINED) return;
+    if (localJoinHandled.current) return;
+    const id = identityRef.current;
+    if (!id) return;
+    // If we have a streamUserId but no userId, wait for localParticipant.userId to become available.
+    if (!id.userId && id.streamUserId && localParticipant?.userId) {
+      localJoinHandled.current = true;
+      post("join", id);
+    }
+  }, [callingState, localIdentity, localParticipant?.userId, post]);
+
   // Seed the LOCAL user on join (catch-up in case the local join event was
   // missed before the subscription attached). Shares `localJoinHandled` with the
   // subscription above, so whichever fires first wins and only one join is posted.
   useEffect(() => {
     if (callingState !== CallingState.JOINED || !localIdentity) return;
+    // Ensure we have at least one identifier (userId, streamUserId, or email) before posting.
+    if (!localIdentity.userId && !localIdentity.streamUserId && !localIdentity.email) return;
     if (localJoinHandled.current) return;
     localJoinHandled.current = true;
 
@@ -197,6 +232,9 @@ export function useAttendanceTracking(
     const isMute = mic.isMute;
     if (prevMicMute.current === null) {
       prevMicMute.current = isMute;
+      if (!isMute) {
+        post("mic_on", localIdentity);
+      }
       return;
     }
     if (isMute === prevMicMute.current) return;
