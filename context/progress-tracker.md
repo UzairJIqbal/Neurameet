@@ -144,6 +144,47 @@ Bring unauthenticated participants (shared meeting link, not signed in) into a r
 - ⏳ **Step G1.5** — Signed-out call room redirect (code complete + root cause fix applied, pending live verification): when an unauthenticated visitor opens the shared meeting link `/meeting/[id]` (the call room), they are redirected to the guest lobby `/meeting/:id/guest` instead of Clerk sign-in. Applied a new middleware branch in `src/middleware.ts` using a strict regex `/^\/meeting\/[^/]+\/?$/` that matches the call room only — it excludes `/meeting/:id/guest` (already public) and `/meeting-intelligence/:id` (detail page stays protected). The branch runs before `auth.protect()`, so signed-in visitors to `/meeting/[id]` land on MeetingSetup unchanged. Route tree confirmed: `/meeting/[id]/page.tsx` + `/meeting/[id]/guest/page.tsx` — no other subroutes exist. **Review-process note:** this closes the gap between G0 §1 "same link" and the implementation; such requirements must enumerate the middleware redirect rule explicitly, not just the target route's status. **Verified (code):** `npx tsc --noEmit` clean (one pre-existing unrelated `AfterMeetingRecap.test.tsx` fixture error, confirmed on base), `npm run build` exit 0. **Pending live walk-through** (sandbox has no Clerk + Stream credentials): signed-out → `/meeting/[id]` → guest lobby; signed-in → `/meeting/[id]` → MeetingSetup; `/meeting-intelligence/[id]` → still protected. G4 held until G1.5 live-verified.
 - ✅ **Step G4** — Attendance + transcript compatibility for guests: **CODE COMPLETE + VERIFIED.** Root cause: `useAttendanceTracking` used Clerk's `useUser()` which returns `null` for guests, so `localIdentity` was always `null` and `post()` returned early — guests never got attendance events recorded. Fix: added optional `identityOverride` parameter to `useAttendanceTracking`, `guestName`/`guestEmail` props to `MeetingRoom`, `guestEmail` prop to `GuestStreamClientProvider`, and threaded `guestEmail` from NameModal through `GuestCallFlow` to `MeetingRoom`. Verified: `npx tsc --noEmit` clean, `npx vitest run` 175/175 green, `npm run build` exit 0.
 
+## Pending — Guest Join Edge Case Hardening (Step G6, new — after G4, before G7)
+
+`/architect` first. Enumerate and gracefully handle every plausible edge case in the G0-G4 guest join flow with Owner Approval mode. The 11 target scenarios: (1) owner leaves within milliseconds of a guest's join request; (2) guest requests and never returns (closes tab); (3) owner denies, guest immediately resubmits with a new nonce; (4) two guests request simultaneously; (5) owner flips `guest_admission_mode` from approval to open mid-flight; (6) guest's poll experiences a network drop/reconnect; (7) owner is not currently in the call when a guest requests; (8) owner ends the call while a guest is pending or freshly admitted; (9) guest is admitted but their tab was already closed before admission resolved; (10) same guest opens two separate tabs for the same meeting; (11) owner's Clerk session expires while the Accept/Deny toast is showing.
+
+- ⏳ **Step G6** — Edge case hardening (architect pass, no code yet): output `prompts/step-G6-edge-cases-architect.md` covering each of the 11 scenarios with: current actual behavior traced from code (`request-join/route.ts`, `guest-store.ts`, `MeetingRoom.tsx` toast handler, `admit`/`deny` routes, `middleware.ts`, `OverviewTab.tsx` toggle, `GuestStreamClientProvider.tsx` poll), verdict per scenario (acceptable vs needs fix), and a precise fix description if needed. G7 opens only after G6 is approved.
+
+## Pending — Responsive Polishing (Step G7, new — after G6 approval)
+
+`/architect` first (after G6 approval). Audit + fix responsiveness across every guest-facing screen (guest lobby, name modal, waiting screen, owner's Accept/Deny toast) at mobile/tablet/desktop breakpoints. Follow the same pattern as Step P13.
+
+- ✅ **Step G7** — Responsive polishing for the guest join flow (G7.1 through G7.10, built + verified). 10 canonical defects fixed across every guest-facing screen: G7.1 NameModal `p-4 sm:p-6` + `whitespace-nowrap`; G7.2 all three requesting-state cards `px-4 sm:px-8` (no bare `px-8` survives); G7.3 Accept/Deny toast `min-w-[260px] sm:min-w-[280px]` + `max-w-[calc(100vw-2rem)]` + `w-[70px] sm:w-[90px]`; G7.4 GuestWaitingScreen `px-4 sm:px-6` + `text-body-sm sm:text-body-md`; G7.5 TerminalScreen `px-4 sm:px-8`; G7.6-G7.8 revert-guard unit tests (14 new tests in `GuestResponsive.test.tsx` + 4 additions to `MeetingRoom.test.tsx`). `npx tsc --noEmit` clean, `npx vitest run` 195/195 green, `npm run build` exit 0. Prompt: `prompts/step-G7-responsive-polishing.md`.
+
+## Done — Guest Join Integration Audit (Step G8, completed)
+
+Systematically audited every existing feature/page in the app that deals with meeting participants, attendance, or post-meeting content, and confirmed guests (no Clerk account, identified via `stream_user_id`/`participant_name`/`participant_email`) are correctly represented. All 9 bugs found (G8-F1 through G8-F9) fixed and verified.
+
+**Output**: `prompts/step-G8-integration-audit.md` — audit document. All fixes applied and verified.
+
+### Bugs fixed (all verified: 200/200 tests green, `tsc --noEmit` clean, build exit 0)
+
+| ID | Area | Fix | Status |
+|----|------|-----|--------|
+| G8-F1 | `src/lib/attendance-merge.ts` — null-`user_id` guest rows collapse into one entry | Composite key now includes `stream_user_id`: `row.user_id ?? row.stream_user_id ?? row.participant_email ?? row.participant_name ?? ""` | ✅ Fixed |
+| G8-F2 | `src/app/api/meetings/[id]/route.ts` — `.eq("user_id", userId)` fails for guests | Added `.eq("stream_user_id", userId)` fallback query after primary check | ✅ Fixed |
+| G8-F3 | `src/app/api/attendance/event/route.ts` — rejects guests with 400 | Changed validation to `!user_id && !stream_user_id && !participant_email` | ✅ Fixed |
+| G8-F4 | `src/components/Navbar.tsx` — hardcoded owner greeting | Added `useUser()` hook; `user?.firstName ?? user?.username ?? "Guest"` | ✅ Fixed |
+| G8-F5 | `src/components/Sidebar.tsx` — falls back to owner identity | Changed fallbacks to `"Guest"`/`"guest@neurameet.app"` | ✅ Fixed |
+| G8-F6 | `src/components/FloatingChat.tsx` — hardcoded avatar slots | Removed hardcoded "NM"/"AI" slots; `user?.firstName ?? user?.username ?? "Guest"` | ✅ Fixed |
+| G8-F7 | `src/app/api/ai/process/route.ts` — no email notification for guests | Added `email` to request body; `clerkUser?.primaryEmailAddress?.emailAddress ?? email ?? null` | ✅ Fixed |
+| G8-F8 | `src/components/meeting-intelligence/AfterMeetingRecap.tsx` — `key={p.userId}` collapses guests | Changed to `key={p.userId ?? p.email ?? p.name}` on timeline + participant list; added `stream_user_id` to `meeting-recap.ts` query and `RawAttendanceRow` type | ✅ Fixed |
+
+**Correctly handles guests** (no fix needed): transcript download/generation, attendance PDF report, engagement tab, `CallParticipantsList` (Stream SDK), `useAttendanceTracking` data capture, export features, search (by design).
+
+**Silently omits guests by design** (acceptable — no fix needed): `OverviewTab`, `FollowUpList`, `RecordingPage`, `PreviousPage`, `UpcomingPage`, `PersonalRoomPage`, `MeetingSetup`, `EndCallButton`, `transcript/status/route.ts`, `search/route.ts`, `SettingsPage`, `DashboardContent`.
+
+✅ **Guest Stream identity rewrap fix (2026-09-19):** `GuestStreamClientProvider` now connects the already server-minted guest with `{ id, name }` plus its access token, without selecting the SDK guest-construction branch. This prevents chained `guest-...-guest-...` ids while retaining the token's server-side guest permissions. Added a source-level regression guard for the connect shape and guest marker removal. `tsc`, focused guest tests (16/16), full Vitest (204/204), and `npm run build` all pass. Live end-to-end guest join remains part of the pending owner walkthrough (G9).
+
+### Pending — Guest Join Manual Walkthrough (Step G9, reserved — after G8, before Deploy)
+
+User-owned end-to-end walkthrough of the entire Guest Join feature after G8 is complete. Catch any remaining inappropriate behavior before Deploy. No agent action — the user runs it manually.
+
 ## Pending — Product Final Polishing (Steps P0 to P11, new — before Deploy)
 
 A sequential manual QA polish pass. Each step is a discrete bug or UX fix found during a full walkthrough. Fix in priority order — P0 first (usability-blocking), then P1 through P11. Each follows the project loop: `/architect` where a decision is needed, `/develop`, `/check verify`, `/test` where regression-worthy, `/sync` to close. Zero-cost rule still applies; the only "new" UI is the P9 presentation-layer replacement that reuses the existing chat backend. No new AI/DB features beyond what the steps name.

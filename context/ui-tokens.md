@@ -140,5 +140,5 @@ Cards use `lg` (16px). Buttons/inputs use `DEFAULT`/`md`.
 - Shell is dark, main content area is light (`surface`/`surface-container-lowest`) — this inversion is correct per approved design, do not flatten to all-dark or all-light
 - Font is Hanken Grotesk (UI) + JetBrains Mono (mono labels) — never SUSE Mono, never a third family
 - Sign-in/Sign-up right panel keeps the dark testimonial treatment (`inverse-surface`) — left form panel stays light
-- Landing page hero/nav/footer stay dark (`inverse-surface`) throughout
+- Landing page is light (`surface` / `surface-container-lowest` / `on-surface` / `on-surface-variant`), consistent with the main app shell — redesigned from dark on 2026-08-25 (Step P1)
 - Old tailwind token names (`dark-1..4`, `purple-1`, `sky-1..3`, `blue-1`, `orange-1`, `yellow-1`) are **retired** — remove them from `tailwind.config.ts`, do not keep as aliases

@@ -91,7 +91,6 @@ export async function POST(req: NextRequest) {
             event: "guest.request_join",
             guest_token: guest.guest_token,
             guest_name: name,
-            guest_email: email ?? null,
             stream_user_id: created.user.id,
           },
         });

@@ -52,7 +52,11 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | G2 | Owner approval notification + Accept/Deny UI | Guest Join | done |
 | G1.5 | Signed-out visitors to the call room `/meeting/:id` redirect to the guest lobby `/meeting/:id/guest` instead of Clerk sign-in (code complete + root cause fix applied 2026-08-31, pending live verification) | Guest Join | in-progress |
 | G3 | Owner per-meeting toggle (anyone joins freely / guest approval required) | Guest Join | in-progress |
-| G4 | Attendance + transcript compatibility for guests | Guest Join | planned |
+| G4 | Attendance + transcript compatibility for guests (identityOverride param, guestName/guestEmail props, guestEmail threaded to GuestStreamClientProvider) | Guest Join | done |
+| G6 | Edge case hardening for Guest Join with Owner Approval (11 scenarios: owner-leave-ms, guest-abandons, deny-resubmit, concurrent-guests, mid-flight-mode-flip, network-drop, owner-absent, call-end-during-pending, ghost-participant, dual-tab, owner-session-expiry) | Guest Join | planned |
+| G7 | Responsive polishing for the guest join flow (every guest-facing screen at mobile/tablet/desktop) | Guest Join | done |
+| G8 | Guest Join Integration Audit: audit every existing feature/page that deals with meeting participants, attendance, or post-meeting content, confirm guests are correctly represented. Found 7 bugs (G8-F1 through G8-F7) in `attendance-merge.ts`, `meetings/[id]/route.ts`, `attendance/event/route.ts`, `Navbar.tsx`, `Sidebar.tsx`, `FloatingChat.tsx`, `ai/process/route.ts`. Output: `prompts/step-G8-integration-audit.md`. | Guest Join | done |
+| G9 | Manual live walkthrough of the entire Guest Join feature end to end (user-owned, no agent action) | Guest Join | reserved |
 | P0 | Stuck loaders / broken redirects (CRITICAL, app-wide): audit every loading state + post-action redirect; bounded timeout + safe fallback for each | Product Final Polishing | done |
 | P1 | Landing page redesign: light theme to match app tokens + real feature copy | Product Final Polishing | done |
 | P2 | Sign-in/Sign-up testimonial panel: replace fake quote with useful walkthrough/feature highlights | Product Final Polishing | done |
@@ -374,6 +378,43 @@ A guest who joins without a Clerk account has no Clerk userId but still shows up
   - [x] `npx tsc --noEmit` clean, `npm run build` exit 0
 
 **Implementation (2026-09-04):** `useAttendanceTracking` accepts optional `identityOverride` param; `MeetingRoom` passes `guestName`/`guestEmail` when `user` is null; `GuestStreamClientProvider` threads `guestEmail` to `connectUser`. Verified 175/175 tests green.
+
+### G6. Edge case hardening for Guest Join with Owner Approval · planned
+`/architect` first. Enumerate and gracefully handle every plausible edge case in the G0-G4 guest join flow with Owner Approval mode. The 11 target scenarios: (1) owner leaves within milliseconds of a guest's join request; (2) guest requests and never returns (closes tab); (3) owner denies, guest immediately resubmits with a new nonce; (4) two guests request simultaneously; (5) owner flips `guest_admission_mode` from approval to open mid-flight; (6) guest's poll experiences a network drop/reconnect; (7) owner is not currently in the call when a guest requests; (8) owner ends the call while a guest is pending or freshly admitted; (9) guest is admitted but their tab was already closed before admission resolved; (10) same guest opens two separate tabs for the same meeting; (11) owner's Clerk session expires while the Accept/Deny toast is showing.
+
+**Done when:** every edge case is analyzed against actual code, each is judged acceptable or given a precise fix, and `prompts/step-G6-edge-cases-architect.md` is approved. G7 (responsive polishing) opens only after G6 is approved.
+
+### G7. Responsive polishing for the guest join flow · in-progress
+`/architect` first (after G6 approval). Audit + fix responsiveness across every guest-facing screen (guest lobby, name modal, waiting screen, owner's Accept/Deny toast) at mobile/tablet/desktop breakpoints. Follow the same pattern as Step P13.
+
+**Done when:** every guest-facing screen is usable at 375, 768, and 1440 with no horizontal overflow or broken UI; `npx tsc --noEmit` clean, `npm run build` exit 0.
+
+- [x] Design it (spec): `/architect G7 responsive polishing` → `prompts/step-G7-responsive-polishing.md`
+
+### G8. Guest Join Integration Audit · completed
+Systematically audited every existing feature/page in the app that deals with meeting participants, attendance, or post-meeting content, and confirmed guests are correctly represented. All 9 bugs found (G8-F1 through G8-F9) fixed and verified.
+
+**Key findings and fixes:**
+- G8-F1: `src/lib/attendance-merge.ts:46` — null-`user_id` guest rows collapse into one entry → fixed: composite key `row.user_id ?? row.stream_user_id ?? row.participant_email ?? row.participant_name ?? ""`
+- G8-F2: `src/app/api/meetings/[id]/route.ts:63–77` — `.eq("user_id", userId)` 404s for guests → fixed: added `.eq("stream_user_id", userId)` fallback query
+- G8-F3: `src/app/api/attendance/event/route.ts:85` — rejects guests with 400 → fixed: validation `!user_id && !stream_user_id && !participant_email`
+- G8-F4: `src/components/Navbar.tsx:28` — hardcoded owner greeting → fixed: `user?.firstName ?? user?.username ?? "Guest"`
+- G8-F5: `src/components/Sidebar.tsx:55–57` — falls back to owner identity → fixed: `"Guest"`/`"guest@neurameet.app"`
+- G8-F6: `src/components/FloatingChat.tsx:26–47` — hardcoded avatar slots for guests → fixed: removed hardcoded slots
+- G8-F7: `src/app/api/ai/process/route.ts:201–218` — no email notification for guests → fixed: `clerkUser?.primaryEmailAddress?.emailAddress ?? email ?? null`
+- G8-F8: `src/components/meeting-intelligence/AfterMeetingRecap.tsx` — `key={p.userId}` collapses guests → fixed: `key={p.userId ?? p.email ?? p.name}` + `stream_user_id` in `meeting-recap.ts` query
+- G8-F9: `src/components/MeetingRoom.tsx:250` — `call.queryRecordings()` called unconditionally for ALL participants including guests; Stream server throws `"User '...' with role 'guest' is not allowed to perform action ListRecordings"`. Fixed: `if (!call || !isOwner) return 0;` at the top of `loadRecordings()` (line 250), which gates all four call sites (function body, `frame_recording_ready` event handler, `showRecordings` panel-open `useEffect`, and `setInterval` polling loop). The Recordings button at line 1001 is already gated by `{isOwner && (...)}`.
+
+**Correctly handles guests**: transcript download/generation, attendance PDF, engagement tab, `CallParticipantsList` (Stream SDK), `useAttendanceTracking`, search (by design), export features.
+
+**Silently omits by design**: `OverviewTab`, `FollowUpList`, `RecordingPage`, `PreviousPage`, `UpcomingPage`, `PersonalRoomPage`, `MeetingSetup`, `EndCallButton`, `transcript/status/route.ts`.
+
+- [x] Design it (spec): `/architect G8 guest join integration audit` → `prompts/step-G8-integration-audit.md`
+- [x] Apply fixes G8-F1 through G8-F8 (verified: 200/200 tests green, `tsc --noEmit` clean, build exit 0)
+- [x] `/check verify` after fixes
+
+### G9. Manual live walkthrough of Guest Join · reserved (no agent action)
+User-owned end-to-end walkthrough of the entire Guest Join feature after G6, G7, and G8 close. Catch any remaining inappropriate behavior before Deploy. No agent action — the user runs it manually.
 
 ## Product Final Polishing (Steps P0 to P11, before Deploy)
 
