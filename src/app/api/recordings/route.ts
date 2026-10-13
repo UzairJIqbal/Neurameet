@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getUserRecordings } from "@/lib/recordings";
+import { fetchUserRecordings } from "@/lib/recordings";
 
 export async function GET() {
 	const { userId } = await auth();
@@ -13,7 +13,14 @@ export async function GET() {
 		);
 	}
 
-	const recordings = await getUserRecordings(userId);
+	const { ok, recordings } = await fetchUserRecordings(userId);
+
+	if (!ok) {
+		return NextResponse.json(
+			{ error: "Failed to fetch recordings", recordings: [] },
+			{ status: 500 },
+		);
+	}
 
 	return NextResponse.json({ recordings });
 }

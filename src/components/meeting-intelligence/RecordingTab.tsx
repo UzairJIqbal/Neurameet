@@ -21,8 +21,7 @@ interface Recording {
 // (e.g. `individual_default_<callId>_user_<id>_<uuid>_audio_only_<ts>.mkv`).
 // That is unreadable in the UI, so we show a clean label and keep the original
 // filename in the tooltip for traceability (P11(d) polish).
-function cleanRecordingName(filename?: string, index = 0): string {
-  if (!filename) return `Recording ${index + 1}`;
+function cleanRecordingName(index: number): string {
   return `Recording ${index + 1}`;
 }
 
@@ -109,7 +108,7 @@ const RecordingTab = ({ meeting }: { meeting: MeetingDetailData }) => {
                   <Play className="h-4 w-4" />
                 </div>
                 <span className="font-body-md font-medium text-on-surface" title={rec.filename ?? undefined}>
-                  {cleanRecordingName(rec.filename, i)}
+                  {cleanRecordingName(i)}
                 </span>
               </div>
               {playUrl(rec) ? (

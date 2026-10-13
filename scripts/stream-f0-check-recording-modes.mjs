@@ -33,8 +33,6 @@ if (!apiKey || !secret) {
 }
 
 const client = new StreamClient(apiKey, secret);
-const TYPE = "default";
-
 function parseArgs(argv) {
   const out = { _: [], callId: null, type: "default" };
   for (let i = 0; i < argv.length; i++) {
@@ -56,7 +54,7 @@ function recordingUrl(r) {
   return r?.url || r?.file_url || r?.video_url || null;
 }
 
-async function createTestCall() {
+async function createTestCall(TYPE) {
   const callId = "f0diag-" + Date.now().toString(36);
   const botId = "f0diag-bot";
 
@@ -104,10 +102,10 @@ async function createTestCall() {
   console.log("2. Turn your MIC ON and speak for ~30-45 seconds (English or Urdu).");
   console.log("3. Leave / end the call.");
   console.log("4. Wait 1-2 minutes for Stream to finalize the audio file.");
-  console.log("5. Run: node scripts/stream-f0-check-recording-modes.mjs check --callId " + callId);
+  console.log("5. Run: node scripts/stream-f0-check-recording-modes.mjs check --callId " + callId + " --type " + TYPE);
 }
 
-async function checkCall(callId) {
+async function checkCall(TYPE, callId) {
   const call = client.video.call(TYPE, callId);
   let c;
   try {
@@ -142,9 +140,10 @@ async function checkCall(callId) {
 
   console.log("\n=== VERDICT (F0 gate) ===");
   if (recs.length === 0) {
-    console.log("NO recordings stored. This account does NOT persist any audio for this call.");
-    console.log("=> F0 BLOCKED: per-participant audio is not retrievable here. Keep manual");
-    console.log("   transcript upload (already built) as the primary path, or revisit the Stream plan.");
+    console.log("NO recordings listed yet. Stream lists a recording only after it finishes");
+    console.log("processing, which can take several minutes after the call ends.");
+    console.log("=> F0 PENDING: re-run this check in a few minutes. Treat it as BLOCKED only if");
+    console.log("   recordings are still missing well after the call ended.");
     return;
   }
   console.log("individual (per-participant) audio present: " + gotIndividual);
@@ -172,13 +171,13 @@ async function main() {
     process.exit(1);
   }
   if (command === "create") {
-    await createTestCall();
+    await createTestCall(args.type);
   } else if (command === "check") {
     if (!args.callId) {
       console.error("check requires --callId <id>");
       process.exit(1);
     }
-    await checkCall(args.callId);
+    await checkCall(args.type, args.callId);
   } else {
     console.error("Unknown command: " + command);
     process.exit(1);

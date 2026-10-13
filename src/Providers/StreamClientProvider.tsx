@@ -32,9 +32,13 @@ const StreamVideoProvider = ({ children }: { children: React.ReactNode }) => {
 	// user (or the client can't be created) videoClient stays null and the page
 	// spins forever with no escape. Borrow P0's bounded timeout so we surface a
 	// recoverable error + Retry instead of an infinite spinner.
-	const { timedOut } = useLoadingTimeout(!videoClient && !isGuestLobby, {
-		timeoutMs: 12000,
-	});
+	// A signed-out user never gets a client, so they are not a connection
+	// failure; they get a sign-in prompt below instead of the timeout error.
+	const isSignedOut = isLoaded && !user;
+	const { timedOut } = useLoadingTimeout(
+		!videoClient && !isGuestLobby && !isSignedOut,
+		{ timeoutMs: 12000 },
+	);
 
 	useEffect(() => {
 		if (!isLoaded || !user) return;
@@ -91,6 +95,18 @@ const StreamVideoProvider = ({ children }: { children: React.ReactNode }) => {
 
 	// Guest lobby: skip this provider entirely — the page handles its own Stream client.
 	if (isGuestLobby) return <>{children}</>;
+
+	if (isSignedOut) {
+		return (
+			<div className="flex h-screen w-full items-center justify-center">
+				<LoadError
+					message="Sign in to continue."
+					listHref="/sign-in"
+					listLabel="Sign in"
+				/>
+			</div>
+		);
+	}
 
 	if (timedOut) {
 		return (

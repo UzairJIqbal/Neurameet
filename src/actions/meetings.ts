@@ -20,8 +20,9 @@ export type CreateMeetingRowResult =
 // Persist a Supabase meetings row at schedule time so the scheduled meeting
 // appears in Meeting Intelligence with its real title immediately, rather than
 // only after the first attendance join. Scheduled meetings store their title in
-// the Stream call's custom.title; this writes it into meetings.title. Upsert on
-// stream_call_id keeps re-scheduling the same call id idempotent.
+// the Stream call's custom.title; this writes it into meetings.title.
+// Re-scheduling the same call id updates the caller's own row; a row owned by
+// someone else is never touched, so a known call id cannot take over ownership.
 export async function createScheduledMeetingRow(params: {
   streamCallId: string;
   title: string;
@@ -40,18 +41,34 @@ export async function createScheduledMeetingRow(params: {
 
   try {
     const supabase = supabaseServer();
+    const fields = {
+      title,
+      status: "scheduled",
+      started_at: params.startsAt,
+      guest_admission_mode: params.guestAdmissionMode ?? "approval",
+    };
 
-    const { error } = await supabase.from("meetings").upsert(
-      {
-        user_id: userId,
-        stream_call_id: params.streamCallId,
-        title,
-        status: "scheduled",
-        started_at: params.startsAt,
-        guest_admission_mode: params.guestAdmissionMode ?? "approval",
-      },
-      { onConflict: "stream_call_id" },
-    );
+    const { data: existing, error: findError } = await supabase
+      .from("meetings")
+      .select("id, user_id")
+      .eq("stream_call_id", params.streamCallId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error("createScheduledMeetingRow lookup failed:", findError);
+      return { ok: false, error: "Failed to save meeting" };
+    }
+    if (existing && existing.user_id !== userId) {
+      return { ok: false, error: "Not authorized" };
+    }
+
+    const { error } = existing
+      ? await supabase.from("meetings").update(fields).eq("id", existing.id)
+      : await supabase.from("meetings").insert({
+          ...fields,
+          user_id: userId,
+          stream_call_id: params.streamCallId,
+        });
 
     if (error) {
       console.error("createScheduledMeetingRow failed:", error);

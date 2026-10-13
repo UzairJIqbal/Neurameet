@@ -136,7 +136,7 @@ const RecordingPage = () => {
   const handleDeleteRecording = async (id?: string) => {
     if (!id) return;
     try {
-      const res = await fetch(`/api/recordings/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/recordings/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `Delete failed: ${res.status}`);

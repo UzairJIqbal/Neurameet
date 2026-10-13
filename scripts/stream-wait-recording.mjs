@@ -46,3 +46,4 @@ for (let i = 1; i <= maxTicks; i++) {
   await sleep(gapMs);
 }
 console.log("Poll finished with no ready recording. The call may not have recorded (check started_at).");
+process.exitCode = 1;

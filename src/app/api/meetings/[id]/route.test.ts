@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
   const store = {
     meetings: { data: null as unknown, error: null as unknown },
-    attendance: { data: null as unknown, error: null as unknown },
+    attendanceRows: [] as Array<Record<string, unknown>>,
     insights: { data: null as unknown, error: null as unknown },
     actionItems: { data: null as unknown, error: null as unknown },
   };
@@ -13,17 +13,30 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
       const result =
         table === "meetings"
           ? store.meetings
-          : table === "attendance_events"
-            ? store.attendance
-            : table === "meeting_insights"
-              ? store.insights
-              : table === "action_items"
-                ? store.actionItems
-                : { data: null, error: null };
+          : table === "meeting_insights"
+            ? store.insights
+            : table === "action_items"
+              ? store.actionItems
+              : { data: null, error: null };
+      // attendance_events applies the eq filters, so a row for another
+      // meeting or another user never counts as proof of participation.
+      const filters: Array<[string, unknown]> = [];
+      const attendance = () => ({
+        data: store.attendanceRows.filter((r) =>
+          filters.every(([col, val]) => r[col] === val),
+        ),
+        error: null,
+      });
       const builder = {
-        eq: () => builder,
+        eq: (col: string, val: unknown) => {
+          filters.push([col, val]);
+          return builder;
+        },
         single: () => Promise.resolve(result),
-        limit: () => Promise.resolve(result),
+        limit: () =>
+          Promise.resolve(
+            table === "attendance_events" ? attendance() : result,
+          ),
       };
       return { select: () => builder };
     },
@@ -62,7 +75,7 @@ describe("GET /api/meetings/[id] authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.meetings = { data: null, error: null };
-    store.attendance = { data: null, error: null };
+    store.attendanceRows = [];
     store.insights = {
       data: {
         summary: "s",
@@ -95,7 +108,7 @@ describe("GET /api/meetings/[id] authorization", () => {
     // Clerk account. Before the fix the strict owner-only .single() threw
     // PGRST116 (0 rows) and returned "Meeting not found" (404).
     store.meetings = { data: meetingRow("owner"), error: null };
-    store.attendance = { data: [{ user_id: "participant" }], error: null };
+    store.attendanceRows = [{ meeting_id: "m1", user_id: "participant" }];
 
     const res = await call("participant", "m1");
     expect(res.status).toBe(200);
@@ -105,7 +118,12 @@ describe("GET /api/meetings/[id] authorization", () => {
 
   it("still rejects a caller who is neither owner nor participant", async () => {
     store.meetings = { data: meetingRow("owner"), error: null };
-    store.attendance = { data: [], error: null };
+    // Someone else attended this meeting, and the stranger attended another
+    // one: neither row may authorize the stranger here.
+    store.attendanceRows = [
+      { meeting_id: "m1", user_id: "participant" },
+      { meeting_id: "m2", user_id: "stranger" },
+    ];
 
     const res = await call("stranger", "m1");
     expect(res.status).toBe(404);

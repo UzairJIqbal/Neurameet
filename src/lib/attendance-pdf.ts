@@ -86,6 +86,16 @@ export function buildReportRows(
   return { headers, lines };
 }
 
+// The standard Helvetica font only encodes WinAnsi characters and pdf-lib
+// throws on anything else (Urdu, CJK, emoji...). Names and titles come from
+// user input, so swap unsupported characters for "?" instead of failing the
+// whole report.
+function toFontSafe(text: string, supported: ReadonlySet<number>): string {
+  return Array.from(text, (ch) =>
+    supported.has(ch.codePointAt(0) ?? 0) ? ch : "?",
+  ).join("");
+}
+
 export async function generateAttendancePdf(
   meeting: MeetingDetailData,
   rows: AttendanceRow[],
@@ -94,7 +104,12 @@ export async function generateAttendancePdf(
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  const { headers, lines } = buildReportRows(meeting, rows);
+  const supported = new Set(regular.getCharacterSet());
+  const built = buildReportRows(meeting, rows);
+  const headers = built.headers;
+  const lines = built.lines.map((line) =>
+    line.map((cell) => toFontSafe(cell, supported)),
+  );
 
   const colX: number[] = [];
   let cursor = MARGIN;
@@ -121,7 +136,10 @@ export async function generateAttendancePdf(
   y -= 16;
 
   page.drawText(
-    `${meeting.title || "Untitled meeting"}  ·  ${dateStr}  ·  ${meeting.status}`,
+    toFontSafe(
+      `${meeting.title || "Untitled meeting"}  ·  ${dateStr}  ·  ${meeting.status}`,
+      supported,
+    ),
     { x: MARGIN, y: y - 14, size: 10, font: regular, color: rgb(0.2, 0.2, 0.2) },
   );
   y -= 28;

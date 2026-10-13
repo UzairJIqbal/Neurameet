@@ -25,19 +25,23 @@ const recordingsCache = new Map<
   { expiry: number; value: RecordingItem[] }
 >();
 
+export type RecordingsResult = { ok: boolean; recordings: RecordingItem[] };
+
 // Returns every recording across the calls this user created (owner-only, per
 // D3.4 recording access control). Calls the Stream Video API: queryCalls for
-// the user's calls, then listRecordings per call. Returns an empty array on any
-// failure so callers can degrade gracefully instead of crashing the request.
-export async function getUserRecordings(
+// the user's calls, then listRecordings per call. `ok` is false when Stream is
+// unconfigured or unreachable, so callers can tell an outage from "no
+// recordings". A failed per-call lookup keeps the partial list but skips the
+// cache, so the next request retries instead of serving it for the full TTL.
+export async function fetchUserRecordings(
   userId: string,
-): Promise<RecordingItem[]> {
+): Promise<RecordingsResult> {
   const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
   const secretKey = process.env.STREAM_SECRET_KEY;
 
   if (!apiKey || !secretKey) {
     console.error("getUserRecordings: missing Stream API keys");
-    return [];
+    return { ok: false, recordings: [] };
   }
 
   try {
@@ -45,7 +49,7 @@ export async function getUserRecordings(
 
     const cached = recordingsCache.get(userId);
     if (cached && Date.now() < cached.expiry) {
-      return cached.value;
+      return { ok: true, recordings: cached.value };
     }
 
     const callsResponse = await client.video.queryCalls({
@@ -57,6 +61,7 @@ export async function getUserRecordings(
     });
 
     const calls = callsResponse.calls || [];
+    let partial = false;
 
     const allRecordings = await Promise.all(
       calls.map(async (call: StreamCallItem) => {
@@ -90,22 +95,32 @@ export async function getUserRecordings(
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.warn(`getUserRecordings: call ${callId}: ${msg}`);
+          partial = true;
           return [];
         }
       }),
     );
 
     const result = allRecordings.flat();
-    recordingsCache.set(userId, {
-      expiry: Date.now() + RECORDINGS_CACHE_TTL_MS,
-      value: result,
-    });
-    return result;
+    if (!partial) {
+      recordingsCache.set(userId, {
+        expiry: Date.now() + RECORDINGS_CACHE_TTL_MS,
+        value: result,
+      });
+    }
+    return { ok: true, recordings: result };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("getUserRecordings: API error:", msg);
-    return [];
+    return { ok: false, recordings: [] };
   }
+}
+
+// Same list, empty on failure, for callers that only need best-effort data.
+export async function getUserRecordings(
+  userId: string,
+): Promise<RecordingItem[]> {
+  return (await fetchUserRecordings(userId)).recordings;
 }
 
 // Owner-only delete: only the user's own recordings (resolved through
@@ -124,7 +139,8 @@ export async function deleteUserRecording(
   }
 
   try {
-    const recordings = await getUserRecordings(userId);
+    const { ok, recordings } = await fetchUserRecordings(userId);
+    if (!ok) return { ok: false, error: "Recordings unavailable" };
     const rec = recordings.find((r) => r.id === recordingId);
     if (!rec) return { ok: false, error: "Recording not found" };
 

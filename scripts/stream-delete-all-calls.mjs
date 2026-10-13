@@ -66,3 +66,4 @@ for (const c of allCalls) {
   await sleep(350);
 }
 console.log(`Deleted ${deleted} of ${allCalls.length} call(s). Failed: ${failed}.`);
+if (failed > 0) process.exitCode = 1;

@@ -105,9 +105,9 @@ test.describe("Owner Recording tab duplicate-key regression (F7b /debug)", () =>
     // Open the Recording tab (owner-only).
     await page.getByRole("button", { name: "Recording" }).click();
 
-    // Both tracks must render.
-    await expect(page.getByText("Track A")).toBeVisible();
-    await expect(page.getByText("Track B")).toBeVisible();
+    // Both tracks must render (clean labels, raw filename kept in the tooltip).
+    await expect(page.getByTitle("Track A")).toBeVisible();
+    await expect(page.getByTitle("Track B")).toBeVisible();
 
     // Give React a tick to flush any key warning.
     await page.waitForTimeout(500);
