@@ -24,20 +24,50 @@ export async function POST(request: Request) {
 
     const supabase = supabaseServer();
 
-    // Scope check: confirm the meeting belongs to this user before embedding.
+    // Scope check: the meeting must exist and the caller must be the owner OR a
+    // recorded participant. This mirrors the lenient ownership rule in
+    // /api/transcript/upload — a participant may upload a transcript under a
+    // different Clerk account than the creator, so a strict owner-only check
+    // here would wrongly reject the embed that follows their own upload and
+    // surface "Meeting not found" (404) to the client.
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id")
+      .select("id, user_id")
       .eq("id", meetingId)
-      .eq("user_id", userId)
       .single();
 
     if (meetingError || !meeting) {
-      console.error("Meeting not found or not owned by user:", meetingError);
+      console.error("Meeting not found:", meetingError);
       return NextResponse.json(
         { error: "Meeting not found" },
         { status: 404 },
       );
+    }
+
+    if (meeting.user_id !== userId) {
+      const { data: part } = await supabase
+        .from("attendance_events")
+        .select("user_id")
+        .eq("meeting_id", meeting.id)
+        .eq("user_id", userId)
+        .limit(1);
+      if (!part || part.length === 0) {
+        // Guests may have a NULL user_id in attendance_events;
+        // match on stream_user_id (the guest's Stream identity).
+        const { data: guestPart } = await supabase
+          .from("attendance_events")
+          .select("user_id")
+          .eq("meeting_id", meeting.id)
+          .eq("stream_user_id", userId)
+          .limit(1);
+        if (!guestPart || guestPart.length === 0) {
+          console.error("Meeting not authorized for user:", userId);
+          return NextResponse.json(
+            { error: "Meeting not found" },
+            { status: 404 },
+          );
+        }
+      }
     }
 
     // Fetch the transcript for this meeting

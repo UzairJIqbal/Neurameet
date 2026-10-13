@@ -24,12 +24,12 @@ export const actionItemSchema = z.object({
   title: z.string().describe("A clear, actionable task title"),
   assignee: z
     .string()
-    .optional()
-    .describe("The person responsible, if mentioned"),
+    .nullable()
+    .describe("The person responsible, or null if not mentioned"),
   dueDate: z
     .string()
-    .optional()
-    .describe("Due date in ISO format (YYYY-MM-DD), if mentioned"),
+    .nullable()
+    .describe("Due date in ISO format (YYYY-MM-DD), or null if not mentioned"),
 });
 
 export type ActionItem = z.infer<typeof actionItemSchema>;

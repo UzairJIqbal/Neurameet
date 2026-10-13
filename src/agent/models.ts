@@ -4,12 +4,20 @@ import { generateText, generateObject } from "ai";
 import { z } from "zod";
 
 export const primaryModel = google("gemini-flash-latest");
-// Groq's free-tier models (e.g. llama-3.1-8b-instant) support response_format
-// json_object but NOT json_schema. structuredOutputs is disabled per-call on the
-// fallback (providerOptions.groq.structuredOutputs: false) so the Groq provider
-// emits json_object while the SDK still validates the result against our Zod
-// schema client-side.
-export const fallbackModel = groq("llama-3.1-8b-instant");
+// Groq fallback: openai/gpt-oss-20b (20B open-weight reasoning model, free tier).
+// This account's Groq key does NOT expose the older llama-3.x chat models
+// (llama-3.1-8b-instant was retired by Groq; llama-3.3-8b-versatile is absent
+// from this account), so we fall back to gpt-oss-20b instead.
+// gpt-oss-20b supports response_format json_schema (Structured Outputs), so the
+// fallback uses the same default structured-outputs path as the Gemini primary —
+// Groq enforces the schema and the SDK validates the result against our Zod
+// schema. (NOTE: gpt-oss does NOT work in json_object mode — Groq then requires
+// the literal word "json" in the messages, which the SDK's json_object path does
+// not supply. The older llama-3.x fallbacks needed json_object, but gpt-oss does
+// not.) gpt-oss is a reasoning model; Structured Outputs' streaming/tool-use
+// restriction does not apply here because the fallback uses non-streaming
+// generateObject.
+export const fallbackModel = groq("openai/gpt-oss-20b");
 
 // Select the chat model BEFORE streaming. Mid-stream provider failover is not
 // possible with streamText (once tokens reach the client, a Groq handoff would
@@ -17,7 +25,30 @@ export const fallbackModel = groq("llama-3.1-8b-instant");
 // 1-token call; on failure/timeout we fall back to Groq for the whole stream.
 const PROBE_TIMEOUT_MS = 4000;
 
+// Cache the resolved model for a short window. Once Gemini is found dead (or
+// alive) we reuse the decision instead of re-probing on every chat message,
+// which would add a full PROBE_TIMEOUT_MS wait and a repeated error log on each
+// call when Gemini is unreachable.
+const PROBE_CACHE_TTL_MS = 60_000;
+let cachedModel: typeof primaryModel | null = null;
+let cachedModelExpiry = 0;
+// Concurrent cache misses share one in-flight probe instead of each probing.
+let inflightProbe: Promise<typeof primaryModel> | null = null;
+
 export async function resolveChatModel(): Promise<typeof primaryModel> {
+  if (cachedModel && Date.now() < cachedModelExpiry) {
+    return cachedModel;
+  }
+  if (!inflightProbe) {
+    inflightProbe = probeChatModel().finally(() => {
+      inflightProbe = null;
+    });
+  }
+  return inflightProbe;
+}
+
+async function probeChatModel(): Promise<typeof primaryModel> {
+  let resolved: typeof primaryModel = primaryModel;
   try {
     await Promise.race([
       generateText({ model: primaryModel, prompt: "ping", maxOutputTokens: 1 }),
@@ -28,11 +59,14 @@ export async function resolveChatModel(): Promise<typeof primaryModel> {
         ),
       ),
     ]);
-    return primaryModel;
   } catch (err) {
-    console.error("Gemini probe failed, using Groq for chat:", err);
-    return fallbackModel as unknown as typeof primaryModel;
+    console.warn("Gemini probe failed, using Groq for chat:", err);
+    resolved = fallbackModel as unknown as typeof primaryModel;
   }
+
+  cachedModel = resolved;
+  cachedModelExpiry = Date.now() + PROBE_CACHE_TTL_MS;
+  return resolved;
 }
 
 export async function withFallback<T>(
@@ -47,18 +81,14 @@ export async function withFallback<T>(
 }
 
 // Structured-object generation (generateObject) with provider fallback.
-// Gemini supports response_format json_schema (the AI SDK default for
-// generateObject); Groq does NOT and rejects it with
-// "This model does not support response format json_schema". When we fall back
-// to Groq we force loose JSON mode (response_format json_object), which Groq
-// supports, while still parsing/validating the result against the Zod schema.
-// Structured-object generation (generateObject) with provider fallback.
-// Gemini supports response_format json_schema (the AI SDK default for
-// generateObject); Groq does NOT and rejects it with
-// "This model does not support response format json_schema". On the Groq
-// fallback we disable structuredOutputs so the provider emits json_object
-// (response_format json_object), which Groq supports, while the SDK still
-// parses/validates the result against the Zod schema.
+// Both Gemini and the Groq fallback (openai/gpt-oss-20b) use the default
+// response_format json_schema path. Groq enforces STRICT structured outputs:
+// every property in `properties` MUST be listed in `required`. So any Zod
+// schema passed here must NOT use `.optional()` for object fields — use
+// `.nullable()` instead (keeps the key in `required` as ["string","null"]).
+// Optional fields would make the Groq fallback 400 with
+// "`required` ... must be supplied ... including every key in properties",
+// which only surfaces when Gemini is down and the call falls back to Groq.
 export async function generateStructuredWithFallback<OBJECT>({
   schema,
   prompt,
@@ -77,13 +107,14 @@ export async function generateStructuredWithFallback<OBJECT>({
       maxRetries: 0,
     });
   } catch (error) {
-    console.error("Gemini structured call failed, falling back to Groq:", error);
+    console.warn("Gemini structured call failed, falling back to Groq:", error);
+    // gpt-oss-20b supports json_schema, so use the default structured-outputs
+    // path (no providerOptions override) — same as the Gemini primary.
     return await generateObject({
       model: fallbackModel,
       schema,
       prompt,
       maxRetries: 1,
-      providerOptions: { groq: { structuredOutputs: false } },
     });
   }
 }
