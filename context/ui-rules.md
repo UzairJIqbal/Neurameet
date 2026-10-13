@@ -35,7 +35,7 @@ Items: Dashboard, Meeting Intelligence, AI Chat, Recordings, Follow-ups, Setting
 ```
 background: bg-surface-container-lowest (#FFFFFF)
 border: 1px solid theme(colors.outline-variant)
-border-radius: 12px (rounded-xl)
+border-radius: 16px (rounded-lg, per ui-tokens.md)
 padding: 24px (p-6)
 ```
 

@@ -51,7 +51,7 @@ Phase 3, Meeting Experience Polish (new — sequential Steps D0 to D3+, after Ad
   ZERO-COST RULE applies as for Advanced: Stream free tier only.
 
 Transcript Generation (new — sequential Steps F0 to F6, after Meeting Experience Polish, before Deploy):
-  Step F0, Architect: verify Stream individual recording access + Groq Whisper API shape + zero-cost feasibility for both; confirm the D3.4 finding (composite frame recording proven non-functional on this account; the per-call `individual_recording` override may be a no-op — verify against the installed Stream SDK before assuming it works) and decide the exact trigger (on call end vs an on-demand button) and where the merge/format logic lives.
+  Step F0 (done — gate passed 2026-08-22), Architect: verify Stream individual recording access + Groq Whisper API shape + zero-cost feasibility for both; confirm the D3.4 finding (composite frame recording proven non-functional on this account; the per-call `individual_recording` override may be a no-op — verify against the installed Stream SDK before assuming it works) and decide the exact trigger (on call end vs an on-demand button) and where the merge/format logic lives.
   Step F1, Fetch individual audio recordings per participant after a call ends (or on trigger).
   Step F2, Transcribe each track via Groq Whisper free tier (English + Urdu, auto language detection, timestamped segments).
   Step F3, Merge tracks into a chronological speaker-labeled transcript ("SpeakerName: text" per line).
@@ -86,7 +86,7 @@ See `context/architecture.md` for full Supabase schema (`meetings`, `transcripts
 
 ## API Contracts
 ```
-POST /api/transcript/upload      → accepts file/text (+ optional owned meetingId to attach the transcript to an existing meeting instead of creating a duplicate), stores transcript, kicks off processing
+POST /api/transcript/upload      → accepts file/text (+ optional meetingId the caller owns or attended, to attach the transcript to an existing meeting instead of creating a duplicate), stores transcript, kicks off processing
 POST /api/ai/process              → summary + action items + category extraction (Gemini/Groq via AI SDK)
 POST /api/ai/embed                → chunk + embed transcript into meeting_chunks (pgvector)
 POST /api/ai/chat                 → RAG chat for a given meetingId, streamed response

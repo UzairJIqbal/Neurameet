@@ -117,12 +117,12 @@ All Advanced features reuse the existing Gemini primary + Groq fallback and pgve
 - All zero cost, Stream free tier only — every candidate Stream feature confirmed free via the Stream skill before adoption. No paid Stream plan.
 
 ### Transcript Generation (new — Steps F0 to F6, before Deploy)
-- Auto-generated, speaker-labeled transcripts from real meeting audio — the primary path replaces manual paste/upload (manual upload stays as a fallback, not removed)
+- On-demand, speaker-labeled transcripts from real meeting audio, downloaded as a `.txt` (as built in F7b); manual upload remains the path into AI processing
 - Reuse Stream `individual_recording` (one audio track per participant) so speaker identity is known without a diarization model
 - Transcribe each participant track via Groq Whisper free tier (English + Urdu, auto language detection, timestamped segments)
 - Merge tracks chronologically into a "SpeakerName: text" formatted transcript
-- Feed the result into the existing Upload Transcript → AI Processing pipeline unchanged (Summary, Action Items, Category, RAG embeddings)
-- F0 architect gate: confirm Stream individual recording actually yields per-participant audio on this account (the D3.4 recovery proved composite recording non-functional and the `individual_recording` override may be a no-op) before committing F1
+- Summary, Action Items, Category and RAG embeddings run only when the transcript is uploaded through the existing Upload Transcript → AI Processing flow
+- F0 architect gate: passed 2026-08-22 — Stream individual recording yields per-participant audio on this account
 - All zero cost — Stream individual recording + Groq Whisper free tier only. No paid transcription service or second provider.
 
 ## Features Out of Scope

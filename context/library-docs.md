@@ -105,7 +105,7 @@ import { google } from "@ai-sdk/google";
 import { groq } from "@ai-sdk/groq";
 
 export const primaryModel = google("gemini-flash-latest");
-export const fallbackModel = groq("llama-3.3-8b-versatile");
+export const fallbackModel = groq("openai/gpt-oss-20b");
 
 export async function withFallback<T>(fn: (model: typeof primaryModel) => Promise<T>): Promise<T> {
   try {
@@ -198,9 +198,9 @@ Only used if a meeting's detected topic/company benefits from a short public-web
 **MIT, zero cost, zero Next.js config.** No `serverExternalPackages` / `transpilePackages` needed (unlike `@react-pdf/renderer`, which breaks the Next 15 + React 19 bundler). Pure JS, runs in a Node-runtime API route.
 
 **Rules:**
-- Generation lives server-side only: `src/lib/attendance-pdf.ts` (pure generator, no `"use client"`) + `src/app/api/attendance/report/route.ts` (owner-checked, returns `application/pdf`). Attendance data never reaches the browser.
+- Generation lives server-side only: `src/lib/attendance-pdf.ts` (pure generator, no `"use client"`) + `src/app/api/attendance/report/route.ts` (owner-checked, returns `application/pdf`). Raw attendance rows never reach the browser; the owner receives only the generated PDF.
 - Route must set `export const runtime = "nodejs"` (it uses `supabaseServer()`).
-- Use `StandardFonts.Helvetica` / `HelveticaBold`. Standard fonts cover the ASCII/Latin names, emails, and timestamps in our data — do NOT register a TTF unless we later need non-Latin glyphs.
+- Use `StandardFonts.Helvetica` / `HelveticaBold`. Standard fonts cover the ASCII/Latin names, emails, and timestamps in our data — names outside WinAnsi are sanitized in `attendance-pdf.ts` before drawing; do NOT register a TTF unless we later need non-Latin glyphs.
 - Render timestamps in **UTC** and label them `(UTC)` — deterministic, avoids server-locale drift. This is a PDF byte buffer, not a DOM component, so the "no hex colors" UI rule does not apply; use plain `rgb()`.
 - Return the PDF from a route as `new NextResponse(pdfBytes, { headers: { "Content-Type": "application/pdf", "Content-Disposition": \`attachment; filename="..."\` } })`.
 - Keep the layout small and explicit (this is a tabular report). `buildReportRows()` is the pure, unit-testable core; `generateAttendancePdf()` wraps it. Test with `npx tsx scripts/check-attendance-pdf.ts` (no browser needed — asserts columns/counts + `%PDF-` header).
