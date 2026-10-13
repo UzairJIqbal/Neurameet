@@ -1,64 +1,46 @@
-# Memory — G4 Guest Attendance/Transcript Attribution (completed)
+# Memory — Guest Stream Identity Rewrapping Fix
 
-Last updated: 2026-09-04
+Last updated: 2026-09-19T12:18:24+05:00
 
 ## What was built
 
-Completed Step G4: made guests attributable in the attendance and transcript pipeline. The root cause was that `useAttendanceTracking` used Clerk's `useUser()` which returns `null` for guests, so `localIdentity` was always `null` and `post()` returned early — guests never got attendance events recorded, appearing as invisible "Speaker <hex>" in transcripts and missing entirely from attendance reports.
-
-**Changes across 4 source files + 1 test file:**
-- `src/hooks/useAttendanceTracking.ts` — Added optional `identityOverride` parameter. When `user` is null and override provided, builds `localIdentity` from `localParticipant?.userId` + override name/email instead of returning `null`.
-- `src/components/MeetingRoom.tsx` — Added `guestName`/`guestEmail` props, moved `useLocalParticipant` into `useCallStateHooks` destructuring (was missing), passes override to `useAttendanceTracking`.
-- `src/components/GuestStreamClientProvider.tsx` — Added `guestEmail` prop (typed `string | null`), threaded into `connectUser()` and `useEffect` dependency array.
-- `src/app/(root)/meeting/[id]/guest/page.tsx` — Threaded `guestEmail` from NameModal through `GuestStreamClientProvider` → `GuestCallFlow` → `MeetingRoom`.
-- `src/components/MeetingRoom.test.tsx` — Added `useLocalParticipant` to mock factory.
+- Updated [src/components/GuestStreamClientProvider.tsx](./src/components/GuestStreamClientProvider.tsx) so an already server-minted guest connects with `{ id, name }` and its access token, without a client-side guest type marker.
+- Added [src/components/GuestStreamClientProvider.test.tsx](./src/components/GuestStreamClientProvider.test.tsx) regression guards for the authenticated connection shape and absence of the guest marker.
+- Updated [context/progress-tracker.md](./context/progress-tracker.md) with the identity rewrapping fix and verification status.
 
 ## Decisions made
 
-- **`identityOverride` approach** — rather than duplicating the hook, added an optional parameter so the same `useAttendanceTracking` function handles both signed-in and guest paths.
-- **`guestEmail` typed `string | null`** in `GuestStreamClientProvider` — the NameModal provides `email || undefined`, but `GuestStreamClientProvider` accepts `null` to match the prop signature.
-- **No changes to `parseStreamUserId`/`resolveSpeakerName`** — the regex `/user_([^_]+)_/` already captures `guest-<8hex>` from recording filenames, and `resolveSpeakerName` already matches `stream_user_id`. These work for guests IF the attendance event exists (which G4 now ensures).
-- **No schema changes needed** — `attendance_events.user_id` was already made nullable via migration in `supabase/schema.sql`.
+- `POST /api/guest/request-join` remains the single guest-minting point. The client must use the returned Stream user id and token directly.
+- Do not pass `type: "guest"` to the installed Stream SDK after server-side minting. That SDK branch calls `/guest` again and creates a second wrapped guest identity.
+- Guest permissions remain server-authorized by the access token and Stream call permissions; omitting the client-side type does not promote the guest to a full user.
 
 ## Problems solved
 
-- **Guests invisible in attendance/transcripts**: `useAttendanceTracking` returned `null` identity for guests → `post()` skipped → no attendance events. Fixed with `identityOverride`.
-- **`useLocalParticipant` missing from `MeetingRoom.test.tsx` mock**: Adding `useLocalParticipant()` to `MeetingRoom.tsx` broke all 11 MeetingRoom tests because the mock factory didn't include it. Fixed by adding `useLocalParticipant: h.useLocalParticipant` to both the mock factory and the `h` hoisted return object.
-- **Type errors on `userId`**: `localParticipant?.userId` returns `string | undefined`, but `AttendanceIdentity.userId` is typed `string`. Fixed by coalescing to empty string `""`.
+- Prevented chained Stream ids such as `guest-...-guest-...`, which were caused by the SDK re-minting a guest when the provider passed the guest type.
+- Preserved the existing guest display name, participant flow, admission flow, redirect logic, and owner-only recordings UI.
 
 ## Current state
 
-- **Verification**: `npx tsc --noEmit` clean, `npx vitest run` 175/175 green, `npm run build` exit 0 — all verified.
-- **G4 code complete and committed** (commits `c6189bf` and `ea89631`).
-- **G3 code complete** across all four pre-join creation paths.
-- `context/progress-tracker.md`, `docs/scope/scope.md`, `memory.md` all updated to reflect G4 done.
-- **G1.5 live verification** still pending (needs Clerk + Stream credentials).
-- **G3 live verification** still pending (needs Clerk + Stream credentials).
+- Installed SDK source was verified:
+  - `StreamVideoClient.connectUser()` routes users with `type === "guest"` to `connectGuestUser()`.
+  - `connectGuestUser()` POSTs to `/guest` and connects with the newly returned credentials.
+  - Omitting `type` uses the normal authenticated `connectUser(user, token)` path.
+- No `type: "guest"` remains in `GuestStreamClientProvider`.
+- Verification passed:
+  - `npx tsc --noEmit`
+  - Focused guest tests: 16/16
+  - Full Vitest: 204/204
+  - `npm run build`
+- A live Clerk/Stream meeting was not available in this environment, so fresh guest id persistence, participant count, after-meeting redirect, and recordings denial still need real-account verification.
+- The worktree contains unrelated pre-existing changes; do not revert them.
 
 ## Next session starts with
 
-1. **Live browser walk-through** (user's responsibility — needs Clerk + Stream credentials):
-   - Verify guest admission toggle works in all four pre-join paths
-   - Verify guests now appear in attendance reports and transcripts by name
-   - Owner toggles "Anyone can join" → guest `request-join` returns `waiting: false` → phase jumps to `"admitted"` immediately
-   - Owner toggles "Approval required" → guest sees "Waiting for the host" → owner gets Accept/Deny toast → Accept → guest joins
-   - Check `guest_admission_mode` column exists in live Supabase DB
-2. **Step G1.5** — Signed-out call room redirect live verification
-3. **Product Final Polishing steps (P0–P11)**
+1. Run the owner-controlled live G9 guest walkthrough with real Clerk, Stream, and Supabase credentials.
+2. Verify a fresh guest join creates one clean `stream_user_id` with no concatenated guest id.
+3. Confirm the owner sees exactly one participant, the guest reaches the after-meeting redirect, and the guest cannot access recordings while the owner can.
+4. If live verification passes, update the pending G9 status in [context/progress-tracker.md](./context/progress-tracker.md) and run the final checks again.
 
 ## Open questions
 
-- Whether `guest_admission_mode` column migration in `supabase/schema.sql` has been applied to the live Supabase DB.
-- Live browser walk-through of the G3 pre-join toggle has NOT been completed.
-- Live browser walk-through of G4 guest attribution has NOT been completed.
-- G1.5 live verification pending Clerk + Stream credentials.
-
-## Key files for continuation
-
-- `src/hooks/useAttendanceTracking.ts` — The core hook fix for guest attribution
-- `src/components/MeetingRoom.tsx` — Receives and forwards guest identity
-- `src/components/GuestStreamClientProvider.tsx` — Threads `guestEmail` to Stream
-- `src/app/(root)/meeting/[id]/guest/page.tsx` — Entry point threading email through
-- `src/components/MeetingRoom.test.tsx` — Updated mock for `useLocalParticipant`
-- `context/progress-tracker.md` — Full project progress
-- `AGENTS.md` — Project instructions, zero-cost rules, data model, API contracts
+- Live end-to-end behavior remains unconfirmed because no authenticated meeting session was available during this session.

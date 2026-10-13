@@ -96,8 +96,14 @@ export default function GuestStreamClientProvider({
 		// is authoritative (sourced from createGuestUser's stored user.name via the
 		// request-join response), NOT client-supplied form state — preventing a
 		// guest from spoofing an arbitrary name.
+		//
+		// Do not mark this user as a guest in the client options. The SDK treats
+		// that marker as a request to call /guest and mint another guest. This
+		// token already belongs to the server-minted guest, so the authenticated
+		// token path preserves its server-side guest permissions without
+		// rewrapping the user id.
 		c.connectUser(
-				{ type: "guest" as const, id: guestUserId, name: guestDisplayName },
+				{ id: guestUserId, name: guestDisplayName },
 				accessToken,
 			)
 				.then(() => {
