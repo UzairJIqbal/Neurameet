@@ -118,7 +118,11 @@ describe("G7 — Responsive token revert guards (source-level)", () => {
   // G7.8 — GuestWaitingScreen error state
   describe("G7.8 — GuestWaitingScreen error state", () => {
     it("the error LoadError wrapper uses flex min-h-screen items-center justify-center", () => {
-      expect(guestPage).toContain("flex min-h-screen items-center justify-center");
+      // Scoped to the poll-failure branch: TerminalScreen and the provider
+      // use the same classes, so a whole-file search would not catch a regression.
+      expect(guestPage).toMatch(
+        /pollFailCount >= 2\) \{\s*return \(\s*<div className="flex min-h-screen items-center justify-center bg-surface">\s*<LoadError/,
+      );
     });
   });
 });
