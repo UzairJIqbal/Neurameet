@@ -1,14 +1,45 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React from "react";
-import { ListChecks, Lightbulb } from "lucide-react";
+import React, { useState } from "react";
+import { ListChecks, Lightbulb, Inbox } from "lucide-react";
 import { MeetingInsights } from "@/lib/meeting-types";
-import TabEmptyState from "./EmptyState";
 
-const SummaryTab = ({ insights }: { insights: MeetingInsights | null }) => {
+const SummaryTab = ({
+  insights,
+  onRetry,
+}: {
+  insights: MeetingInsights | null;
+  onRetry?: () => void;
+}) => {
+  const [retrying, setRetrying] = useState(false);
+
   if (!insights) {
-    return <TabEmptyState message="No summary available yet." />;
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-surface-variant bg-surface-container-lowest px-6 py-16 text-center">
+        <Inbox className="h-10 w-10 text-on-surface-variant" />
+        <p className="text-body-lg text-on-surface-variant">
+          No summary available yet.
+        </p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={async () => {
+              setRetrying(true);
+              try {
+                await onRetry();
+              } finally {
+                setRetrying(false);
+              }
+            }}
+            disabled={retrying}
+            className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {retrying ? "Retrying…" : "Retry summary generation"}
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (

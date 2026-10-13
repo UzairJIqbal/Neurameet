@@ -5,7 +5,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 // Embeddings are Gemini-only (Groq has no embedding model), consistent with
 // Step 5's embed.ts. Used here to embed the user's question for retrieval.
-const QUESTION_EMBEDDING = google.textEmbeddingModel("gemini-embedding-001");
+// Exported so prep.ts (Step C2) reuses the single shared Gemini embedding model.
+export const QUESTION_EMBEDDING = google.textEmbeddingModel("gemini-embedding-001");
 
 /**
  * Embed the question and retrieve the top-k transcript chunks for this meeting.
@@ -70,4 +71,72 @@ export function buildSystemPrompt(context: string[]): string {
     "Meeting transcript context:",
     context.join("\n\n"),
   ].join("\n");
+}
+
+export type CrossMeetingHit = {
+  id: string;
+  meetingId: string;
+  meetingTitle: string;
+  chunkText: string;
+  chunkIndex: number;
+  similarity: number;
+};
+
+/**
+ * Embed the query and similarity-search across ALL of the user's meeting chunks
+ * (cross-meeting). Returns hits attributed to their source meeting. Never throws
+ * — retrieval failures degrade to an empty list.
+ */
+export async function searchAcrossMeetings(
+  userId: string,
+  query: string,
+  matchCount = 20,
+  threshold = 0.1,
+): Promise<CrossMeetingHit[]> {
+  if (!query.trim()) return [];
+
+  const { embedding } = await embed({
+    model: QUESTION_EMBEDDING,
+    value: query,
+    // Pin to 768-dim to match the meeting_chunks.embedding vector(768) column.
+    providerOptions: { google: { outputDimensionality: 768 } },
+  });
+
+  const { data, error } = await supabaseServer().rpc(
+    "match_meeting_chunks_user",
+    {
+      query_embedding: embedding,
+      p_user_id: userId,
+      match_count: matchCount,
+      similarity_threshold: threshold,
+    },
+  );
+
+  if (error) {
+    // Surface the failure instead of masking it as an empty result set, so a
+    // missing/misconfigured RPC is visible rather than looking like "no matches".
+    throw new Error(
+      `match_meeting_chunks_user failed: ${
+        typeof error === "object" ? JSON.stringify(error) : String(error)
+      }`,
+    );
+  }
+
+  return (data ?? []).map(
+    (row: {
+      id: unknown;
+      meeting_id: unknown;
+      meeting_title: string | null;
+      chunk_text: string | null;
+      chunk_index: number | null;
+      similarity: number | null;
+    }) => ({
+      id: String(row.id),
+      meetingId: String(row.meeting_id),
+      meetingTitle: row.meeting_title ?? "Untitled meeting",
+      chunkText: row.chunk_text ?? "",
+      chunkIndex: Number(row.chunk_index ?? 0),
+      similarity: Number(row.similarity ?? 0),
+    }),
+  );
 }
