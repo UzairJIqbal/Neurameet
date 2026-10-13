@@ -45,10 +45,6 @@ const FloatingChat = () => {
   const router = useRouter();
   const { user } = useUser();
 
-  // The dedicated /ai-chat page is the same general chat in full screen form.
-  // Do not stack a floating copy on top of it.
-  if (pathname === "/ai-chat") return null;
-
   // Auto scope to the current meeting when on a meeting detail route, so the
   // bubble answers meeting aware questions from anywhere.
   const meetingMatch = pathname.match(/^\/(?:meeting-intelligence|meeting)\/([^/]+)/);
@@ -93,6 +89,11 @@ const FloatingChat = () => {
     : undefined;
 
   const userName = user?.firstName ?? user?.username ?? "Guest";
+
+  // The dedicated /ai-chat page is the same general chat in full screen form.
+  // Do not stack a floating copy on top of it. This return sits after every
+  // hook so the hook order stays stable across route changes.
+  if (pathname === "/ai-chat") return null;
 
   if (!open) {
     return (

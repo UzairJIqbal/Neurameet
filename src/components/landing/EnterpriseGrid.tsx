@@ -28,7 +28,7 @@ const items = [
 
 const EnterpriseGrid = () => {
   return (
-    <section id="stack" className="bg-surface py-24 border-t border-outline-variant">
+    <section id="stack" className="scroll-mt-20 bg-surface py-24 border-t border-outline-variant">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-on-surface mb-4">

@@ -121,6 +121,7 @@ const DashboardContent = () => {
   const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false);
   const { timedOut } = useLoadingTimeout(isLoading, {
     timeoutMs: 12000,
     retryNonce,
@@ -131,6 +132,7 @@ const DashboardContent = () => {
     const loadDashboard = async () => {
       try {
         setIsLoading(true);
+        setLoadFailed(false);
         const [meetingsRes, followUpsRes] = await Promise.all([
           fetch("/api/meetings"),
           fetch("/api/follow-ups"),
@@ -150,6 +152,7 @@ const DashboardContent = () => {
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
         toast.error("Failed to load your meetings");
+        setLoadFailed(true);
         setMeetings([]);
         setFollowUps([]);
       } finally {
@@ -346,7 +349,7 @@ const DashboardContent = () => {
                   <div className="col-span-12 hidden text-right md:col-span-4 md:block">Action</div>
                 </div>
                 <div className="divide-y divide-surface-variant min-h-[12rem]">
-                  {timedOut ? (
+                  {timedOut || loadFailed ? (
                     <LoadError
                       message="We couldn't load your meetings."
                       onRetry={() => setRetryNonce((k) => k + 1)}
@@ -440,7 +443,7 @@ const DashboardContent = () => {
                   <div className="col-span-12 hidden text-right md:col-span-4 md:block">Action</div>
                 </div>
                 <div className="divide-y divide-surface-variant min-h-[12rem]">
-                  {timedOut ? (
+                  {timedOut || loadFailed ? (
                     <LoadError
                       message="We couldn't load your follow-ups."
                       onRetry={() => setRetryNonce((k) => k + 1)}

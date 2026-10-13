@@ -82,7 +82,7 @@ const LandingFooter = () => {
               {socialLinks.map(({ label, Icon }) => (
                 <span
                   key={label}
-                  aria-disabled="true"
+                  role="img"
                   aria-label={label}
                   title="Coming soon"
                   className="text-on-surface-variant cursor-default"

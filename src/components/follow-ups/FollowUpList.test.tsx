@@ -64,7 +64,7 @@ describe("Follow-ups list responsive (P13.5)", () => {
     const openLink = (await screen.findByRole("link", {
       name: /Open/i,
     })) as HTMLAnchorElement;
-    const actionCell = openLink.parentElement as HTMLElement;
+    const actionCell = openLink.closest("div") as HTMLElement;
     const tokens = actionCell.className.split(" ");
     expect(tokens).toContain("col-span-12");
     expect(tokens).toContain("md:col-span-4");

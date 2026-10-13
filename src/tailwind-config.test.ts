@@ -7,28 +7,31 @@
  * missing, dropdowns render unstyled across Settings, MeetingSetup, and the
  * intelligence tabs. Lock the keys in so the gap can't silently regress.
  *
- * We assert against the raw source text (not the resolved config object) so the
- * test stays environment-agnostic and still fails fast if a key is pruned.
+ * We assert against the parsed theme.extend.colors entries, so a key that is
+ * pruned or pointed at the wrong CSS variable fails fast.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import config from "../tailwind.config";
 
-const src = readFileSync(resolve(process.cwd(), "tailwind.config.ts"), "utf8");
+const colors = (config.theme?.extend?.colors ?? {}) as Record<string, unknown>;
+
+function expectToken(key: string) {
+  expect(colors[key]).toBe(`hsl(var(--${key}))`);
+}
 
 describe("tailwind.config.ts — shadcn token keys (P13.10)", () => {
   it("defines the popover semantic color keys", () => {
-    expect(src).toContain('"popover"');
-    expect(src).toContain('"popover-foreground"');
+    expectToken("popover");
+    expectToken("popover-foreground");
   });
 
   it("defines the accent semantic color keys", () => {
-    expect(src).toContain('"accent"');
-    expect(src).toContain('"accent-foreground"');
+    expectToken("accent");
+    expectToken("accent-foreground");
   });
 
   it("defines the muted semantic color keys", () => {
-    expect(src).toContain('"muted"');
-    expect(src).toContain('"muted-foreground"');
+    expectToken("muted");
+    expectToken("muted-foreground");
   });
 });

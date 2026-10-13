@@ -1,7 +1,13 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useCallback, useEffect, useState, useTransition } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ListChecks } from "lucide-react";
@@ -44,11 +50,17 @@ const FollowUpDetails = ({ id }: { id: string }) => {
     retryNonce,
   });
   const [isPending, startTransition] = useTransition();
+  // Only the latest load may write state, so a slow earlier response (or one
+  // that lands after unmount) never overwrites newer data.
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestId === requestIdRef.current;
     try {
       setIsLoading(true);
       const res = await fetch(`/api/follow-ups/${id}`);
+      if (!isCurrent()) return;
 
       if (res.status === 404) {
         setNotFound(true);
@@ -60,18 +72,24 @@ const FollowUpDetails = ({ id }: { id: string }) => {
       }
 
       const data = (await res.json()) as { followUp: FollowUpDetail };
+      if (!isCurrent()) return;
       setFollowUp(data.followUp ?? null);
     } catch (err) {
+      if (!isCurrent()) return;
       console.error("Failed to load follow-up:", err);
       toast.error("Failed to load follow-up");
       setFollowUp(null);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
-  }, [id, retryNonce]);
+  }, [id]);
 
   useEffect(() => {
     load();
+    return () => {
+      // Invalidate any in-flight load on unmount or before a retry reload.
+      requestIdRef.current += 1;
+    };
   }, [load, retryNonce]);
 
   const handleStatusChange = (status: FollowUpStatus) => {
@@ -90,7 +108,9 @@ const FollowUpDetails = ({ id }: { id: string }) => {
     try {
       const res = await fetch(`/api/follow-ups/${id}`, { method: "DELETE" });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
         throw new Error(data.error ?? `Delete failed: ${res.status}`);
       }
       toast.success("Follow-up deleted");

@@ -10,9 +10,10 @@ import FloatingChat from "./FloatingChat";
 // min-h-[600px]. The visual outcome at 375 and 768 is verified manually via
 // /check verify.
 
+const nav = vi.hoisted(() => ({ pathname: "/dashboard" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
-  usePathname: () => "/dashboard",
+  usePathname: () => nav.pathname,
 }));
 vi.mock("@clerk/nextjs", () => ({
   useUser: () => ({ user: { firstName: "Test", imageUrl: "" } }),
@@ -33,5 +34,19 @@ describe("Floating chat expanded height (P13.3)", () => {
     expect(tokens).toContain("sm:min-h-[52vh]");
     expect(tokens).toContain("sm:max-h-[min(720px,88vh)]");
     expect(tokens).not.toContain("min-h-[600px]");
+  });
+});
+
+describe("Floating chat route changes", () => {
+  it("survives navigating to and from /ai-chat (stable hook order)", () => {
+    nav.pathname = "/dashboard";
+    const { rerender, container } = render(<FloatingChat />);
+    nav.pathname = "/ai-chat";
+    expect(() => rerender(<FloatingChat />)).not.toThrow();
+    expect(container.innerHTML).toBe("");
+    nav.pathname = "/dashboard";
+    expect(() => rerender(<FloatingChat />)).not.toThrow();
+    expect(screen.getByLabelText("Open support chat")).toBeTruthy();
+    nav.pathname = "/dashboard";
   });
 });

@@ -22,10 +22,13 @@ const MeetingList = () => {
   });
 
   useEffect(() => {
+    // Abort on retry or unmount so a stale response cannot overwrite the list
+    // (or undo a delete made while it was in flight).
+    const controller = new AbortController();
     const fetchMeetings = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch("/api/meetings");
+        const res = await fetch("/api/meetings", { signal: controller.signal });
 
         if (!res.ok) {
           throw new Error(`API error: ${res.status}`);
@@ -34,15 +37,17 @@ const MeetingList = () => {
         const data = (await res.json()) as { meetings: MeetingListItem[] };
         setMeetings(data.meetings ?? []);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Failed to load meetings:", err);
         toast.error("Failed to load meetings");
         setMeetings([]);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     fetchMeetings();
+    return () => controller.abort();
   }, [retryNonce]);
 
   const handleDeleteMeeting = async (id: string) => {

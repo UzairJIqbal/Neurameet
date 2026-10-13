@@ -88,10 +88,10 @@ const Sidebar = ({
 
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-2 px-3">
-        {sidebarLinks.map((link, idx) => {
+        {sidebarLinks.map((link) => {
           const isActive = pathname === link.href;
           return (
-            <React.Fragment key={idx}>
+            <React.Fragment key={link.href}>
               {link.dividerBefore && (
                 <div className="mx-1 my-2 border-t border-outline/30" />
               )}
@@ -188,8 +188,22 @@ export const Sidebar_Com = ({
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+
+    // The drawer is mobile-only; once the viewport reaches lg the sidebar is
+    // static, so close it to release the scroll lock.
+    const lg =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(min-width: 1024px)")
+        : null;
+    const onViewport = () => {
+      if (lg?.matches) setOpen(false);
+    };
+    onViewport();
+    lg?.addEventListener("change", onViewport);
+
     return () => {
       document.removeEventListener("keydown", onKey);
+      lg?.removeEventListener("change", onViewport);
       document.body.style.overflow = "";
     };
   }, [open]);

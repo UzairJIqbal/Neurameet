@@ -5,7 +5,7 @@ import useGetCallbyId from "@/hooks/useGetCallbyId";
 import { useUser } from "@clerk/nextjs";
 import { useStreamVideoClient } from "@stream-io/video-react-sdk";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React from "react";
 import toast from "react-hot-toast";
 import type { GuestAdmissionMode } from "@/lib/meeting-types";
 import { createScheduledMeetingRow } from "@/actions/meetings";
@@ -32,8 +32,8 @@ const PersonalRoomPage = () => {
 	const topicName = user?.username;
 	const meetingId = user?.id;
 	const inviteLink = `${process.env.NEXT_PUBLIC_BASE_URL}/meeting/${meetingId}`;
-	const [guestAdmissionMode, setGuestAdmissionMode] =
-		useState<GuestAdmissionMode>("approval");
+	// The personal room always asks the owner to admit guests.
+	const guestAdmissionMode: GuestAdmissionMode = "approval";
 
 	const { call } = useGetCallbyId(meetingId as string);
 
@@ -78,12 +78,15 @@ const PersonalRoomPage = () => {
 		// Persist the meetings row with the owner's chosen admission mode
 		// so the meeting shows in Meeting Intelligence immediately.
 		try {
-			await createScheduledMeetingRow({
+			const result = await createScheduledMeetingRow({
 				streamCallId: meetingId as string,
 				title: `${topicName}'s Meeting Room`,
 				startsAt: new Date().toISOString(),
 				guestAdmissionMode,
 			});
+			if (!result.ok) {
+				console.error("PersonalRoom: meeting row not persisted:", result.error);
+			}
 		} catch (dbErr) {
 			console.error("PersonalRoom: meeting row not persisted:", dbErr);
 		}

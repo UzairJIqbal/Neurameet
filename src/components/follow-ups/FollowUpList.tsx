@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, ListChecks } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
@@ -30,12 +30,15 @@ const FollowUpList = () => {
   const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [retryNonce, setRetryNonce] = useState(0);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const handleDeleteFollowUp = async (id: string) => {
     try {
       const res = await fetch(`/api/follow-ups/${id}`, { method: "DELETE" });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
         throw new Error(data.error ?? `Delete failed: ${res.status}`);
       }
       setFollowUps((prev) => prev.filter((f) => f.id !== id));
@@ -52,10 +55,15 @@ const FollowUpList = () => {
   });
 
   useEffect(() => {
+    // Abort on retry or unmount so a stale response never overwrites state.
+    const controller = new AbortController();
+    controllerRef.current = controller;
     const fetchFollowUps = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch("/api/follow-ups");
+        const res = await fetch("/api/follow-ups", {
+          signal: controller.signal,
+        });
 
         if (!res.ok) {
           throw new Error(`API error: ${res.status}`);
@@ -64,16 +72,24 @@ const FollowUpList = () => {
         const data = (await res.json()) as { followUps: FollowUpItem[] };
         setFollowUps(data.followUps ?? []);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Failed to load follow-ups:", err);
         toast.error("Failed to load follow-ups");
         setFollowUps([]);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     fetchFollowUps();
+    return () => controller.abort();
   }, [retryNonce]);
+
+  // A load that hit the timeout is abandoned: its late response must not
+  // replace the retry view.
+  useEffect(() => {
+    if (timedOut) controllerRef.current?.abort();
+  }, [timedOut]);
 
   if (timedOut) {
     return (

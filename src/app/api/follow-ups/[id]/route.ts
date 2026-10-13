@@ -148,7 +148,15 @@ export async function DELETE(
       .eq("id", id)
       .maybeSingle();
 
-    if (findError || !data) {
+    if (findError) {
+      console.error("Follow-up lookup failed:", findError.message);
+      return NextResponse.json(
+        { error: "Failed to load follow-up" },
+        { status: 500 },
+      );
+    }
+
+    if (!data) {
       return NextResponse.json(
         { error: "Follow-up not found" },
         { status: 404 },

@@ -2,14 +2,24 @@
 import type { Metadata } from "next";
 import "react-datepicker/dist/react-datepicker.css";
 import "./globals.css";
-// Google Font imports removed (fonts fetched at runtime in dev, not needed for build)
+import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "react-hot-toast";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 
-// Dummy font objects to avoid external font fetching during build
-const hankenGrotesk = { variable: "" } as const;
-const jetbrainsMono = { variable: "" } as const;
+const hankenGrotesk = Hanken_Grotesk({
+	variable: "--font-hanken-grotesk",
+	weight: ["400", "500", "600", "700", "800"],
+	subsets: ["latin"],
+	display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+	variable: "--font-jetbrains-mono",
+	weight: ["400", "500", "700"],
+	subsets: ["latin"],
+	display: "swap",
+});
 
 export const metadata: Metadata = {
 	title: "Neuromeet",
