@@ -170,6 +170,7 @@ function GuestCallFlow({
   const client = useStreamVideoClient();
   const [call, setCall] = useState<Call | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [callEnded, setCallEnded] = useState(false);
 
   // Timeout guard for the admitted-without-call state (open-mode race).
   // If phase is "admitted" but call is still null after this timeout,
@@ -241,6 +242,31 @@ function GuestCallFlow({
         setPhase("error");
       });
   }, [phase, call, setPhase]);
+
+  // If the call ends before the guest is admitted (owner ends the call
+  // while the guest is still waiting), show a clear error instead of
+  // an infinite spinner. The call object exists even in the waiting
+  // phase (it was fetched via call.get() without joining).
+  useEffect(() => {
+    if (!call || phase === "admitted" || phase === "denied" || phase === "expired") return;
+    const offEnded = call.on("call.ended", () => {
+      setCallEnded(true);
+    });
+    return () => offEnded();
+  }, [call, phase]);
+
+  // The call ended while the guest was still waiting (owner left
+  // before admission). Show a clear error — not an infinite spinner.
+  if (callEnded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <LoadError
+          message="The meeting has ended before you could join. Share the link again to try."
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+  }
 
   // Call failed to load or join
   if (phase === "error" && joinError) {
@@ -387,7 +413,7 @@ function GuestCallFlow({
       <StreamCall call={call}>
         <StreamTheme>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-            <div className="relative w-full max-w-[420px] rounded-xl border border-outline-variant bg-surface-container-lowest px-8 py-6 text-center shadow-xl">
+            <div className="relative w-full max-w-[420px] rounded-xl border border-outline-variant bg-surface-container-lowest px-4 sm:px-8 py-6 text-center shadow-xl">
               <div className="flex items-center justify-center gap-3 text-body-md text-on-surface-variant">
                 <svg
                   className="animate-spin h-5 w-5 text-primary-container"
@@ -461,6 +487,8 @@ function GuestWaitingScreen({
   guestToken: string;
   setPhase: (v: JoinPhase) => void;
 }) {
+  const [pollFailCount, setPollFailCount] = useState(0);
+
   useEffect(() => {
     const poll = async () => {
       try {
@@ -471,6 +499,8 @@ function GuestWaitingScreen({
           throw new Error(`status check failed (${res.status})`);
         }
         const data = await res.json();
+        // Reset fail count on success.
+        setPollFailCount(0);
         const statuses = [
           "pending",
           "admitted",
@@ -492,6 +522,9 @@ function GuestWaitingScreen({
         // "pending" → keep polling
       } catch (err) {
         console.debug("[guest/status] poll failed:", err);
+        // Increment fail count; after 2+ consecutive failures,
+        // show a LoadError so the guest knows polling is broken.
+        setPollFailCount((c) => c + 1);
       }
     };
 
@@ -500,9 +533,21 @@ function GuestWaitingScreen({
     return () => clearInterval(interval);
   }, [guestToken, setPhase]);
 
+  // Consecutive poll failures — show a recoverable error.
+  if (pollFailCount >= 2) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <LoadError
+          message="Connection lost while waiting. Real-time events still work, but the page may not update until you retry."
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface">
-      <div className="w-full max-w-2xl rounded-xl border border-outline-variant bg-surface-container-lowest p-4 shadow-xl text-center">
+      <div className="w-full max-w-2xl rounded-xl border border-outline-variant bg-surface-container-lowest px-4 sm:px-6 py-4 shadow-xl text-center">
         <h1 className="text-display-sm font-semibold text-on-surface mb-4">
           Waiting for the host
         </h1>
@@ -527,7 +572,7 @@ function GuestWaitingScreen({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <span className="text-body-md text-on-surface-variant">
+          <span className="text-body-sm sm:text-body-md text-on-surface-variant">
             Waiting for the host to let you in…
           </span>
         </div>
@@ -670,7 +715,7 @@ function NameModal({
   if (phase === "requesting") {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest px-8 py-6 text-center shadow-xl max-w-sm">
+        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 sm:px-8 py-6 text-center shadow-xl max-w-sm">
           <div className="flex items-center justify-center gap-3 text-body-md text-on-surface-variant">
             <svg
               className="animate-spin h-5 w-5 text-primary-container"
@@ -702,7 +747,7 @@ function NameModal({
   // Default: show the name/email modal
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 shadow-xl">
+      <div className="relative w-full max-w-sm rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 sm:p-6 shadow-xl">
         <h2 className="mb-4 text-sm font-medium text-on-surface">
           Enter your name to join
         </h2>
@@ -759,7 +804,7 @@ function NameModal({
         <button
           type="button"
           onClick={handleAskToJoin}
-          className="mt-4 w-full rounded-2xl bg-primary-container px-6 py-3 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary focus:ring-2 focus:ring-primary/30"
+          className="mt-4 w-full rounded-2xl bg-primary-container px-6 py-3 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary focus:ring-2 focus:ring-primary/30 whitespace-nowrap"
         >
           Join meeting
         </button>
@@ -786,7 +831,7 @@ function TerminalScreen({
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-surface-container-lowest to-surface">
       <div
         className={cn(
-          "rounded-xl border px-8 py-12 text-center max-w-md",
+          "rounded-xl border px-4 sm:px-8 py-12 text-center max-w-md",
           errorVariant
             ? "border-error-container bg-error-container/40 text-on-error-container"
             : "border-outline-variant bg-surface-container text-on-surface",
