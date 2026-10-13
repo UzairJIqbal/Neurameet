@@ -72,6 +72,17 @@ const config = {
 				// Background (shadcn compat)
 				"on-background": "#181B27",
 
+				// Shadcn semantic tokens — wired to :root CSS custom properties
+				// so bg-popover / text-popover-foreground / bg-accent /
+				// text-accent-foreground / bg-muted utilities resolve correctly
+				// (P13.10: these color keys were missing, leaving dropdowns unstyled).
+				"popover": "hsl(var(--popover))",
+				"popover-foreground": "hsl(var(--popover-foreground))",
+				"accent": "hsl(var(--accent))",
+				"accent-foreground": "hsl(var(--accent-foreground))",
+				"muted": "hsl(var(--muted))",
+				"muted-foreground": "hsl(var(--muted-foreground))",
+
 				// Sidebar active nav fill (Material 3 token from locked design)
 				"on-secondary-fixed-variant": "#3A4375",
 

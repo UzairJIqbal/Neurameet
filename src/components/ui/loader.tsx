@@ -127,7 +127,7 @@ export const LoaderThree = () => {
 
 export const LoaderFour = ({ text = "Loading..." }: { text?: string }) => {
     return (
-        <div className="relative font-bold text-black [perspective:1000px] dark:text-white">
+        <div className="relative font-bold text-on-surface [perspective:1000px]">
             <motion.span
                 animate={{
                     scaleX: [1, 2, 1],
@@ -145,7 +145,7 @@ export const LoaderFour = ({ text = "Loading..." }: { text?: string }) => {
                 {text}
             </motion.span>
             <motion.span
-                className="absolute inset-0 text-[#00e571]/50 blur-[0.5px] dark:text-[#00e571]"
+                className="absolute inset-0 text-green-1/50 blur-[0.5px]"
                 animate={{
                     x: [-2, 4, -3, 1.5, -2],
                     y: [-2, 4, -3, 1.5, -2],
@@ -162,7 +162,7 @@ export const LoaderFour = ({ text = "Loading..." }: { text?: string }) => {
                 {text}
             </motion.span>
             <motion.span
-                className="absolute inset-0 text-[#8b00ff]/50 dark:text-[#8b00ff]"
+                className="absolute inset-0 text-primary-container/50"
                 animate={{
                     x: [0, 1, -1.5, 1.5, -1, 0],
                     y: [0, -1, 1.5, -0.5, 0],

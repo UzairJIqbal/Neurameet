@@ -71,6 +71,15 @@
     min-width: 36px;
   }
 
+  /* P13.6 /debug: Stream control captions (ScreenShare "Share", CancelCall
+     "Leave", etc.) are rendered in a div that ignores our hidden sm:inline
+     pattern, so on mobile they show text next to the icon while our custom
+     buttons are icon-only. Mixed widths break the flex-wrap of the control
+     pill. Below sm, hide the caption so every control is icon-only and uniform. */
+  .str-video__composite-button__caption {
+    display: none;
+  }
+
   .str-video__participant-list {
     max-height: calc(100vh - 12rem);
     overflow-y: auto;

@@ -1,47 +1,74 @@
 "use client";
 
-import Image from "next/image";
 import React from "react";
+import {
+  IconVideo,
+  IconSparkles,
+  IconSearch,
+} from "@tabler/icons-react";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
   variant: "sign-in" | "sign-up";
 }
 
-const variantContent = {
-  "sign-in": {
-    testimonial: {
-      quote:
-        "NeuraMeet has completely transformed how our team handles meeting intelligence. The AI summaries are a game-changer.",
-      name: "Sarah Jenkins",
-      role: "CTO at TechFlow",
-      avatar:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuBd9LseWQtaP9gjxdjY1jh3GUPOyAnLdkkIkFQAM5wr87pIeogDJIvSZ11HylP3pUYPUgzWPMjOBu1Ztsoc5jfEPrCnnCJv7sqwDpFwiPe9ektuGZMqPAMbm68sRAQNuGZokCbnDenvZvwrQsRzfIh2Xz7Y9eXFdOieAcIOWjBLszi_Wbsvg9lJRzjG_nVGo76-NAx7vD9NuZBGDjtB4SXIf-AkzGwbG8DhR5vTbySEcYskhUTOPgNq-Q",
-    },
+interface WalkthroughStep {
+  icon: typeof IconVideo;
+  title: string;
+  description: string;
+}
+
+interface AuthVariantContent {
+  heading: string;
+  sub: string;
+  steps: WalkthroughStep[];
+}
+
+const steps: WalkthroughStep[] = [
+  {
+    icon: IconVideo,
+    title: "Host or join a meeting",
+    description:
+      "Start a call in NeuraMeet or join with a link. Video runs on Stream's real-time infrastructure.",
   },
+  {
+    icon: IconSparkles,
+    title: "We process it automatically",
+    description:
+      "Groq Whisper transcribes the audio in English and Urdu; Gemini and Groq generate the summary, action items, and category.",
+  },
+  {
+    icon: IconSearch,
+    title: "Explore and act",
+    description:
+      "Browse a searchable history, download attendance, track follow-ups, and chat with any meeting's content.",
+  },
+];
+
+const variantContent: Record<"sign-in" | "sign-up", AuthVariantContent> = {
   "sign-up": {
-    testimonial: {
-      quote:
-        "The automated action items are incredibly accurate. It feels like having a dedicated project manager in every call.",
-      name: "David Chen",
-      role: "VP Engineering at ScaleUp",
-      avatar:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuC1oLTOHTOXFnsez_UXTrta583MyRIZCCYynwRq6buRvk2DsH9YeOKT2vehnTNHn0Vw8aISEMfhIfX6k2-ri5w5YZzJhXdSiKs2vOMAvs9KkVf7KBl8XAIhzXmeZji_fXqvpFWiwpNzt-Fi-iyS9u61i4in8UcVQcvtKb4drzvyaAdAMYr36M6HV_xzKLx6TWgtmiK_JKqE0WAzRXBn8MhWVXRUGrzkaHUuY8jcjoSoDj8hMyioQ9Z0pQ",
-    },
+    heading: "From call to clarity in three steps",
+    sub: "No manual note taking. NeuraMeet does the work the moment the call ends.",
+    steps,
   },
-} as const;
+  "sign-in": {
+    heading: "Welcome back",
+    sub: "Your meetings, notes, and follow-ups are right where you left them.",
+    steps,
+  },
+};
 
 const AuthLayout = ({ children, variant }: AuthLayoutProps) => {
   const content = variantContent[variant];
 
   return (
-    <div className="flex h-full w-full flex-col md:flex-row">
+    <div className="flex min-h-screen w-full flex-col md:flex-row">
       {/* Left Panel: Form — bg-surface-container-lowest, 40% on desktop */}
       <div className="flex-1 md:flex-none md:w-[40%] bg-surface-container-lowest flex flex-col justify-center px-6 py-8 sm:px-10 md:px-10 md:py-8 relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
         <div className="mx-auto w-full max-w-[400px]">{children}</div>
       </div>
 
-      {/* Right Panel: Testimonial — bg-inverse-surface, 60% on desktop, hidden on mobile */}
+      {/* Right Panel: Walkthrough — bg-inverse-surface, 60% on desktop, hidden on mobile */}
       <div className="hidden md:flex flex-1 md:w-[60%] bg-inverse-surface relative items-center justify-center p-8 lg:p-10 overflow-hidden">
         {/* Abstract background blurs */}
         <div
@@ -65,44 +92,41 @@ const AuthLayout = ({ children, variant }: AuthLayoutProps) => {
 
         {/* Content */}
         <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-start">
-          {/* Quote icon */}
-          <div className="mb-6 opacity-40">
-            <svg
-              aria-hidden="true"
-              className="h-12 w-12 text-on-primary"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-            </svg>
-          </div>
+          {/* Heading + sub */}
+          <h2 className="text-on-primary font-semibold text-2xl md:text-3xl leading-tight">
+            {content.heading}
+          </h2>
+          <p className="text-inverse-on-surface/70 text-base mt-3 max-w-xl">
+            {content.sub}
+          </p>
 
-          {/* Quote text */}
-          <blockquote className="mb-8">
-            <p className="text-on-primary leading-tight font-semibold text-2xl md:text-3xl">
-              &ldquo;{content.testimonial.quote}&rdquo;
-            </p>
-          </blockquote>
-
-          {/* Attribution */}
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full overflow-hidden border border-outline-variant/30 bg-surface-variant/10 relative">
-              <Image
-                src={content.testimonial.avatar}
-                alt={content.testimonial.name}
-                fill
-                sizes="48px"
-                className="object-cover"
-              />
-            </div>
-            <div>
-              <div className="text-on-primary font-semibold">
-                {content.testimonial.name}
-              </div>
-              <div className="text-secondary-fixed-dim text-sm">
-                {content.testimonial.role}
-              </div>
-            </div>
+          {/* Three-step visual walkthrough */}
+          <div className="flex flex-col gap-8 mt-10 w-full">
+            {content.steps.map((step, i) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.title} className="flex gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary-container/10 border border-primary-container/20 flex items-center justify-center shrink-0">
+                    <Icon
+                      size={24}
+                      className="text-primary-container"
+                      stroke={1.5}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-primary-container font-bold text-sm">
+                      0{i + 1}
+                    </div>
+                    <h3 className="text-on-primary font-semibold text-lg leading-snug">
+                      {step.title}
+                    </h3>
+                    <p className="text-inverse-on-surface/70 text-sm leading-relaxed mt-1">
+                      {step.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

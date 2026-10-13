@@ -118,3 +118,68 @@ export async function GET(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+interface FollowUpOwnedRow {
+  id: string;
+  meeting_id: string;
+  meetings: Embedded<{ user_id: string | null }>;
+}
+
+// Owner-only delete. Scoped to the caller's own meetings via the follow-up's
+// parent meeting (follow_ups.user_id isn't a column — ownership flows through
+// meetings.user_id). Only the row is removed; the parent meeting is untouched.
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const { userId } = await auth();
+
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const supabase = supabaseServer();
+
+    const { data, error: findError } = await supabase
+      .from("follow_ups")
+      .select("id, meeting_id, meetings(user_id)")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (findError || !data) {
+      return NextResponse.json(
+        { error: "Follow-up not found" },
+        { status: 404 },
+      );
+    }
+
+    const row = data as FollowUpOwnedRow;
+    const ownerId = first(row.meetings)?.user_id;
+
+    if (ownerId !== userId) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+
+    const { error: deleteError } = await supabase
+      .from("follow_ups")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("Failed to delete follow-up:", deleteError);
+      return NextResponse.json(
+        { error: "Failed to delete follow-up" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to delete follow-up";
+    console.error("Follow-up delete error:", err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

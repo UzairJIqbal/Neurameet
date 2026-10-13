@@ -1,10 +1,17 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { sidebarLinks } from "../../constants";
 import { usePathname } from "next/navigation";
 import { useClerk, useUser } from "@clerk/nextjs";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, User, LogOut, X, Menu } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import DashboardContent from "@/components/DashboardContent";
 import PreviousPage from "./PreviousPage";
 import RecordingPage from "./RecordingPage";
@@ -15,7 +22,10 @@ import MeetingList from "./meeting-intelligence/MeetingList";
 import FollowUpList from "./follow-ups/FollowUpList";
 import SettingsPage from "./SettingsPage";
 import GeneralChat from "./meeting-intelligence/GeneralChat";
+import SearchPage from "./SearchPage";
+import PrepPage from "./PrepPage";
 import Navbar from "./Navbar";
+import FloatingChat from "./FloatingChat";
 
 export type SidebarPagesTypes =
   | "Home"
@@ -27,25 +37,38 @@ export type SidebarPagesTypes =
   | "meetingIntelligence"
   | "followUps"
   | "aiChat"
-  | "settings";
+  | "settings"
+  | "search"
+  | "prep";
 
-const Sidebar = () => {
+const Sidebar = ({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) => {
   const pathname = usePathname();
-  const { signOut } = useClerk();
+  const { signOut, openUserProfile } = useClerk();
   const { user } = useUser();
 
-  const fullName = user?.fullName ?? "Uzair Iqbal";
-  const email = user?.primaryEmailAddress?.emailAddress ?? "uzair@example.com";
-  const avatar = user?.imageUrl ?? "/icons/images/Uzair Javaid.png";
+  const fullName = user?.fullName ?? "Guest";
+  const email = user?.primaryEmailAddress?.emailAddress ?? "guest@neurameet.app";
+  const avatar = user?.imageUrl ?? "";
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-full w-[260px] flex-col bg-inverse-surface py-6">
+    <aside
+      className={cn(
+        "absolute inset-y-0 left-0 z-50 flex w-[260px] shrink-0 flex-col bg-inverse-surface py-6 transition-transform duration-300 ease-in-out lg:fixed lg:translate-x-0",
+        open ? "translate-x-0" : "-translate-x-full",
+      )}
+    >
       {/* Brand */}
-      <div className="mb-8 flex items-center gap-3 px-6">
+      <div className="mb-8 flex items-center justify-between gap-3 px-6">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-container text-[18px] font-bold text-on-primary">
           N
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-headline-md font-bold leading-tight text-on-primary">
             NeuraMeet
           </h1>
@@ -53,6 +76,14 @@ const Sidebar = () => {
             AI Intelligence
           </p>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close menu"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-primary transition-colors hover:bg-on-secondary-fixed-variant/50 lg:hidden"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Nav */}
@@ -60,46 +91,75 @@ const Sidebar = () => {
         {sidebarLinks.map((link, idx) => {
           const isActive = pathname === link.href;
           return (
-            <a
-              key={idx}
-              href={link.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
-                isActive
-                  ? "border-l-4 border-primary-container bg-on-secondary-fixed-variant text-on-primary"
-                  : "text-outline hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary",
+            <React.Fragment key={idx}>
+              {link.dividerBefore && (
+                <div className="mx-1 my-2 border-t border-outline/30" />
               )}
-            >
-              <span className="flex h-5 w-5 items-center justify-center">
-                {link.icon}
-              </span>
-              <span className="text-label-caps">{link.label}</span>
-            </a>
+              <a
+                href={link.href}
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
+                  isActive
+                    ? "border-l-4 border-primary-container bg-on-secondary-fixed-variant text-on-primary"
+                    : "text-outline hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary",
+                )}
+              >
+                <span className="flex h-5 w-5 items-center justify-center">
+                  {link.icon}
+                </span>
+                <span className="text-label-caps">{link.label}</span>
+              </a>
+            </React.Fragment>
           );
         })}
       </nav>
 
-      {/* User profile + sign out */}
+      {/* User profile + account menu */}
       <div className="mt-auto px-3">
-        <button
-          type="button"
-          onClick={() => signOut()}
-          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={avatar}
-            alt={fullName}
-            className="h-8 w-8 shrink-0 rounded-full object-cover"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-bold text-on-primary">
-              {fullName}
-            </p>
-            <p className="truncate text-[10px] text-outline">{email}</p>
-          </div>
-          <ChevronDown className="h-4 w-4 shrink-0 text-outline" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="group flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={avatar}
+                alt={fullName}
+                className="h-8 w-8 shrink-0 rounded-full object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold text-on-primary">
+                  {fullName}
+                </p>
+                <p className="truncate text-[10px] text-outline">{email}</p>
+              </div>
+              <ChevronDown className="h-4 w-4 shrink-0 text-outline transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[232px] border border-outline/30 bg-inverse-surface text-on-primary"
+          >
+            <DropdownMenuItem
+              className="text-body-md hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary focus:bg-on-secondary-fixed-variant focus:text-on-primary"
+              onSelect={() => openUserProfile()}
+            >
+              <User className="h-4 w-4" />
+              Manage account
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-outline/30" />
+            <DropdownMenuItem
+              className="text-body-md hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary focus:bg-on-secondary-fixed-variant focus:text-on-primary"
+              onSelect={() => signOut()}
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );
@@ -112,11 +172,45 @@ export const Sidebar_Com = ({
   type: SidebarPagesTypes;
   children?: React.ReactNode;
 }) => {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // Close the drawer whenever the route changes.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  // Escape to close + lock background scroll while the drawer is open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   return (
-    <>
-      <Sidebar />
-      <div className="ml-0 flex min-h-full flex-col bg-surface lg:ml-[260px]">
-        {type !== "Home" && <Navbar />}
+    <div className="relative flex min-h-0 flex-1 overflow-x-clip">
+      <Sidebar open={open} onClose={() => setOpen(false)} />
+      <div className="flex flex-1 min-h-0 flex-col overflow-y-auto bg-surface lg:ml-[260px]">
+        {type !== "Home" && <Navbar onMenu={() => setOpen(true)} />}
+        <FloatingChat />
+        {type === "Home" && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={open}
+            className="fixed left-3 top-3 z-50 flex h-11 w-11 items-center justify-center rounded-lg bg-inverse-surface text-on-primary shadow-lg lg:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
         {children ?? (
           <>
             {type === "Home" && <DashboardContent />}
@@ -129,10 +223,19 @@ export const Sidebar_Com = ({
             {type === "followUps" && <FollowUpList />}
             {type === "aiChat" && <GeneralChat />}
             {type === "settings" && <SettingsPage />}
+            {type === "search" && <SearchPage />}
+            {type === "prep" && <PrepPage />}
           </>
         )}
       </div>
-    </>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+    </div>
   );
 };
 

@@ -8,9 +8,11 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<StreamVideoProvider>
-			<ReminderManager />
-			{children}
-		</StreamVideoProvider>
+		<div className="h-screen overflow-hidden">
+			<StreamVideoProvider>
+				<ReminderManager />
+				{children}
+			</StreamVideoProvider>
+		</div>
 	);
 }

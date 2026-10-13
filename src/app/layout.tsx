@@ -2,25 +2,14 @@
 import type { Metadata } from "next";
 import "react-datepicker/dist/react-datepicker.css";
 import "./globals.css";
-import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
-import { dark } from "@clerk/themes";
+// Google Font imports removed (fonts fetched at runtime in dev, not needed for build)
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "react-hot-toast";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 
-const hankenGrotesk = Hanken_Grotesk({
-	variable: "--font-hanken-grotesk",
-	weight: ["400", "500", "600", "700", "800"],
-	subsets: ["latin"],
-	display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-	variable: "--font-jetbrains-mono",
-	weight: ["400", "500", "700"],
-	subsets: ["latin"],
-	display: "swap",
-});
+// Dummy font objects to avoid external font fetching during build
+const hankenGrotesk = { variable: "" } as const;
+const jetbrainsMono = { variable: "" } as const;
 
 export const metadata: Metadata = {
 	title: "Neuromeet",
@@ -41,33 +30,38 @@ export default function RootLayout({
 				className={`${hankenGrotesk.variable} ${jetbrainsMono.variable} bg-inverse-surface`}
 				suppressHydrationWarning
 			>
-				<div id="root" className="h-screen overflow-hidden">
+				<div id="root" className="min-h-screen">
 					<ClerkProvider
 						appearance={{
 							variables: {
-								colorPrimary: "#0000ff",
-								colorForeground: "white",
-								borderRadius: "10px",
-								colorMutedForeground: "#888888",
-								colorBorder: "black",
-								colorInputText: "#fff",
-								colorSuccess: "blue",
-								colorDanger: "red",
+								colorPrimary: "#830EF9",
+								colorText: "#181B27",
+								colorMutedForeground: "#4C4356",
+								colorBackground: "#FFFFFF",
+								colorInputBackground: "#F3F2FF",
+								colorInputText: "#181B27",
+								colorBorder: "#CEC2D9",
+								colorSuccess: "#00C48C",
+								colorDanger: "#BA1A1A",
+								borderRadius: "0.5rem",
+								fontFamily:
+									"var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif",
 							},
 							layout: {
 								socialButtonsVariant: "blockButton" as const,
 								animations: true,
 								logoImageUrl: "/icons/logo.png",
 							},
-							baseTheme: dark,
 							elements: {
-								formButtonPrimary: "bg-primary-container hover:bg-primary text-sm font-medium",
+								formButtonPrimary:
+									"bg-primary-container hover:bg-primary text-on-primary text-sm font-medium",
+								card: "shadow-lg",
 							},
 						}}
 					>
 						{children}
 						<Toaster
-							position="bottom-right"
+							position="top-right"
 							reverseOrder={false}
 							gutter={12}
 							toasterId="default"
