@@ -1,10 +1,20 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useCallback, useEffect, useState, useTransition } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ListChecks } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { LoadError } from "@/components/ui/load-error";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import toast from "react-hot-toast";
 import { FollowUpDetail, FollowUpStatus } from "@/lib/meeting-types";
 import { updateFollowUpStatus } from "@/actions/follow-ups";
@@ -30,15 +40,27 @@ function formatDate(value: string | null) {
 }
 
 const FollowUpDetails = ({ id }: { id: string }) => {
+  const router = useRouter();
   const [followUp, setFollowUp] = useState<FollowUpDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
   const [isPending, startTransition] = useTransition();
+  // Only the latest load may write state, so a slow earlier response (or one
+  // that lands after unmount) never overwrites newer data.
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestId === requestIdRef.current;
     try {
       setIsLoading(true);
       const res = await fetch(`/api/follow-ups/${id}`);
+      if (!isCurrent()) return;
 
       if (res.status === 404) {
         setNotFound(true);
@@ -50,19 +72,25 @@ const FollowUpDetails = ({ id }: { id: string }) => {
       }
 
       const data = (await res.json()) as { followUp: FollowUpDetail };
+      if (!isCurrent()) return;
       setFollowUp(data.followUp ?? null);
     } catch (err) {
+      if (!isCurrent()) return;
       console.error("Failed to load follow-up:", err);
       toast.error("Failed to load follow-up");
       setFollowUp(null);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
     load();
-  }, [load]);
+    return () => {
+      // Invalidate any in-flight load on unmount or before a retry reload.
+      requestIdRef.current += 1;
+    };
+  }, [load, retryNonce]);
 
   const handleStatusChange = (status: FollowUpStatus) => {
     if (status === followUp?.status) return;
@@ -75,6 +103,35 @@ const FollowUpDetails = ({ id }: { id: string }) => {
       await load();
     });
   };
+
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`/api/follow-ups/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(data.error ?? `Delete failed: ${res.status}`);
+      }
+      toast.success("Follow-up deleted");
+      router.push("/follow-ups");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to delete follow-up";
+      toast.error(msg);
+    }
+  };
+
+  if (timedOut) {
+    return (
+      <LoadError
+        message="We couldn't load this follow-up."
+        onRetry={() => setRetryNonce((k) => k + 1)}
+        listHref="/follow-ups"
+        listLabel="Back to follow-ups"
+      />
+    );
+  }
 
   if (isLoading) return <LoaderOne />;
 
@@ -108,13 +165,20 @@ const FollowUpDetails = ({ id }: { id: string }) => {
         Back to follow-ups
       </Link>
 
-      <header className="flex flex-col gap-1">
-        <h1 className="text-display-lg-mobile font-display-lg text-on-surface md:text-display-lg">
-          {followUp.actionTitle ?? "Untitled action item"}
-        </h1>
-        <p className="text-body-md text-on-surface-variant">
-          {followUp.meetingTitle ?? "Unknown meeting"}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-display-lg-mobile font-display-lg text-on-surface md:text-display-lg">
+            {followUp.actionTitle ?? "Untitled action item"}
+          </h1>
+          <p className="text-body-md text-on-surface-variant">
+            {followUp.meetingTitle ?? "Unknown meeting"}
+          </p>
+        </div>
+        <ConfirmDelete
+          label="Delete follow-up"
+          confirmLabel="Delete"
+          onConfirm={handleDelete}
+        />
       </header>
 
       <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">

@@ -8,7 +8,7 @@ const bullets = [
     icon: IconSearch,
     title: "Universal Search",
     description:
-      "Find specific decisions, quotes, or action items across thousands of hours of meetings instantly.",
+      "Find specific decisions, quotes, or action items across all your meetings instantly.",
   },
   {
     icon: IconFilter,
@@ -26,15 +26,15 @@ const bullets = [
 
 const MeetingHistory = () => {
   return (
-    <section className="bg-inverse-surface py-24 border-t border-inverse-on-surface/10">
+    <section className="bg-surface py-24 border-t border-outline-variant">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex flex-col-reverse lg:flex-row items-center gap-16">
           {/* Left — text */}
           <div className="lg:w-1/3">
-            <h2 className="text-3xl font-bold text-inverse-on-surface mb-6">
-              Your meeting history, categorized and searchable
+            <h2 className="text-3xl font-bold text-on-surface mb-6">
+              Your meeting history, organized and searchable
             </h2>
-            <p className="text-inverse-on-surface/70 text-lg mb-8 leading-relaxed">
+            <p className="text-on-surface-variant text-lg mb-8 leading-relaxed">
               Never lose context again. NeuraMeet automatically organizes all
               your meeting intelligence into a central, secure repository.
             </p>
@@ -43,7 +43,7 @@ const MeetingHistory = () => {
                 const Icon = b.icon;
                 return (
                   <li key={b.title}>
-                    <h4 className="text-inverse-on-surface font-semibold mb-2 flex items-center gap-2">
+                    <h4 className="text-on-surface font-semibold mb-2 flex items-center gap-2">
                       <Icon
                         size={16}
                         className="text-primary-container"
@@ -51,7 +51,7 @@ const MeetingHistory = () => {
                       />
                       {b.title}
                     </h4>
-                    <p className="text-inverse-on-surface/70 text-sm">
+                    <p className="text-on-surface-variant text-sm">
                       {b.description}
                     </p>
                   </li>
@@ -62,17 +62,17 @@ const MeetingHistory = () => {
 
           {/* Right — light-themed browser mockup */}
           <div className="lg:w-2/3 w-full">
-            <div className="bg-inverse-on-surface/80 rounded-xl p-2 relative border border-inverse-on-surface/10">
+            <div className="bg-surface-container-low rounded-xl p-2 relative border border-outline-variant">
               {/* Browser chrome */}
-              <div className="h-8 bg-inverse-surface rounded-t-lg border-b border-inverse-on-surface/5 flex items-center px-4 gap-2">
+              <div className="h-8 bg-surface-container rounded-t-lg border-b border-outline-variant flex items-center px-4 gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-error/80" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
+                <div className="w-2.5 h-2.5 rounded-full bg-outline-variant" />
+                <div className="w-2.5 h-2.5 rounded-full bg-secondary-container" />
               </div>
               {/* Light content area */}
               <div className="bg-surface-container-lowest text-on-surface rounded-b-lg overflow-hidden shadow-lg border border-outline-variant">
                 <div className="p-6">
-                  <div className="flex justify-between items-center mb-6">
+                  <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
                     <h3 className="text-xl font-bold text-on-surface">
                       Meeting Intelligence
                     </h3>
@@ -97,12 +97,12 @@ const MeetingHistory = () => {
                       {
                         label: "Client Discussion",
                         date: "Jul 28, 2024",
-                        color: "bg-blue-100 text-blue-600",
+                        color: "bg-secondary-container text-on-secondary-container",
                       },
                       {
                         label: "Weekly Standup",
                         date: "Jul 26, 2024",
-                        color: "bg-orange-100 text-orange-600",
+                        color: "bg-primary-container/15 text-primary-container",
                       },
                     ].map((row) => (
                       <div

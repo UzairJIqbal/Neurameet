@@ -4,125 +4,84 @@
 
 /* eslint-disable prettier/prettier */
 
-import Image from "next/image";
+import type { ReactNode } from "react";
+import {
+  LayoutDashboard,
+  History,
+  CalendarClock,
+  Brain,
+  MessageSquare,
+  PlayCircle,
+  Video,
+  ListTodo,
+  Settings,
+  Search,
+  ListChecks,
+} from "lucide-react";
 
-export const sidebarLinks = [
+export type SidebarLink = {
+  label: string;
+  href: string;
+  icon: ReactNode;
+  dividerBefore?: boolean;
+};
+
+export const sidebarLinks: SidebarLink[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
-    icon: (
-      <Image
-        src="/icons/sidebar/Home.png"
-        alt="Dashboard"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
-  },
-  {
-    label: "Previous Meetings",
-    href: "/previous",
-    icon: (
-      <Image
-        src="/icons/sidebar/Previous.png"
-        alt="Previous Meetings"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
-  },
-  {
-    label: "Upcoming Meetings",
-    href: "/upcoming",
-    icon: (
-      <Image
-        src="/icons/sidebar/Upcoming.png"
-        alt="Upcoming Meetings"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
+    icon: <LayoutDashboard className="h-5 w-5" />,
   },
   {
     label: "Meeting Intelligence",
     href: "/meeting-intelligence",
-    icon: (
-      <Image
-        src="/icons/sidebar/Upcoming.png"
-        alt="Meeting Intelligence"
-        height={10}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
+    icon: <Brain className="h-5 w-5" />,
   },
   {
     label: "AI Chat",
     href: "/ai-chat",
-    icon: (
-      <Image
-        src="/icons/sidebar/Previous.png"
-        alt="AI Chat"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
+    icon: <MessageSquare className="h-5 w-5" />,
   },
   {
     label: "Recordings",
     href: "/recording",
-    icon: (
-      <Image
-        src="/icons/sidebar/Recordings.png"
-        alt="Recordings"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
-  },
-  {
-    label: "Personal Room",
-    href: "/personal-room",
-    icon: (
-      <Image
-        src="/icons/sidebar/Personal.png"
-        alt="Personal Room"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
+    icon: <PlayCircle className="h-5 w-5" />,
   },
   {
     label: "Follow-ups",
     href: "/follow-ups",
-    icon: (
-      <Image
-        src="/icons/sidebar/Personal.png"
-        alt="Follow-ups"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
+    icon: <ListTodo className="h-5 w-5" />,
+  },
+  {
+    label: "Previous Meetings",
+    href: "/previous",
+    icon: <History className="h-5 w-5" />,
+  },
+  {
+    label: "Upcoming Meetings",
+    href: "/upcoming",
+    icon: <CalendarClock className="h-5 w-5" />,
+  },
+  {
+    label: "Personal Room",
+    href: "/personal-room",
+    icon: <Video className="h-5 w-5" />,
+  },
+  {
+    label: "Search",
+    href: "/search",
+    icon: <Search className="h-5 w-5" />,
+  },
+  {
+    label: "Prep",
+    href: "/prep",
+    icon: <ListChecks className="h-5 w-5" />,
   },
   {
     label: "Settings",
     href: "/settings",
-    icon: (
-      <Image
-        src="/icons/sidebar/Personal.png"
-        alt="Settings"
-        height={20}
-        width={20}
-        className="invert brightness-0"
-      />
-    ),
+    icon: <Settings className="h-5 w-5" />,
+    dividerBefore: true,
   },
 ];
 

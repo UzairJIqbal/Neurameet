@@ -1,10 +1,13 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, ListChecks } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { LoadError } from "@/components/ui/load-error";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import toast from "react-hot-toast";
 import { FollowUpItem, FollowUpStatus } from "@/lib/meeting-types";
 
@@ -26,12 +29,41 @@ const formatDate = (value: string | null) =>
 const FollowUpList = () => {
   const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const controllerRef = useRef<AbortController | null>(null);
+
+  const handleDeleteFollowUp = async (id: string) => {
+    try {
+      const res = await fetch(`/api/follow-ups/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(data.error ?? `Delete failed: ${res.status}`);
+      }
+      setFollowUps((prev) => prev.filter((f) => f.id !== id));
+      toast.success("Follow-up deleted");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to delete follow-up";
+      toast.error(msg);
+    }
+  };
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   useEffect(() => {
+    // Abort on retry or unmount so a stale response never overwrites state.
+    const controller = new AbortController();
+    controllerRef.current = controller;
     const fetchFollowUps = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch("/api/follow-ups");
+        const res = await fetch("/api/follow-ups", {
+          signal: controller.signal,
+        });
 
         if (!res.ok) {
           throw new Error(`API error: ${res.status}`);
@@ -40,16 +72,35 @@ const FollowUpList = () => {
         const data = (await res.json()) as { followUps: FollowUpItem[] };
         setFollowUps(data.followUps ?? []);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Failed to load follow-ups:", err);
         toast.error("Failed to load follow-ups");
         setFollowUps([]);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     fetchFollowUps();
-  }, []);
+    return () => controller.abort();
+  }, [retryNonce]);
+
+  // A load that hit the timeout is abandoned: its late response must not
+  // replace the retry view.
+  useEffect(() => {
+    if (timedOut) controllerRef.current?.abort();
+  }, [timedOut]);
+
+  if (timedOut) {
+    return (
+      <LoadError
+        message="We couldn't load your follow-ups."
+        onRetry={() => setRetryNonce((k) => k + 1)}
+        listHref="/follow-ups"
+        listLabel="Back to follow-ups"
+      />
+    );
+  }
 
   if (isLoading) return <LoaderOne />;
 
@@ -76,16 +127,14 @@ const FollowUpList = () => {
           <div className="grid grid-cols-12 gap-4 border-b border-surface-variant bg-surface-container-low/50 px-6 py-4 text-label-caps uppercase tracking-wider text-on-surface-variant">
             <div className="col-span-6 md:col-span-5">Action item</div>
             <div className="col-span-6 md:col-span-3">Meeting</div>
-            <div className="col-span-6 md:col-span-2">Due</div>
-            <div className="col-span-6 hidden text-right md:col-span-2 md:block">
+            <div className="col-span-12 hidden text-right md:col-span-4 md:block">
               Open
             </div>
           </div>
           <div className="divide-y divide-surface-variant">
             {followUps.map((fu) => (
-              <Link
+              <div
                 key={fu.id}
-                href={`/follow-ups/${fu.id}`}
                 className="grid grid-cols-12 items-center gap-4 px-6 py-4 transition-colors hover:bg-surface-container-low"
               >
                 <div className="col-span-6 flex flex-col gap-2 md:col-span-5">
@@ -97,20 +146,28 @@ const FollowUpList = () => {
                   >
                     {STATUS_LABELS[fu.status]}
                   </span>
+                  <span className="text-body-sm text-on-surface-variant">
+                    Due {formatDate(fu.dueDate)}
+                  </span>
                 </div>
                 <div className="col-span-6 truncate text-body-md text-on-surface-variant md:col-span-3">
                   {fu.meetingTitle ?? "Unknown meeting"}
                 </div>
-                <div className="col-span-6 text-body-md text-on-surface-variant md:col-span-2">
-                  {formatDate(fu.dueDate)}
-                </div>
-                <div className="col-span-6 md:col-span-2 md:text-right">
-                  <span className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-4 py-2 text-body-md text-primary transition-colors hover:border-primary hover:bg-primary/5">
+                <div className="col-span-12 mt-2 flex flex-wrap justify-end gap-2 md:col-span-4 md:mt-0 md:flex-nowrap">
+                  <Link
+                    href={`/follow-ups/${fu.id}`}
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-surface-variant px-4 py-2 text-body-md text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                  >
                     Open
                     <ArrowRight className="h-4 w-4" />
-                  </span>
+                  </Link>
+                  <ConfirmDelete
+                    label="Delete follow-up"
+                    confirmLabel="Delete"
+                    onConfirm={() => handleDeleteFollowUp(fu.id)}
+                  />
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>

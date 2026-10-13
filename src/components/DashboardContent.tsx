@@ -8,8 +8,8 @@ import {
   Plus,
   Video,
   Upload,
-  Brain,
   Search,
+  X,
   Bell,
   Sparkles,
   CalendarDays,
@@ -20,7 +20,8 @@ import {
 import MeetingModel from "./MeetingModel";
 import UploadTranscriptModal from "./UploadTranscriptModal";
 import { ModalProvider } from "./ui/animated-modal";
-import { LoaderOne } from "./ui/loader";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { LoadError } from "@/components/ui/load-error";
 import { MeetingListItem, FollowUpItem } from "@/lib/meeting-types";
 import toast from "react-hot-toast";
 
@@ -59,6 +60,49 @@ const QuickActionCard = ({
 );
 
 /* ------------------------------------------------------------------ */
+/*  Skeleton rows — fixed size, no layout shift                        */
+/* ------------------------------------------------------------------ */
+
+const SkeletonBlock = ({ className = "" }: { className?: string }) => (
+  <div className={`animate-pulse rounded bg-surface-container ${className}`} />
+);
+
+// Matches a Meeting Intelligence row (icon chip + title / date / Open Insights).
+const MeetingRowSkeleton = () => (
+  <div className="grid grid-cols-12 items-center px-6 py-4">
+    <div className="col-span-6 flex items-center gap-3 md:col-span-5">
+      <SkeletonBlock className="h-8 w-8" />
+      <SkeletonBlock className="h-4 w-40" />
+    </div>
+    <div className="col-span-3">
+      <SkeletonBlock className="h-4 w-20" />
+    </div>
+    <div className="col-span-3 flex justify-end">
+      <SkeletonBlock className="h-8 w-24 rounded-lg" />
+    </div>
+  </div>
+);
+
+// Matches a Follow-up row (icon chip + two line label / due / Open).
+const FollowUpRowSkeleton = () => (
+  <div className="grid grid-cols-12 items-center px-6 py-4">
+    <div className="col-span-6 flex items-center gap-3 md:col-span-5">
+      <SkeletonBlock className="h-8 w-8 shrink-0" />
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <SkeletonBlock className="h-4 w-40" />
+        <SkeletonBlock className="h-3 w-28" />
+      </div>
+    </div>
+    <div className="col-span-3">
+      <SkeletonBlock className="h-4 w-20" />
+    </div>
+    <div className="col-span-3 flex justify-end">
+      <SkeletonBlock className="h-8 w-16 rounded-lg" />
+    </div>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
 /*  DashboardContent — main export                                     */
 /* ------------------------------------------------------------------ */
 
@@ -76,11 +120,19 @@ const DashboardContent = () => {
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
         setIsLoading(true);
+        setLoadFailed(false);
         const [meetingsRes, followUpsRes] = await Promise.all([
           fetch("/api/meetings"),
           fetch("/api/follow-ups"),
@@ -100,6 +152,7 @@ const DashboardContent = () => {
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
         toast.error("Failed to load your meetings");
+        setLoadFailed(true);
         setMeetings([]);
         setFollowUps([]);
       } finally {
@@ -108,7 +161,7 @@ const DashboardContent = () => {
     };
 
     loadDashboard();
-  }, []);
+  }, [retryNonce]);
 
   // Greeting + live summary counts derived from the fetched data.
   const firstName = user?.firstName ?? "there";
@@ -134,6 +187,21 @@ const DashboardContent = () => {
     (f) => f.status !== "completed",
   ).length;
 
+  // Live, client-side search over the already-fetched dashboard data.
+  const q = query.trim().toLowerCase();
+  const filteredMeetings = q
+    ? meetings.filter((m) => m.title.toLowerCase().includes(q))
+    : meetings;
+  const filteredFollowUps = q
+    ? followUps.filter((f) =>
+        `${f.actionTitle ?? ""} ${f.meetingTitle ?? ""}`
+          .toLowerCase()
+          .includes(q),
+      )
+    : followUps;
+  const visibleMeetings = q ? filteredMeetings : meetings.slice(0, 3);
+  const visibleFollowUps = q ? filteredFollowUps : followUps.slice(0, 3);
+
   const quickActions: QuickAction[] = [
     {
       title: "New Meeting",
@@ -155,13 +223,6 @@ const DashboardContent = () => {
       icon: <Upload className="h-6 w-6" />,
       iconWrap: "bg-tertiary-container/30 text-tertiary",
       onClick: () => setShowUploadModal(true),
-    },
-    {
-      title: "Ask AI",
-      subtitle: "Chat with AI",
-      icon: <Brain className="h-6 w-6" />,
-      iconWrap: "bg-primary-container/10 text-primary-container",
-      onClick: () => router.push("/ai-chat"),
     },
     {
       title: "Schedule Meeting",
@@ -190,12 +251,25 @@ const DashboardContent = () => {
 
           <div className="flex items-center gap-4">
             <div className="relative hidden md:block">
-              <Search className="absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-outline" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-outline" />
               <input
                 type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search anything..."
-                className="w-64 rounded-full border border-surface-variant bg-surface-container-low py-2 pl-9 pr-4 text-body-md text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                aria-label="Search meetings and follow-ups"
+                className="w-64 rounded-full border border-surface-variant bg-surface-container-low py-2 pl-9 pr-9 text-body-md text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-outline transition-colors hover:text-on-surface"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
             <button
               type="button"
@@ -217,43 +291,75 @@ const DashboardContent = () => {
 
         {/* ---- Content ---- */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+          {/* Mobile search entry (hidden on sm+, the header search covers that) */}
+          <div className="relative mb-6 sm:hidden">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-outline" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search meetings & follow-ups"
+              aria-label="Search meetings and follow-ups"
+              className="w-full rounded-full border border-surface-variant bg-surface-container-low py-2 pl-9 pr-9 text-body-md text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-outline transition-colors hover:text-on-surface"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
           {/* Quick Actions */}
           <h3 className="mb-4 text-headline-sm font-semibold text-on-surface">
             Quick Actions
           </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {quickActions.map((action) => (
               <QuickActionCard key={action.title} {...action} />
             ))}
           </div>
 
           {/* Meeting Intelligence + Follow-ups */}
-          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="mt-8 grid grid-cols-1 gap-8">
             {/* Meeting Intelligence */}
-            <div className="flex flex-col gap-4 lg:col-span-8">
+            <div className="flex flex-col gap-4">
               <div className="flex items-end justify-between">
                 <h3 className="text-headline-sm font-semibold text-on-surface">
                   Meeting Intelligence
                 </h3>
-                <Link
-                  href="/meeting-intelligence"
-                  className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
-                >
-                  View All <ArrowRight className="text-sm" />
-                </Link>
+                {!q && (
+                  <Link
+                    href="/meeting-intelligence"
+                    className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
+                  >
+                    View All <ArrowRight className="text-sm" />
+                  </Link>
+                )}
               </div>
 
               <div className="card-shadow flex-1 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest">
                 <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-3 text-label-caps uppercase tracking-wider text-on-surface-variant">
-                  <div className="col-span-6">Meeting Title</div>
-                  <div className="col-span-3">Date</div>
-                  <div className="col-span-3 text-right">Action</div>
+                  <div className="col-span-6 md:col-span-5">Meeting Title</div>
+                  <div className="col-span-6 md:col-span-3">Date</div>
+                  <div className="col-span-12 hidden text-right md:col-span-4 md:block">Action</div>
                 </div>
-                <div className="divide-y divide-surface-variant">
-                  {isLoading ? (
-                    <div className="flex justify-center py-10">
-                      <LoaderOne />
-                    </div>
+                <div className="divide-y divide-surface-variant min-h-[12rem]">
+                  {timedOut || loadFailed ? (
+                    <LoadError
+                      message="We couldn't load your meetings."
+                      onRetry={() => setRetryNonce((k) => k + 1)}
+                    />
+                  ) : isLoading ? (
+                    <>
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <MeetingRowSkeleton key={i} />
+                      ))}
+                    </>
                   ) : meetings.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
                       <FileText className="h-8 w-8 text-on-surface-variant" />
@@ -268,13 +374,20 @@ const DashboardContent = () => {
                         Upload Transcript
                       </button>
                     </div>
+                  ) : q && filteredMeetings.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                      <Search className="h-8 w-8 text-on-surface-variant" />
+                      <p className="text-body-md text-on-surface-variant">
+                        No results for &ldquo;{query.trim()}&rdquo;.
+                      </p>
+                    </div>
                   ) : (
-                    meetings.slice(0, 3).map((m) => (
+                    visibleMeetings.map((m) => (
                       <div
                         key={m.id}
                         className="grid grid-cols-12 items-center px-6 py-4 transition-colors hover:bg-surface-container-low/50"
                       >
-                        <div className="col-span-6 flex items-center gap-3">
+                        <div className="col-span-6 flex items-center gap-3 md:col-span-5">
                           <div className="flex h-8 w-8 items-center justify-center rounded bg-surface-container text-primary">
                             <FileText className="h-4 w-4" />
                           </div>
@@ -282,14 +395,14 @@ const DashboardContent = () => {
                             {m.title}
                           </span>
                         </div>
-                        <div className="col-span-3 text-body-md text-on-surface-variant">
+                        <div className="col-span-6 md:col-span-3 text-body-md text-on-surface-variant">
                           {m.startedAt || m.createdAt
                             ? new Date(
                                 m.startedAt ?? m.createdAt,
                               ).toLocaleDateString()
                             : "—"}
                         </div>
-                        <div className="col-span-3 text-right">
+                        <div className="col-span-12 mt-2 flex flex-wrap justify-end gap-2 md:col-span-4 md:mt-0 md:flex-nowrap">
                           <button
                             type="button"
                             onClick={() =>
@@ -308,30 +421,39 @@ const DashboardContent = () => {
             </div>
 
             {/* Meeting Follow-ups */}
-            <div className="flex flex-col gap-4 lg:col-span-4">
+            <div className="flex flex-col gap-4">
               <div className="flex items-end justify-between">
                 <h3 className="text-headline-sm font-semibold text-on-surface">
                   Meeting Follow-ups
                 </h3>
-                <Link
-                  href="/follow-ups"
-                  className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
-                >
-                  View All <ArrowRight className="text-sm" />
-                </Link>
+                {!q && (
+                  <Link
+                    href="/follow-ups"
+                    className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
+                  >
+                    View All <ArrowRight className="text-sm" />
+                  </Link>
+                )}
               </div>
 
               <div className="card-shadow flex-1 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest">
                 <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-3 text-label-caps uppercase tracking-wider text-on-surface-variant">
-                  <div className="col-span-6">Action Item</div>
-                  <div className="col-span-3">Due</div>
-                  <div className="col-span-3 text-right">Action</div>
+                  <div className="col-span-6 md:col-span-5">Action Item</div>
+                  <div className="col-span-6 md:col-span-3">Due</div>
+                  <div className="col-span-12 hidden text-right md:col-span-4 md:block">Action</div>
                 </div>
-                <div className="divide-y divide-surface-variant">
-                  {isLoading ? (
-                    <div className="flex justify-center py-10">
-                      <LoaderOne />
-                    </div>
+                <div className="divide-y divide-surface-variant min-h-[12rem]">
+                  {timedOut || loadFailed ? (
+                    <LoadError
+                      message="We couldn't load your follow-ups."
+                      onRetry={() => setRetryNonce((k) => k + 1)}
+                    />
+                  ) : isLoading ? (
+                    <>
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <FollowUpRowSkeleton key={i} />
+                      ))}
+                    </>
                   ) : followUps.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
                       <ListChecks className="h-8 w-8 text-on-surface-variant" />
@@ -339,13 +461,20 @@ const DashboardContent = () => {
                         No follow-ups yet.
                       </p>
                     </div>
+                  ) : q && filteredFollowUps.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                      <Search className="h-8 w-8 text-on-surface-variant" />
+                      <p className="text-body-md text-on-surface-variant">
+                        No results for &ldquo;{query.trim()}&rdquo;.
+                      </p>
+                    </div>
                   ) : (
-                    followUps.slice(0, 3).map((item) => (
+                    visibleFollowUps.map((item) => (
                       <div
                         key={item.id}
                         className="grid grid-cols-12 items-center px-6 py-4 transition-colors hover:bg-surface-container-low/50"
                       >
-                        <div className="col-span-6 flex items-center gap-3">
+                        <div className="col-span-6 flex items-center gap-3 md:col-span-5">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-surface-container text-primary">
                             <ListChecks className="h-4 w-4" />
                           </div>
@@ -358,12 +487,12 @@ const DashboardContent = () => {
                             </span>
                           </div>
                         </div>
-                        <div className="col-span-3 text-body-md text-on-surface-variant">
+                        <div className="col-span-6 md:col-span-3 text-body-md text-on-surface-variant">
                           {item.dueDate
                             ? new Date(item.dueDate).toLocaleDateString()
                             : "No date"}
                         </div>
-                        <div className="col-span-3 text-right">
+                        <div className="col-span-12 mt-2 flex flex-wrap justify-end gap-2 md:col-span-4 md:mt-0 md:flex-nowrap">
                           <button
                             type="button"
                             onClick={() =>

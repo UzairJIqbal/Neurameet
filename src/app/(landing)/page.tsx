@@ -10,7 +10,7 @@ import LandingFooter from "@/components/landing/LandingFooter";
 
 export default function LandingPage() {
   return (
-    <div className="bg-inverse-surface min-h-screen">
+    <div className="bg-surface min-h-screen">
       <LandingNav />
       <LandingHero />
       <FeatureGrid />

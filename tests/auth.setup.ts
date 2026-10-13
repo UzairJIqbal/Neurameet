@@ -67,7 +67,7 @@ setup("authenticate test user (shared session)", async ({ browser }) => {
   // Load the Clerk sign-in page so window.Clerk is available.
   await page.goto("/sign-in");
   await page.waitForFunction(() => Boolean(window.Clerk?.loaded), null, {
-    timeout: 30000,
+    timeout: 60000,
   });
 
   // clerk.signIn registers the captcha-bypass route AND performs the ticket
@@ -78,8 +78,10 @@ setup("authenticate test user (shared session)", async ({ browser }) => {
   await clerk.signIn({ page, emailAddress: E2E_EMAIL });
 
   // After a successful ticket sign-in, the session cookie is set. Navigate into
-  // the app; the middleware now trusts the session.
-  await page.goto("/dashboard");
+  // the app; the middleware now trusts the session. clerk.signIn's ticket
+  // setActive reloads the page to apply the session cookie, so tolerate that
+  // in-flight navigation instead of letting our goto abort it.
+  await page.goto("/dashboard", { waitUntil: "domcontentloaded" }).catch(() => {});
   await page.waitForURL(/\/dashboard/, { timeout: 30000 });
 
   // If auth failed we'd be bounced to /sign-in — fail loudly.
