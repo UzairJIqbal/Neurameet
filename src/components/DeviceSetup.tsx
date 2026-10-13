@@ -148,19 +148,15 @@ export default function DeviceSetup({
   call,
   onJoin,
   buttonLabel = "Join Meeting",
-  guestAdmissionMode: externalGuestAdmissionMode,
 }: {
   call: Call;
   onJoin: () => void;
   buttonLabel?: string;
-  guestAdmissionMode?: "open" | "approval";
 }) {
   // Intended device state for the pre-join lobby (drives the toggle buttons).
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
   const [audioType, setAudioType] = useState<audioType>("voice calls");
-  const [guestAdmissionMode, setGuestAdmissionMode] =
-    useState<"open" | "approval">(externalGuestAdmissionMode ?? "approval");
 
   const { useCameraState, useMicrophoneState } = useCallStateHooks();
   const {
@@ -433,39 +429,6 @@ export default function DeviceSetup({
               label="Mic"
             />
             <AudioDropdown audioType={audioType} setAudioType={setAudioType} />
-          </div>
-        </div>
-
-        {/* Guest admission mode — owner decides before joining */}
-        <div className="flex w-full flex-col gap-2">
-          <label className="text-base font-normal leading-[22.4px] text-white text-center">
-            Guest Admission
-          </label>
-          <div className="flex gap-2 justify-center">
-            <button
-              type="button"
-              onClick={() => setGuestAdmissionMode("open")}
-              disabled={guestAdmissionMode === "open"}
-              className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
-                guestAdmissionMode === "open"
-                  ? "bg-primary-container text-on-primary"
-                  : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
-              } disabled:opacity-60`}
-            >
-              Anyone can join
-            </button>
-            <button
-              type="button"
-              onClick={() => setGuestAdmissionMode("approval")}
-              disabled={guestAdmissionMode === "approval"}
-              className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
-                guestAdmissionMode === "approval"
-                  ? "bg-primary-container text-on-primary"
-                  : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
-              } disabled:opacity-60`}
-            >
-              Approval required
-            </button>
           </div>
         </div>
 

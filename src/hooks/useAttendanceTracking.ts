@@ -19,6 +19,8 @@ interface AttendanceIdentity {
   streamUserId: string | null;
   name: string | null;
   email: string | null;
+  // Guests only: their Stream token, which the server verifies to identify them.
+  guestStreamToken: string | null;
 }
 
 /**
@@ -35,6 +37,7 @@ export function useAttendanceTracking(
     streamUserId: string | null;
     name: string | null;
     email: string | null;
+    guestStreamToken: string | null;
   },
 ) {
   const call = useCall();
@@ -65,6 +68,7 @@ export function useAttendanceTracking(
         streamUserId: identityOverride.streamUserId ?? localParticipant?.userId ?? null,
         name: identityOverride.name,
         email: identityOverride.email,
+        guestStreamToken: identityOverride.guestStreamToken,
       };
     }
     if (!user) return null;
@@ -82,8 +86,13 @@ export function useAttendanceTracking(
       // duplicate token into attendance_events and surface everywhere it's read.
       name: normalizeSpeakerName(user.fullName ?? user.username ?? null),
       email: user.primaryEmailAddress?.emailAddress ?? null,
+      guestStreamToken: null,
     };
   }, [
+    identityOverride?.streamUserId,
+    identityOverride?.name,
+    identityOverride?.email,
+    identityOverride?.guestStreamToken,
     user?.id,
     user?.fullName,
     user?.username,
@@ -108,6 +117,7 @@ export function useAttendanceTracking(
         stream_user_id: identity.streamUserId,
         participant_name: identity.name,
         participant_email: identity.email,
+        guest_stream_token: identity.guestStreamToken,
         event_type: eventType,
       });
       const opts: RequestInit = {
@@ -258,13 +268,14 @@ export function useAttendanceTracking(
     return () => {
       const c = callRef.current;
       const id = identityRef.current;
-      if (!c || !id?.userId) return;
+      if (!c || !id || (!id.userId && !id.streamUserId)) return;
       const payload = JSON.stringify({
         stream_call_id: c.id,
         user_id: id.userId,
         stream_user_id: id.streamUserId,
         participant_name: id.name,
         participant_email: id.email,
+        guest_stream_token: id.guestStreamToken,
         event_type: "leave",
       });
       try {
@@ -284,13 +295,14 @@ export function useAttendanceTracking(
   const reportLocalLeave = useCallback(() => {
     const c = callRef.current;
     const id = identityRef.current;
-    if (!c || !id?.userId) return;
+    if (!c || !id || (!id.userId && !id.streamUserId)) return;
     const payload = JSON.stringify({
       stream_call_id: c.id,
       user_id: id.userId,
       stream_user_id: id.streamUserId,
       participant_name: id.name,
       participant_email: id.email,
+      guest_stream_token: id.guestStreamToken,
       event_type: "leave",
     });
     try {

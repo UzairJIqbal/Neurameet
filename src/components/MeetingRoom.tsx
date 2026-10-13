@@ -1,7 +1,6 @@
 /* eslint-disable prettier/prettier */
 
 import { cn } from "@/lib/utils";
-import { LoadError } from "@/components/ui/load-error";
 import { isAlreadyRecordingError } from "@/lib/recording-state";
 import {
   PaginatedGridLayout,
@@ -166,9 +165,11 @@ const RecordingsPanelLoading = () => (
 const MeetingRoom = ({
   guestName,
   guestEmail,
+  guestStreamToken,
 }: {
   guestName?: string | null;
   guestEmail?: string | null;
+  guestStreamToken?: string | null;
 }) => {
   const [layout, setLayout] = useState<callTypesLayout>("speaker-right");
   const [showParticipants, setShowParticipants] = useState(false);
@@ -199,7 +200,12 @@ const MeetingRoom = ({
   const localParticipant = useLocalParticipant();
   const { reportLocalLeave } = useAttendanceTracking(
     !user && (guestName || guestEmail)
-      ? { streamUserId: localParticipant?.userId ?? null, name: guestName ?? null, email: guestEmail ?? null }
+      ? {
+          streamUserId: localParticipant?.userId ?? null,
+          name: guestName ?? null,
+          email: guestEmail ?? null,
+          guestStreamToken: guestStreamToken ?? null,
+        }
       : undefined,
   );
   // D3.4: the owner is the call creator. The Record control is owner-only
@@ -513,6 +519,9 @@ const MeetingRoom = ({
     const pendingTimers = new Map<string, NodeJS.Timeout>();
 
     const showGuestToast = (guestToken: string, guestName: string) => {
+      // Already showing this guest (event + poll both fire): keep the existing
+      // toast and its TTL timer instead of re-rendering and leaking a timer.
+      if (pendingTimers.has(guestToken)) return;
       // Single-click UX: the interactive toast stays visible long enough for the
       // owner to SEE the outcome (success/error) on the same card they clicked,
       // then auto-dismisses after a short delay. Previously, the `finally` block
@@ -797,8 +806,8 @@ const MeetingRoom = ({
         .catch((err) => {
           // Non-fatal — real-time events are the primary path.
           console.debug("[MeetingRoom] guest pending poll failed:", err);
-          // Increment fail count; after 2+ consecutive failures,
-          // the owner sees a LoadError so they know polling is broken.
+          // Increment fail count; after 2 consecutive failures the owner
+          // gets a one-time warning toast (the call itself keeps running).
           setPollFailCount((c) => c + 1);
         });
     };
@@ -815,26 +824,22 @@ const MeetingRoom = ({
     };
   }, [call, isOwner]);
 
+  // Warn once when guest polling keeps failing. Never replace the live call UI.
+  useEffect(() => {
+    if (pollFailCount === 2) {
+      toast.error(
+        "Guest discovery polling failed — pending guests may be delayed.",
+        { id: "guest-poll-fail" },
+      );
+    }
+  }, [pollFailCount]);
+
   // Load recordings when the panel opens; refresh re-queries on demand.
   useEffect(() => {
     if (showRecordings) void loadRecordings();
   }, [showRecordings, loadRecordings]);
 
   if (callingState !== CallingState.JOINED) return <LoaderOne />;
-
-  // Consecutive poll failures — show a recoverable error so the
-  // owner knows the guest-discovery polling is broken.
-  if (pollFailCount >= 2) {
-    return (
-      <LoadError
-        message="Guest discovery polling failed. Real-time events still work, but pending guests may not appear until the page reloads."
-        onRetry={() => {
-          setPollFailCount(0);
-          window.location.reload();
-        }}
-      />
-    );
-  }
 
   return (
     <section className="relative min-h-screen w-full overflow-hidden bg-inverse-surface text-inverse-on-surface">
@@ -982,7 +987,8 @@ const MeetingRoom = ({
 
           <CancelCallButton onLeave={OnLeave} caption="Leave" />
 
-          <EndCallButton />
+          {/* The personal room is permanent: leave it, never end it for everyone. */}
+          {call?.id !== user?.id && <EndCallButton />}
 
           <Button
             onClick={() => {

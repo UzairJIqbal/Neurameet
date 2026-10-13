@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { StreamClient } from "@stream-io/node-sdk";
 import { supabaseServer } from "@/lib/supabase-server";
+import { verifyStreamUserToken } from "@/lib/stream-token";
 
 type AttendanceEventType =
   | "join"
@@ -14,8 +15,10 @@ type AttendanceEventType =
 
 interface AttendanceEventBody {
   stream_call_id: string;
-  user_id: string;
+  user_id?: string | null;
   stream_user_id?: string | null;
+  // Guests have no Clerk session; they prove identity with their Stream token.
+  guest_stream_token?: string | null;
   participant_email?: string | null;
   participant_name?: string | null;
   event_type: AttendanceEventType;
@@ -36,16 +39,21 @@ function secondsBetween(laterIso: string, earlierIso: string): number {
   return Math.max(0, Math.round(deltaMs / 1000));
 }
 
-// Resolve the meeting title from the Stream call's custom description. Stream
-// stores the human title there (e.g. "Instant Meeting" / the scheduled
-// description); the Supabase meetings row is created later (first attendance
-// event) and must copy it, otherwise the dashboard "Meeting Title" column is
-// always blank (schema default is ''). Returns "Meeting" if it can't be read so
-// the attendance write never fails.
-async function resolveMeetingTitle(streamCallId: string): Promise<string> {
+interface CallInfo {
+  title: string;
+  ownerId: string | null;
+}
+
+// Resolve the meeting title and owner from the Stream call. Stream stores the
+// human title in custom (e.g. "Instant Meeting" / the scheduled description);
+// the Supabase meetings row is created later (first attendance event) and must
+// copy it, otherwise the dashboard "Meeting Title" column is always blank. The
+// owner is the call's creator, never the caller. ownerId is null if the call
+// can't be read.
+async function resolveCallInfo(streamCallId: string): Promise<CallInfo> {
   const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
   const secretKey = process.env.STREAM_SECRET_KEY;
-  if (!apiKey || !secretKey) return "Meeting";
+  if (!apiKey || !secretKey) return { title: "Meeting", ownerId: null };
   try {
     const client = new StreamClient(apiKey, secretKey);
     const call = client.video.call("default", streamCallId);
@@ -56,23 +64,28 @@ async function resolveMeetingTitle(streamCallId: string): Promise<string> {
       | { title?: string; description?: string }
       | undefined;
     const title = custom?.title?.trim() || custom?.description?.trim();
-    return title ? title : "Meeting";
+    return {
+      title: title ? title : "Meeting",
+      ownerId: data.call?.created_by?.id ?? null,
+    };
   } catch {
-    return "Meeting";
+    return { title: "Meeting", ownerId: null };
   }
+}
+
+// Signed-in callers are identified by their Clerk session; guests by a Stream
+// token that Stream itself accepts. Body-supplied ids are never trusted.
+async function resolveCallerId(
+  authUserId: string | null,
+  body: AttendanceEventBody,
+): Promise<string | null> {
+  if (authUserId) return authUserId;
+  if (!body.guest_stream_token) return null;
+  return verifyStreamUserToken(body.guest_stream_token, body.stream_call_id);
 }
 
 export async function POST(request: Request) {
   const { userId: authUserId } = await auth();
-
-  // Allow guest payloads (identified by stream_user_id or participant_email) to bypass Clerk auth.
-  // The actual permission check occurs after parsing the request body.
-  // If a guest identifier is present we treat the request as authorized.
-  // authUserId will be used for owner actions; otherwise it may be null.
-  // No early return here.
-  // if (!authUserId) {
-  //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  // }
 
   let body: AttendanceEventBody;
   try {
@@ -81,21 +94,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { stream_call_id, user_id, stream_user_id, participant_email, event_type } = body;
+  const { stream_call_id, event_type } = body;
 
-  if (
-    !stream_call_id ||
-    !event_type ||
-    !VALID_EVENTS.has(event_type) ||
-    (event_type !== "call_ended" &&
-      !user_id &&
-      !stream_user_id &&
-      !participant_email)
-  ) {
+  if (!stream_call_id || !event_type || !VALID_EVENTS.has(event_type)) {
     return NextResponse.json(
       { error: "Missing or invalid required fields" },
       { status: 400 },
     );
+  }
+
+  const user_id = await resolveCallerId(authUserId, body);
+  if (!user_id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Call-end is a terminal marker, not an attendance row mutation: it flips the
@@ -108,9 +118,13 @@ export async function POST(request: Request) {
       const now = new Date().toISOString();
       const { data: meeting } = await supabase
         .from("meetings")
-        .select("id, ended_at")
+        .select("id, ended_at, user_id")
         .eq("stream_call_id", stream_call_id)
         .maybeSingle();
+      // Only the meeting owner may end it.
+      if (meeting && (!authUserId || meeting.user_id !== authUserId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       if (meeting) {
         await supabase
           .from("meetings")
@@ -131,7 +145,8 @@ export async function POST(request: Request) {
 
   const email = body.participant_email ?? null;
   const name = body.participant_name ?? null;
-  const streamUserId = body.stream_user_id ?? null;
+  // Guests: the verified Stream id is both their user_id and stream_user_id.
+  const streamUserId = authUserId ? (body.stream_user_id ?? null) : user_id;
 
   try {
     const supabase = supabaseServer();
@@ -154,7 +169,7 @@ export async function POST(request: Request) {
       // Backfill blank titles from the Stream call custom so the dashboard
       // "Meeting Title" column isn't empty for meetings created before this fix.
       if (!meeting.title) {
-        const title = await resolveMeetingTitle(stream_call_id);
+        const { title } = await resolveCallInfo(stream_call_id);
         if (title !== "Meeting") {
           try {
             await supabase
@@ -187,11 +202,15 @@ export async function POST(request: Request) {
       // index on stream_call_id makes the second insert fail with 23505 —
       // treat that as "someone else won the race" and fall through to the
       // existing-row branch above rather than returning 500.
-      const title = await resolveMeetingTitle(stream_call_id);
+      // The row's owner is the Stream call's creator, whoever joins first.
+      const { title, ownerId } = await resolveCallInfo(stream_call_id);
+      if (!ownerId) {
+        return NextResponse.json({ error: "Call not found" }, { status: 404 });
+      }
       const { data: created, error: createError } = await supabase
         .from("meetings")
         .insert({
-          user_id,
+          user_id: ownerId,
           stream_call_id,
           title,
           status: "active",
@@ -231,16 +250,11 @@ export async function POST(request: Request) {
     }
 
     const findOpenRow = async () => {
-      const filters: string[] = [];
-      if (user_id) filters.push(`user_id.eq.${user_id}`);
-      if (streamUserId) filters.push(`stream_user_id.eq.${streamUserId}`);
-      if (email) filters.push(`participant_email.eq.${email}`);
-      const filterStr = filters.join(',');
       return supabase
         .from("attendance_events")
         .select("*")
         .eq("meeting_id", meetingId)
-        .or(filterStr)
+        .eq("user_id", user_id)
         .is("session_ended_at", null)
         .order("created_at", { ascending: false })
         .limit(1)

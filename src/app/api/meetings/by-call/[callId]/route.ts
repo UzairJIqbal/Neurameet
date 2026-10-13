@@ -8,8 +8,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 // pages, which render Stream calls (not Supabase meeting rows). The Stream call
 // is deleted (creator-only, enforced by Stream), and any linked Supabase meeting
 // row is cascade-removed. Non-owners are rejected: a Supabase meeting row is
-// checked by user_id, and a call-only (never-processed) deletion is still gated
-// by Stream's own creator enforcement on deleteCall.
+// checked by user_id, and a call-only (never-processed) entry is checked against
+// the Stream call's created_by (the server client bypasses Stream's own
+// client-side permission checks, so we must enforce ownership ourselves).
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ callId: string }> },
@@ -42,9 +43,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
-    // Delete the Stream call. Stream enforces creator-only; a rejection here
-    // means the caller isn't the owner of a call-only entry either.
     const client = new StreamClient(apiKey, secretKey);
+
+    // No meeting row: the caller must be the Stream call's creator.
+    if (!meeting) {
+      try {
+        const { call } = await client.video.call("default", callId).get();
+        if (call.created_by.id !== userId) {
+          return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("by-call delete: failed to load Stream call:", msg);
+        return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
+      }
+    }
+
+    // Delete the Stream call (ownership verified above).
     try {
       await client.video.deleteCall({ type: "default", id: callId });
     } catch (err) {

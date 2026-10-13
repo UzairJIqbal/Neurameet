@@ -23,18 +23,23 @@ const CategoryTab = ({
   const [selected, setSelected] = useState<MeetingCategory>(
     (insights?.category as MeetingCategory) ?? "General",
   );
+  // The saved value, so the badge and Save button update even when the
+  // parent's insights prop doesn't change after router.refresh().
+  const [saved, setSaved] = useState<MeetingCategory | null>(null);
   const [isPending, startTransition] = useTransition();
 
   if (!insights) {
     return <TabEmptyState message="No category available yet." />;
   }
 
-  const current = (insights.category as MeetingCategory) ?? "General";
+  const current =
+    saved ?? (insights.category as MeetingCategory) ?? "General";
 
   const handleSave = () => {
     startTransition(async () => {
       const res = await updateMeetingCategory(meetingId, selected);
       if (res.ok) {
+        setSaved(selected);
         toast.success("Category updated");
         router.refresh();
       } else {

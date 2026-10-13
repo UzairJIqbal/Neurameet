@@ -120,6 +120,7 @@ function GuestLobby() {
       <GuestCallFlow
         meetingId={meetingId}
         guestToken={guestToken}
+        accessToken={accessToken}
         phase={phase}
         setPhase={setPhase}
         requestTimedOut={requestTimedOut}
@@ -148,6 +149,7 @@ const ADMITTED_CALL_TIMEOUT_MS = 12000;
 function GuestCallFlow({
   meetingId,
   guestToken,
+  accessToken,
   phase,
   setPhase,
   requestTimedOut,
@@ -157,6 +159,7 @@ function GuestCallFlow({
 }: {
   meetingId: string;
   guestToken: string;
+  accessToken: string;
   phase: JoinPhase;
   setPhase: (v: JoinPhase) => void;
   requestTimedOut: boolean;
@@ -348,7 +351,11 @@ function GuestCallFlow({
     return (
       <StreamCall call={call}>
         <StreamTheme>
-          <MeetingRoom guestName={guestDisplayName} guestEmail={guestEmail} />
+          <MeetingRoom
+            guestName={guestDisplayName}
+            guestEmail={guestEmail}
+            guestStreamToken={accessToken}
+          />
         </StreamTheme>
       </StreamCall>
     );

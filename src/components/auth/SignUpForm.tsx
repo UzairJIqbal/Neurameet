@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import AuthLayout from "./AuthLayout";
 
 const SignUpForm = () => {
-  const { signUp, isLoaded } = useSignUp();
+  const { signUp, isLoaded, setActive } = useSignUp();
   const { isSignedIn } = useAuth();
   const router = useRouter();
 
@@ -51,6 +51,8 @@ const SignUpForm = () => {
       await signUp.update({ firstName: fullName });
 
       if (result.status === "complete") {
+        // Activate the new session before navigating, or /dashboard sees no user.
+        await setActive({ session: result.createdSessionId });
         router.push("/dashboard");
         toast.success("Account created successfully");
       } else if (result.status === "missing_requirements") {

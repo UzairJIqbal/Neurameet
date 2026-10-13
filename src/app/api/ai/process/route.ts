@@ -29,6 +29,18 @@ export async function POST(request: Request) {
 
     const supabase = supabaseServer();
 
+    // Ownership check: only the meeting's owner may run extraction on it.
+    const { data: owned, error: ownErr } = await supabase
+      .from("meetings")
+      .select("id")
+      .eq("id", meetingId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (ownErr || !owned) {
+      return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
+    }
+
     // Fetch the transcript for this meeting
     const { data: transcript, error: transcriptError } = await supabase
       .from("transcripts")

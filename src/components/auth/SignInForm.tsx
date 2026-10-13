@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import AuthLayout from "./AuthLayout";
 
 const SignInForm = () => {
-  const { signIn, isLoaded } = useSignIn();
+  const { signIn, isLoaded, setActive } = useSignIn();
   const { isSignedIn } = useAuth();
   const router = useRouter();
 
@@ -36,6 +36,8 @@ const SignInForm = () => {
         password,
       });
       if (result.status === "complete") {
+        // Activate the new session before navigating, or /dashboard sees no user.
+        await setActive({ session: result.createdSessionId });
         router.push("/dashboard");
         toast.success("Signed in successfully");
       } else {
