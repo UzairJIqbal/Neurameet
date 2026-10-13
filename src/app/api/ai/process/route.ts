@@ -3,8 +3,23 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { sendMeetingReadyEmail } from "@/lib/email";
 import { normalizeDueDate } from "@/lib/normalize-date";
+import { MEETING_CATEGORIES } from "@/lib/meeting-types";
 import { generateStructuredWithFallback } from "@/agent/models";
 import { extractionResultSchema } from "@/agent/types";
+import { setTranscriptState } from "@/lib/transcript-state";
+
+// Normalize the model's free-text category to a valid MEETING_CATEGORIES
+// member. The AI SDK returns an unconstrained string; mapping it (case-
+// insensitive) to the enum guarantees the Category tab badge + select never
+// show an invalid value (P11 (b)). Unrecognized input falls back to "General".
+function normalizeCategory(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "General";
+  const match = MEETING_CATEGORIES.find(
+    (c) => c.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return match ?? "General";
+}
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -15,9 +30,10 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { meetingId, emailNotifications } = body as {
+    const { meetingId, emailNotifications, email } = body as {
       meetingId?: string;
       emailNotifications?: boolean;
+      email?: string | null;
     };
 
     if (!meetingId) {
@@ -56,15 +72,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Run AI extraction via Gemini (with Groq fallback).
-    // Groq cannot use response_format json_schema, so the fallback path inside
-    // generateStructuredWithFallback forces loose JSON mode — see models.ts.
+    // Bound the input size before extraction. Long recordings (multiple 10-min
+    // chunks concatenated) can push the model's structured-output response past
+    // what it can complete, which makes the AI SDK throw
+    // "Provider stream ended without finish_reason" (truncated JSON). Capping
+    // the transcript keeps the summary/action-item extraction reliable.
+    const MAX_TRANSCRIPT_CHARS = 16000;
+    const rawText = transcript.raw_text ?? "";
+    const truncatedText =
+      rawText.length > MAX_TRANSCRIPT_CHARS
+        ? rawText.slice(0, MAX_TRANSCRIPT_CHARS) +
+        "\n[transcript truncated for processing]"
+        : rawText;
+
+    // Run AI extraction via Gemini (with Groq fallback). Both paths use the
+    // default json_schema structured-outputs mode, so the schema must avoid
+    // `.optional()` fields (use `.nullable()`) — see generateStructuredWithFallback.
     const { object: result } = await generateStructuredWithFallback({
       schema: extractionResultSchema,
       prompt: `Analyze the following meeting transcript and extract structured insights.
 
 Transcript:
-${transcript.raw_text}
+${truncatedText}
 
 Respond with a SINGLE JSON object only (no markdown, no prose), with exactly this structure:
 {
@@ -72,15 +101,45 @@ Respond with a SINGLE JSON object only (no markdown, no prose), with exactly thi
     "summary": "A comprehensive summary of the meeting",
     "keyPoints": ["Key point discussed", "Another key point"],
     "decisions": ["Decision that was made"],
-    "category": "Product | Engineering | Sales | Design | Operations | General",
+    "category": "Product | Sales | Design | Operations | Engineering | General",
     "detectedTopics": ["Specific topic", "Another topic"]
   },
   "actionItems": [
     { "title": "A clear, actionable task", "assignee": "Person responsible or null", "dueDate": "ISO date YYYY-MM-DD or null" }
   ]
 }
-Extract: a comprehensive summary, key points, decisions made, the meeting category, specific topics detected, and action items with assignee and due date if mentioned.`,
+Extraction rules:
+- Summary: a comprehensive summary of the meeting.
+- Key points: the main points discussed.
+- Decisions: explicit decisions that were made.
+- Category: choose the SINGLE most representative category from the list. Do NOT default to any one; pick the category that best matches what the meeting was actually about.
+- Detected topics: specific topics discussed.
+- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, and a due date (ISO YYYY-MM-DD) if stated.`,
     });
+
+    // Idempotent retry: clear any prior insights, action items, and their
+    // follow-ups for this meeting before writing the new ones. This runs only
+    // after extraction succeeded, so a failed AI call keeps the old results. A retry (or any re-run
+    // of this route) must not create duplicate rows, since the detail API does
+    // a single-row fetch on meeting_insights. Safe no-op on first run.
+    {
+      const { error: delInsightsErr } = await supabase
+        .from("meeting_insights")
+        .delete()
+        .eq("meeting_id", meetingId);
+      if (delInsightsErr)
+        console.error("Failed to clear prior insights:", delInsightsErr);
+
+      const { data: priorItems } = await supabase
+        .from("action_items")
+        .select("id")
+        .eq("meeting_id", meetingId);
+      if (priorItems && priorItems.length > 0) {
+        const priorIds = priorItems.map((i) => i.id);
+        await supabase.from("follow_ups").delete().in("action_item_id", priorIds);
+        await supabase.from("action_items").delete().in("id", priorIds);
+      }
+    }
 
     // Write meeting insights
     const { error: insightsError } = await supabase
@@ -90,7 +149,7 @@ Extract: a comprehensive summary, key points, decisions made, the meeting catego
         summary: result.insights.summary,
         key_points: result.insights.keyPoints,
         decisions: result.insights.decisions,
-        category: result.insights.category,
+        category: normalizeCategory(result.insights.category),
         detected_topics: result.insights.detectedTopics,
         processed_at: new Date().toISOString(),
       });
@@ -153,8 +212,22 @@ Extract: a comprehensive summary, key points, decisions made, the meeting catego
     let emailSent = false;
     if (emailNotifications) {
       try {
-        const user = await currentUser();
-        const to = user?.primaryEmailAddress?.emailAddress;
+        const clerkUser = await currentUser();
+        const clerkEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+        // Determine recipient email securely.
+        // Prefer Clerk owner email. If not available, look up the participant's email from attendance_events.
+        let participantEmail: string | null = null;
+        if (!clerkEmail) {
+          // Fetch participant email from attendance_events for this meeting and caller.
+          const { data: att } = await supabase
+            .from('attendance_events')
+            .select('participant_email')
+            .eq('meeting_id', meetingId)
+            .or(`user_id.eq.${userId},stream_user_id.eq.${userId}`)
+            .limit(1);
+          participantEmail = att && att[0] ? att[0].participant_email : null;
+        }
+        const to = clerkEmail ?? participantEmail ?? null;
         if (to) {
           const { data: meeting } = await supabase
             .from("meetings")
@@ -174,6 +247,13 @@ Extract: a comprehensive summary, key points, decisions made, the meeting catego
       } catch (emailErr) {
         console.error("[process] Meeting-ready email failed:", emailErr);
       }
+    }
+
+    // Mark the transcript fully ready now that AI insights + embeddings exist.
+    try {
+      await setTranscriptState(supabase, meetingId, "ready");
+    } catch {
+      // best-effort; AI work already succeeded.
     }
 
     return NextResponse.json({

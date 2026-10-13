@@ -11,7 +11,28 @@ import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { readUserPrefs } from "@/lib/user-prefs";
 
-const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
+// A transcript generated from a real call is downloaded as
+// `meeting-<meetingId>-transcript.txt` (AfterMeetingRecap stamps the call's
+// Supabase meeting id into the filename). When the same file is later uploaded
+// from the Dashboard, we recover that id here so the upload attaches to the
+// EXISTING call (attendance + recordings intact) instead of orphaning a new row.
+// This is what makes the recap-page and Dashboard upload paths behave identically.
+const MEETING_ID_FILENAME = /meeting-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})-transcript\.txt$/i;
+
+function extractMeetingIdFromFilename(name: string): string | null {
+  const match = MEETING_ID_FILENAME.exec(name);
+  return match ? match[1] : null;
+}
+
+const UploadTranscriptModal = ({
+  onClose,
+  meetingId,
+  defaultTitle,
+}: {
+  onClose: () => void;
+  meetingId?: string;
+  defaultTitle?: string;
+}) => {
   const router = useRouter();
   const { setOpen } = useModal();
 
@@ -20,12 +41,23 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
   useEffect(() => {
     setOpen(true);
   }, [setOpen]);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(defaultTitle ?? "");
   const [pasteText, setPasteText] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [parsedMeetingId, setParsedMeetingId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Lives across the async upload so Cancel can abort the in-flight request.
+  const abortRef = useRef<AbortController | null>(null);
+  // Tells the catch handler that an abort came from a user click, not the
+  // timeout, so we can stay quiet instead of showing a "timed out" toast.
+  const cancelledRef = useRef(false);
+
+  // An explicit meetingId (recap page) wins; otherwise fall back to one we
+  // recovered from the uploaded filename so both entry points resolve the same
+  // meeting.
+  const effectiveMeetingId = meetingId ?? parsedMeetingId;
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,10 +66,14 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
 
       if (!file.name.endsWith(".txt")) {
         toast.error("Only .txt files are supported");
+        setParsedMeetingId(null);
+        setFileName(null);
+        setFileContent(null);
         return;
       }
 
       setFileName(file.name);
+      setParsedMeetingId(extractMeetingIdFromFilename(file.name));
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result;
@@ -57,10 +93,14 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
 
     if (!file.name.endsWith(".txt")) {
       toast.error("Only .txt files are supported");
+      setParsedMeetingId(null);
+      setFileName(null);
+      setFileContent(null);
       return;
     }
 
     setFileName(file.name);
+    setParsedMeetingId(extractMeetingIdFromFilename(file.name));
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result;
@@ -84,14 +124,30 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
       return;
     }
 
+    // Allow cancellation + a hard ceiling on wait time. A slow or rate-limited
+    // AI provider (Gemini/Groq free tier) can make /api/ai/process hang for
+    // minutes with no escape; the AbortController lets Cancel stop it, and the
+    // timer guarantees the UI never spins forever (the prior 5-minute hang).
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+
     setIsProcessing(true);
 
     try {
-      // Step 1: Upload transcript
+      // Step 1: Upload transcript. When a meetingId is supplied (recap flow for
+      // a real call) the server attaches the transcript to that EXISTING meeting
+      // instead of creating a duplicate — keeping it linked to the call's
+      // attendance + recording (P11 fix).
       const uploadRes = await fetch("/api/transcript/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), rawText: rawText.trim() }),
+        body: JSON.stringify({
+          title: title.trim(),
+          rawText: rawText.trim(),
+          ...(effectiveMeetingId ? { meetingId: effectiveMeetingId } : {}),
+        }),
+        signal: controller.signal,
       });
 
       if (!uploadRes.ok) {
@@ -99,7 +155,8 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
         throw new Error(uploadData.error || "Upload failed");
       }
 
-      const { meetingId } = (await uploadRes.json()) as { meetingId: string };
+      const { meetingId: returnedMeetingId, canProcess } =
+        (await uploadRes.json()) as { meetingId: string; canProcess?: boolean };
 
       // Respect the "AI auto-summary on upload" preference. When OFF, store the
       // transcript only and skip AI processing + embedding (no insights/chunks).
@@ -107,7 +164,16 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
       if (!aiAutoSummary) {
         toast.success("Transcript uploaded");
         onClose();
-        router.push(`/meeting-intelligence/${meetingId}`);
+        router.push(`/meeting-intelligence/${returnedMeetingId}`);
+        return;
+      }
+
+      // A participant may attach a transcript, but only the owner can run AI
+      // processing on the meeting, so stop here instead of failing.
+      if (canProcess === false) {
+        toast.success("Transcript uploaded. The meeting owner can generate insights.");
+        onClose();
+        router.push(`/meeting-intelligence/${returnedMeetingId}`);
         return;
       }
 
@@ -116,7 +182,8 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
       const processRes = await fetch("/api/ai/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingId, emailNotifications }),
+        body: JSON.stringify({ meetingId: returnedMeetingId, emailNotifications }),
+        signal: controller.signal,
       });
 
       if (!processRes.ok) {
@@ -133,7 +200,8 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
         const embedRes = await fetch("/api/ai/embed", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ meetingId }),
+          body: JSON.stringify({ meetingId: returnedMeetingId }),
+          signal: controller.signal,
         });
         if (!embedRes.ok) {
           embedFailed = true;
@@ -141,12 +209,15 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
           console.error("Embedding failed:", embedData.error || "unknown");
         }
       } catch (embedErr) {
+        // Cancel or the timeout aborted the request: end the flow instead of
+        // redirecting as if processing had finished.
+        if (controller.signal.aborted) throw embedErr;
         embedFailed = true;
         console.error("Embedding request failed:", embedErr);
       }
 
       onClose();
-      router.push(`/meeting-intelligence/${meetingId}`);
+      router.push(`/meeting-intelligence/${returnedMeetingId}`);
 
       if (embedFailed) {
         toast.error(
@@ -156,12 +227,31 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
         toast.success("Transcript processed successfully!");
       }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong";
-      toast.error(message);
+      // An aborted request (user Cancel, or the 2-minute timeout) is not a
+      // generic failure. A user click stays quiet; an unexpected abort reads as
+      // a timeout so the message stays honest.
+      if (controller.signal.aborted) {
+        if (!cancelledRef.current) {
+          toast.error("Processing timed out. Please try your upload again.");
+        }
+      } else {
+        const message =
+          err instanceof Error ? err.message : "Something went wrong";
+        toast.error(message);
+      }
     } finally {
+      clearTimeout(timeoutId);
+      abortRef.current = null;
       setIsProcessing(false);
     }
+  };
+
+  const handleCancel = () => {
+    if (isProcessing && abortRef.current) {
+      cancelledRef.current = true;
+      abortRef.current.abort();
+    }
+    onClose();
   };
 
   return (
@@ -231,6 +321,13 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
                   className="hidden"
                 />
               </div>
+
+              {parsedMeetingId && !meetingId ? (
+                <p className="text-xs text-on-surface-variant">
+                  Recognized as a transcript from one of your meetings — it will be
+                  added to that meeting&apos;s attendance and recordings.
+                </p>
+              ) : null}
             </div>
           )}
         </ModalContent>
@@ -238,8 +335,7 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
         <ModalFooter className="bg-surface-container-low">
           <button
             className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm text-on-surface hover:bg-surface-container-low sm:w-28"
-            onClick={() => onClose()}
-            disabled={isProcessing}
+            onClick={handleCancel}
           >
             Cancel
           </button>
@@ -248,7 +344,7 @@ const UploadTranscriptModal = ({ onClose }: { onClose: () => void }) => {
             onClick={handleUpload}
             disabled={isProcessing}
           >
-            {isProcessing ? "Processing..." : "Upload & Process"}
+            Upload & Process
           </button>
         </ModalFooter>
       </ModalBody>
