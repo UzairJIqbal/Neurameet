@@ -14,7 +14,7 @@ const SummaryTab = ({
 }) => {
   const [retrying, setRetrying] = useState(false);
 
-  if (!insights) {
+  if (!insights?.summary) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-surface-variant bg-surface-container-lowest px-6 py-16 text-center">
         <Inbox className="h-10 w-10 text-on-surface-variant" />

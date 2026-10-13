@@ -80,7 +80,10 @@ const MeetingTabs = ({
           />
         )}
         {active === "Summary" && (
-          <SummaryTab insights={insights} onRetry={onRetry} />
+          <SummaryTab
+            insights={insights}
+            onRetry={isOwner ? onRetry : undefined}
+          />
         )}
         {active === "Action Items" && (
           <ActionItemsTab insights={insights} actionItems={actionItems} />

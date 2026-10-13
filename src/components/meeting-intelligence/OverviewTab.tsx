@@ -74,6 +74,8 @@ const OverviewTab = ({
     : null;
 
   const hasAttendance = attendanceCount > 0;
+  // The report API is owner-only, so participants never get a link that 404s.
+  const canDownloadReport = hasAttendance && isOwner;
   const reportHref = `/api/attendance/report?meetingId=${meeting.id}`;
 
   return (
@@ -84,12 +86,14 @@ const OverviewTab = ({
             Attendance Report
           </span>
           <span className="text-body-md text-on-surface-variant">
-            {hasAttendance
+            {canDownloadReport
               ? "Download the participant attendance PDF for this meeting."
-              : "No attendance recorded yet."}
+              : hasAttendance
+                ? "Only the meeting owner can download the attendance report."
+                : "No attendance recorded yet."}
           </span>
         </div>
-        {hasAttendance ? (
+        {canDownloadReport ? (
           <a
             href={reportHref}
             download

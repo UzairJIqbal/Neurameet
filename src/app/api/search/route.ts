@@ -12,9 +12,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { query } = (await request.json()) as { query?: string };
+    const body: unknown = await request.json().catch(() => null);
+    const query =
+      body && typeof body === "object"
+        ? (body as { query?: unknown }).query
+        : undefined;
 
-    if (!query || !query.trim()) {
+    if (typeof query !== "string" || !query.trim()) {
       return NextResponse.json(
         { error: "Query is required" },
         { status: 400 },

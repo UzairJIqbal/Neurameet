@@ -3,7 +3,7 @@ import type { UIMessage } from "ai";
 const STORAGE_PREFIX = "neurameet:chat:";
 
 export type ConversationMeta = {
-  /** Stored key id: "general" or "meeting:<id>". */
+  /** Stored key id: "general" or the meeting id (ChatPanel's chatId). */
   id: string;
   /** Meeting id when the conversation is meeting-scoped, else undefined. */
   meetingId?: string;
@@ -32,23 +32,30 @@ export function listConversations(): ConversationMeta[] {
   if (typeof window === "undefined") return [];
   const result: ConversationMeta[] = [];
 
-  for (let i = 0; i < window.sessionStorage.length; i++) {
-    const key = window.sessionStorage.key(i);
-    if (!key || !key.startsWith(STORAGE_PREFIX)) continue;
+  // Storage access itself can throw (privacy mode, blocked site data).
+  let keys: string[];
+  try {
+    keys = Array.from({ length: window.sessionStorage.length }, (_, i) =>
+      window.sessionStorage.key(i),
+    ).filter((k): k is string => !!k && k.startsWith(STORAGE_PREFIX));
+  } catch {
+    return [];
+  }
 
+  for (const key of keys) {
     try {
       const raw = window.sessionStorage.getItem(key);
       if (!raw) continue;
-      const parsed = JSON.parse(raw) as {
-        messages: UIMessage[];
-        updatedAt: number;
-      };
-      const messages = parsed.messages;
+      // ChatPanel stores { messages, updatedAt }; older builds stored the array.
+      const parsed = JSON.parse(raw) as
+        { messages: UIMessage[]; updatedAt: number } | UIMessage[];
+      const messages = Array.isArray(parsed) ? parsed : parsed.messages;
+      const updatedAt = Array.isArray(parsed) ? 0 : (parsed.updatedAt ?? 0);
       if (!Array.isArray(messages) || messages.length === 0) continue;
 
       const id = key.slice(STORAGE_PREFIX.length);
-      const meetingMatch = id.match(/^meeting:(.+)$/);
-      const meetingId = meetingMatch ? meetingMatch[1] : undefined;
+      // ChatPanel keys a meeting chat by the raw meeting id.
+      const meetingId = id === "general" ? undefined : id;
 
       const last = messages[messages.length - 1];
       const firstUser = messages.find((m) => m.role === "user");
@@ -59,7 +66,7 @@ export function listConversations(): ConversationMeta[] {
           ? "Meeting chat"
           : "General chat";
 
-      result.push({ id, meetingId, title, preview, updatedAt: parsed.updatedAt ?? 0 });
+      result.push({ id, meetingId, title, preview, updatedAt });
     } catch {
       continue;
     }

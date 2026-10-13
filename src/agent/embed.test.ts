@@ -15,7 +15,10 @@ const { mockEmbedMany, mockSupabase } = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
-vi.mock("ai", () => ({ embedMany: mockEmbedMany }));
+vi.mock("ai", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("ai")>()),
+  embedMany: mockEmbedMany,
+}));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 
 import { embedAndStore, chunkTranscript } from "./embed";
@@ -50,6 +53,24 @@ describe("embedAndStore resilience", () => {
 
     await expect(embedAndStore("m1", "Hello world.")).rejects.toThrow(
       "Embedding count mismatch",
+    );
+    expect(mockEmbedMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT retry a permanent API error (e.g. invalid key)", async () => {
+    const { APICallError } = await import("ai");
+    mockEmbedMany.mockRejectedValue(
+      new APICallError({
+        message: "API key not valid",
+        url: "https://example.test",
+        requestBodyValues: {},
+        statusCode: 400,
+        isRetryable: false,
+      }),
+    );
+
+    await expect(embedAndStore("m1", "Hello world.")).rejects.toThrow(
+      "API key not valid",
     );
     expect(mockEmbedMany).toHaveBeenCalledTimes(1);
   });

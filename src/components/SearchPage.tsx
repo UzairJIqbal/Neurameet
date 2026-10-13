@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Link from "next/link";
 import { Search, Loader2 } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
@@ -55,9 +55,17 @@ const SearchPage = () => {
     retryNonce,
   });
 
+  // Only the latest request may update state; starting a new one (or a
+  // Retry after a timeout) aborts the previous request.
+  const controllerRef = useRef<AbortController | null>(null);
+
   const runSearch = async () => {
     const trimmed = query.trim();
     if (!trimmed) return;
+
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
     setIsLoading(true);
     setSearched(true);
@@ -65,6 +73,7 @@ const SearchPage = () => {
     setError(null);
     try {
       const res = await fetch("/api/search", {
+        signal: controller.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: trimmed }),
@@ -80,13 +89,14 @@ const SearchPage = () => {
       const data = (await res.json()) as { results: CrossMeetingHit[] };
       setResults(data.results ?? []);
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error("Cross-meeting search failed:", err);
       setResults([]);
       setError(
         err instanceof Error ? err.message : "Search failed unexpectedly",
       );
     } finally {
-      setIsLoading(false);
+      if (controllerRef.current === controller) setIsLoading(false);
     }
   };
 

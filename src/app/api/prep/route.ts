@@ -12,12 +12,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { title, notes } = (await request.json()) as {
-      title?: string;
-      notes?: string;
-    };
+    const body: unknown = await request.json().catch(() => null);
+    const { title, notes } =
+      body && typeof body === "object"
+        ? (body as { title?: unknown; notes?: unknown })
+        : { title: undefined, notes: undefined };
 
-    if (!title || !title.trim()) {
+    if (notes !== undefined && typeof notes !== "string") {
+      return NextResponse.json(
+        { error: "Notes must be text" },
+        { status: 400 },
+      );
+    }
+
+    if (typeof title !== "string" || !title.trim()) {
       return NextResponse.json(
         { error: "Meeting title is required" },
         { status: 400 },

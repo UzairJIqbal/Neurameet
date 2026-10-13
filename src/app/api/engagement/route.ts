@@ -14,9 +14,12 @@ export const runtime = "nodejs";
 // 15% of their measured presence.
 const LOW_ENGAGEMENT_RATIO = 0.15;
 const LOW_ENGAGEMENT_MIN_DURATION_SECONDS = 60;
+// Transcript characters sent to the model in one pass.
+const TRANSCRIPT_ANALYSIS_LIMIT = 16000;
 
 type AttendanceRow = {
   user_id: string | null;
+  stream_user_id: string | null;
   participant_name: string | null;
   participant_email: string | null;
   session_started_at: string;
@@ -42,9 +45,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { meetingId } = (await request.json()) as { meetingId?: string };
+    const body: unknown = await request.json().catch(() => null);
+    const meetingId =
+      body && typeof body === "object"
+        ? (body as { meetingId?: unknown }).meetingId
+        : undefined;
 
-    if (!meetingId || !meetingId.trim()) {
+    if (typeof meetingId !== "string" || !meetingId.trim()) {
       return NextResponse.json(
         { error: "meetingId is required" },
         { status: 400 },
@@ -108,13 +115,13 @@ export async function POST(request: Request) {
     // `meeting_insights`, the only table that holds it) — all keyed by meeting id.
     const [
       { data: attendance, error: attendanceError },
-      { data: transcriptRow },
+      { data: transcriptRow, error: transcriptError },
       { data: insightsRow },
     ] = await Promise.all([
       supabase
         .from("attendance_events")
         .select(
-          "user_id, participant_name, participant_email, session_started_at, session_ended_at, talk_time_seconds, mic_toggles, camera_toggles",
+          "user_id, stream_user_id, participant_name, participant_email, session_started_at, session_ended_at, talk_time_seconds, mic_toggles, camera_toggles",
         )
         .eq("meeting_id", id),
       supabase
@@ -137,6 +144,14 @@ export async function POST(request: Request) {
       );
     }
 
+    if (transcriptError) {
+      console.error("Engagement transcript query failed:", transcriptError);
+      return NextResponse.json(
+        { error: "Failed to load transcript" },
+        { status: 500 },
+      );
+    }
+
     const hasTranscript = Boolean(transcriptRow?.raw_text);
     const rawText = transcriptRow?.raw_text ?? "";
     const meetingCategory = (insightsRow as { category?: string | null } | null)
@@ -145,12 +160,15 @@ export async function POST(request: Request) {
     // (4) aggregate attendance into speakers keyed by stable identity
     const byKey = new Map<string, SpeakerInsight>();
 
-    for (const row of (attendance ?? []) as AttendanceRow[]) {
+    const rows = (attendance ?? []) as AttendanceRow[];
+    for (const [index, row] of rows.entries()) {
+      // Stable identities only. A row with none stays separate rather than
+      // merging different guests who share a display name.
       const key =
         row.user_id ||
+        row.stream_user_id ||
         row.participant_email ||
-        row.participant_name ||
-        "unknown";
+        `row-${index}`;
 
       const duration = durationSeconds(
         row.session_started_at,
@@ -221,8 +239,12 @@ export async function POST(request: Request) {
     // (6) AI contributions when a transcript is present
     let overallSummary: string;
     if (hasTranscript && rawText) {
+      // A long transcript is analysed only up to the limit, so the model has
+      // not seen everyone's later contributions. In that case its absence-based
+      // low-engagement flags are ignored; the measured talk-time flag stands.
+      const truncated = rawText.length > TRANSCRIPT_ANALYSIS_LIMIT;
       const ai = await generateSpeakerContributions({
-        transcriptText: rawText.slice(0, 16000),
+        transcriptText: rawText.slice(0, TRANSCRIPT_ANALYSIS_LIMIT),
         knownNames: aggregated.map((s) => ({
           name: s.name,
           talkTimeSeconds: s.totalTalkTimeSeconds,
@@ -242,7 +264,7 @@ export async function POST(request: Request) {
         if (!match) continue;
         s.contributions = match.contributions;
         s.keyTopics = match.keyTopics;
-        if (match.lowEngagement) {
+        if (match.lowEngagement && !truncated) {
           s.lowEngagement = true;
           s.lowEngagementReason = match.lowEngagementReason ?? s.lowEngagementReason;
         }
@@ -266,12 +288,16 @@ export async function POST(request: Request) {
           cameraToggles: 0,
           contributions: sp.contributions,
           keyTopics: sp.keyTopics,
-          lowEngagement: sp.lowEngagement,
-          lowEngagementReason: sp.lowEngagementReason ?? null,
+          lowEngagement: truncated ? false : sp.lowEngagement,
+          lowEngagementReason: truncated
+            ? null
+            : (sp.lowEngagementReason ?? null),
         });
       }
 
-      overallSummary = ai.overallSummary;
+      overallSummary = truncated
+        ? `${ai.overallSummary} (Contributions are based on the first part of a long transcript.)`
+        : ai.overallSummary;
     } else if (aggregated.length > 0) {
       overallSummary =
         "No transcript was uploaded for this meeting, so contributions are based on attendance only.";

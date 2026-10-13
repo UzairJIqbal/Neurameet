@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { ListChecks, Loader2 } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
@@ -37,15 +37,24 @@ const PrepPage = () => {
     retryNonce,
   });
 
+  // Only the latest request may update state; starting a new one (or a
+  // Retry after a timeout) aborts the previous request.
+  const controllerRef = useRef<AbortController | null>(null);
+
   const generate = async () => {
     const trimmed = title.trim();
     if (!trimmed) return;
+
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
     setIsLoading(true);
     setGenerated(true);
     setError(null);
     try {
       const res = await fetch("/api/prep", {
+        signal: controller.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: trimmed, notes: notes.trim() }),
@@ -59,13 +68,14 @@ const PrepPage = () => {
       const data = (await res.json()) as { suggestions: PrepSuggestions };
       setSuggestions(data.suggestions ?? null);
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error("Meeting prep failed:", err);
       setSuggestions(null);
       setError(
         err instanceof Error ? err.message : "Prep failed unexpectedly",
       );
     } finally {
-      setIsLoading(false);
+      if (controllerRef.current === controller) setIsLoading(false);
     }
   };
 

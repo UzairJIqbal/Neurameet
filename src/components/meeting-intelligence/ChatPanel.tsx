@@ -19,7 +19,9 @@ const loadMessages = (id: string): UIMessage[] => {
   try {
     const raw = window.sessionStorage.getItem(STORAGE_PREFIX + id);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as StoredChat;
+    // Older builds stored the bare message array; keep that history readable.
+    const parsed = JSON.parse(raw) as StoredChat | UIMessage[];
+    if (Array.isArray(parsed)) return parsed;
     return parsed.messages ?? [];
   } catch {
     return [];

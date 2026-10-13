@@ -32,13 +32,22 @@ const PROBE_TIMEOUT_MS = 4000;
 const PROBE_CACHE_TTL_MS = 60_000;
 let cachedModel: typeof primaryModel | null = null;
 let cachedModelExpiry = 0;
+// Concurrent cache misses share one in-flight probe instead of each probing.
+let inflightProbe: Promise<typeof primaryModel> | null = null;
 
 export async function resolveChatModel(): Promise<typeof primaryModel> {
-  const now = Date.now();
-  if (cachedModel && now < cachedModelExpiry) {
+  if (cachedModel && Date.now() < cachedModelExpiry) {
     return cachedModel;
   }
+  if (!inflightProbe) {
+    inflightProbe = probeChatModel().finally(() => {
+      inflightProbe = null;
+    });
+  }
+  return inflightProbe;
+}
 
+async function probeChatModel(): Promise<typeof primaryModel> {
   let resolved: typeof primaryModel = primaryModel;
   try {
     await Promise.race([
@@ -56,7 +65,7 @@ export async function resolveChatModel(): Promise<typeof primaryModel> {
   }
 
   cachedModel = resolved;
-  cachedModelExpiry = now + PROBE_CACHE_TTL_MS;
+  cachedModelExpiry = Date.now() + PROBE_CACHE_TTL_MS;
   return resolved;
 }
 

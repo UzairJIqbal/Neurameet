@@ -20,11 +20,32 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
               : table === "meeting_insights"
                 ? store.insights
                 : { data: null, error: null };
+      // `.eq()` filters array results by field so the participant lookup only
+      // matches rows for the requested user.
+      const filters: Array<[string, unknown]> = [];
+      const resolve = () => {
+        if (!Array.isArray(result.data)) return Promise.resolve(result);
+        const rows = (result.data as Array<Record<string, unknown>>).filter(
+          (row) =>
+            filters.every(
+              ([field, value]) =>
+                field === "meeting_id" || row[field] === value,
+            ),
+        );
+        return Promise.resolve({ ...result, data: rows });
+      };
       const builder = {
-        eq: () => builder,
+        eq: (field: string, value: unknown) => {
+          filters.push([field, value]);
+          return builder;
+        },
         single: () => Promise.resolve(result),
-        limit: () => Promise.resolve(result),
+        limit: () => resolve(),
         maybeSingle: () => Promise.resolve(result),
+        then: (
+          onFulfilled: (value: unknown) => unknown,
+          onRejected?: (reason: unknown) => unknown,
+        ) => resolve().then(onFulfilled, onRejected),
       };
       return { select: () => builder };
     },
@@ -115,5 +136,40 @@ describe("POST /api/engagement authorization", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Meeting not found");
+  });
+
+  it("rejects a stranger even when other participants are recorded", async () => {
+    store.meetings = { data: ownerRow, error: null };
+    store.attendance = {
+      data: [
+        {
+          user_id: "participant",
+          stream_user_id: "participant",
+          participant_name: "Participant",
+          participant_email: null,
+          session_started_at: "2024-01-01T00:00:00Z",
+          session_ended_at: null,
+          talk_time_seconds: 0,
+          mic_toggles: 0,
+          camera_toggles: 0,
+        },
+      ],
+      error: null,
+    };
+
+    const res = await call("stranger", "m1");
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects a non-string meetingId", async () => {
+    mockAuth.mockResolvedValue({ userId: "owner" });
+    const res = await POST(
+      new Request("http://localhost/api/engagement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingId: 42 }),
+      }),
+    );
+    expect(res.status).toBe(400);
   });
 });

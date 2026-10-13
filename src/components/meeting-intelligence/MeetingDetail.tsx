@@ -31,10 +31,16 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
   });
 
   useEffect(() => {
+    // Abort the previous request when a retry (or a new meetingId) starts, so
+    // a superseded response can never overwrite the latest state.
+    const controller = new AbortController();
     const fetchDetail = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(`/api/meetings/${meetingId}`);
+        setNotFound(false);
+        const res = await fetch(`/api/meetings/${meetingId}`, {
+          signal: controller.signal,
+        });
 
         if (res.status === 404) {
           setNotFound(true);
@@ -48,15 +54,17 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         const json = (await res.json()) as MeetingDetailResponse;
         setData(json);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("Failed to load meeting:", err);
         toast.error("Failed to load meeting");
         setNotFound(true);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     fetchDetail();
+    return () => controller.abort();
   }, [meetingId, retryNonce]);
 
   const retrySummary = async () => {

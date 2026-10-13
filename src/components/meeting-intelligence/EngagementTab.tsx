@@ -149,6 +149,13 @@ const EngagementTab = ({ meetingId }: { meetingId: string }) => {
           Engagement could not be generated.
         </p>
         <p className="text-body-md text-on-surface-variant">{error}</p>
+        <button
+          type="button"
+          onClick={() => setRetryNonce((k) => k + 1)}
+          className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10"
+        >
+          Retry
+        </button>
       </div>
     );
   }

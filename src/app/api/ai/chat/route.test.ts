@@ -11,6 +11,7 @@ const {
   mockResolveChatModel,
   mockRetrieveContext,
   mockBuildSystemPrompt,
+  mockGetUserRecordings,
 } = vi.hoisted(() => {
   const store = {
     meetings: { data: null as unknown, error: null as unknown },
@@ -30,7 +31,11 @@ const {
         eq: () => builder,
         single: () => Promise.resolve(result),
         limit: () => Promise.resolve(result),
-        order: () => Promise.resolve(result),
+        order: () => builder,
+        then: (
+          onFulfilled: (value: unknown) => unknown,
+          onRejected?: (reason: unknown) => unknown,
+        ) => Promise.resolve(result).then(onFulfilled, onRejected),
       };
       return { select: () => builder };
     },
@@ -47,6 +52,7 @@ const {
     mockResolveChatModel: vi.fn(async () => ({ fakeModel: true })),
     mockRetrieveContext: vi.fn(async () => []),
     mockBuildSystemPrompt: vi.fn(() => "system-prompt"),
+    mockGetUserRecordings: vi.fn(async () => [{}, {}]),
   };
 });
 
@@ -67,6 +73,10 @@ vi.mock("@/agent/models", () => ({ resolveChatModel: mockResolveChatModel }));
 vi.mock("@/agent/rag", () => ({
   retrieveContext: mockRetrieveContext,
   buildSystemPrompt: mockBuildSystemPrompt,
+}));
+
+vi.mock("@/lib/recordings", () => ({
+  getUserRecordings: mockGetUserRecordings,
 }));
 
 import { POST } from "./route";
@@ -152,5 +162,34 @@ describe("POST /api/ai/chat authorization", () => {
 
     expect(res.status).toBe(404);
     expect(mockStreamText).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/ai/chat general assistant", () => {
+  const ask = (text: string) => ({
+    messages: [{ role: "user", parts: [{ type: "text", text }] }],
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCurrentUser.mockResolvedValue({ firstName: "Ana" });
+    store.meetings = { data: [], error: null };
+  });
+
+  it("rejects a malformed messages payload", async () => {
+    const res = await call("u1", { messages: [{ role: "hacker" }] });
+    expect(res.status).toBe(400);
+  });
+
+  it("does not short-circuit a non-count recording question", async () => {
+    const res = await call("u1", ask("How do I record a meeting?"));
+    expect(res.status).toBe(200);
+    expect(mockGetUserRecordings).not.toHaveBeenCalled();
+    expect(mockStreamText).toHaveBeenCalled();
+  });
+
+  it("looks up recordings for a count question", async () => {
+    await call("u1", ask("How many recordings do I have?"));
+    expect(mockGetUserRecordings).toHaveBeenCalledWith("u1");
   });
 });

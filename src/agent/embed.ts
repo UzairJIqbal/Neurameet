@@ -1,5 +1,5 @@
 import "server-only";
-import { embedMany } from "ai";
+import { APICallError, embedMany } from "ai";
 import { google } from "@ai-sdk/google";
 import { supabaseServer } from "@/lib/supabase-server";
 
@@ -57,6 +57,8 @@ async function embedBatch(values: string[]): Promise<number[][]> {
   const { embeddings } = await embedMany({
     model: EMBEDDING_MODEL,
     values,
+    // Retries are handled by embedWithRetry below; SDK retries would stack.
+    maxRetries: 0,
     // Pin to 768-dim to match the meeting_chunks.embedding vector(768) column.
     providerOptions: { google: { outputDimensionality: 768 } },
   });
@@ -74,6 +76,11 @@ async function embedWithRetry(values: string[]): Promise<number[][]> {
     } catch (err) {
       // A count mismatch is deterministic — retrying can't fix it.
       if (err instanceof Error && err.message === "Embedding count mismatch") {
+        throw err;
+      }
+      // Permanent API errors (bad key, invalid request) fail immediately; only
+      // rate limits, 5xx and network errors are retried.
+      if (APICallError.isInstance(err) && !err.isRetryable) {
         throw err;
       }
       lastErr = err;
