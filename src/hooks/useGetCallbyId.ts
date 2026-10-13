@@ -30,6 +30,14 @@ export default function useGetCallbyId(
             try {
                 if (options.allowLinkAccess) {
                     const linkedCall = clinet.call("default", callId);
+                    // Disable devices before get(): call.get() runs the SDK device
+                    // setup which auto-enables the camera (call settings default
+                    // `camera_default_on`) and logs a red "[devices]: Failed to get
+                    // video stream" when no camera is available. MeetingSetup
+                    // re-enables devices after a permission check, so starting
+                    // disabled here does not affect the meeting.
+                    await linkedCall.camera.disable().catch(() => {});
+                    await linkedCall.microphone.disable().catch(() => {});
                     await linkedCall.get();
 
                     if (!cancelled) setCall(linkedCall);

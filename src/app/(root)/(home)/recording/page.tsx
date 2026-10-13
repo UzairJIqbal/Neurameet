@@ -3,10 +3,7 @@ import Sidebar_Com from '@/components/Sidebar';
 import React from 'react'
 
 const recording = () => {
-    return <div>
-        <Sidebar_Com type='recordingsPage' />
-    </div>;
-
-}
+    return <Sidebar_Com type='recordingsPage' />;
+};
 
 export default recording
