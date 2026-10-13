@@ -77,7 +77,9 @@ const FloatingChat = () => {
   }, [open, view]);
 
   const openConversation = (conv: ConversationMeta) => {
-    setActiveChatId(conv.id);
+    // Stored ids are the raw meeting id (ChatPanel's key); map back to the
+    // "meeting:<id>" form this widget uses for scoping.
+    setActiveChatId(conv.meetingId ? `meeting:${conv.meetingId}` : "general");
     setView("chat");
   };
 
