@@ -3,19 +3,34 @@
 import MeetingRoom from "@/components/MeetingRoom";
 import MeetingSetup from "@/components/MeetingSetup";
 import { LoaderOne } from "@/components/ui/loader";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { LoadError } from "@/components/ui/load-error";
 import useGetCallbyId from "@/hooks/useGetCallbyId";
 import { useUser } from "@clerk/nextjs";
 import { StreamCall, StreamTheme } from "@stream-io/video-react-sdk";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import React, { useState } from "react";
 
 export default function Meeting() {
   const { id } = useParams() as { id: string };
+  const router = useRouter();
   const [isSetupCompleted, setisSetupCompleted] = useState(false);
   const { isLoaded } = useUser();
   const { call, callLoading, error } = useGetCallbyId(id, {
     allowLinkAccess: true,
   });
+
+  const stillLoading = !isLoaded || callLoading;
+  const { timedOut } = useLoadingTimeout(stillLoading, { timeoutMs: 12000 });
+
+  if (timedOut) {
+    return (
+      <LoadError
+        message="We couldn't load this meeting."
+        onRetry={() => router.refresh()}
+      />
+    );
+  }
 
   if (!isLoaded || callLoading) return <LoaderOne />;
   if (error || !call) {

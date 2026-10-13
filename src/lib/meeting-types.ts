@@ -10,6 +10,8 @@ export interface MeetingListItem {
   streamCallId: string;
 }
 
+export type GuestAdmissionMode = "open" | "approval";
+
 export interface MeetingDetailData {
   id: string;
   title: string;
@@ -18,6 +20,8 @@ export interface MeetingDetailData {
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
+  user_id: string;
+  guestAdmissionMode: GuestAdmissionMode;
 }
 
 export interface MeetingInsights {
@@ -39,6 +43,7 @@ export interface MeetingDetailResponse {
   meeting: MeetingDetailData;
   insights: MeetingInsights | null;
   actionItems: ActionItem[];
+  attendanceCount: number;
 }
 
 export type FollowUpStatus = "pending" | "needs_attention" | "completed";
@@ -61,6 +66,18 @@ export const MEETING_CATEGORIES: MeetingCategory[] = [
   "General",
 ];
 
+export interface AttendanceRow {
+  id: string;
+  userId: string;
+  participantEmail: string | null;
+  participantName: string | null;
+  sessionStartedAt: string;
+  sessionEndedAt: string | null;
+  micToggles: number;
+  cameraToggles: number;
+  talkTimeSeconds: number;
+}
+
 export interface FollowUpItem {
   id: string;
   meetingId: string;
@@ -78,4 +95,28 @@ export interface FollowUpItem {
 export interface FollowUpDetail extends FollowUpItem {
   meetingStatus: string | null;
   meetingStartedAt: string | null;
+}
+
+export interface SpeakerInsight {
+  name: string;
+  email: string | null;
+  present: boolean; // appears in attendance_events
+  sessions: number; // number of attendance rows aggregated
+  totalTalkTimeSeconds: number; // summed talk_time_seconds
+  totalDurationSeconds: number; // summed (ended_at - started_at) for ended rows
+  talkTimeRatio: number; // totalTalkTimeSeconds / totalDurationSeconds (0 if no duration)
+  micToggles: number;
+  cameraToggles: number;
+  contributions: string[]; // AI from transcript; [] if no transcript / not found
+  keyTopics: string[]; // AI from transcript; [] if none
+  lowEngagement: boolean;
+  lowEngagementReason: string | null;
+}
+
+export interface SpeakerEngagementResponse {
+  meetingId: string;
+  hasTranscript: boolean;
+  hasAttendance: boolean;
+  overallSummary: string; // AI overall takeaway; fallback note when no transcript
+  speakers: SpeakerInsight[];
 }
