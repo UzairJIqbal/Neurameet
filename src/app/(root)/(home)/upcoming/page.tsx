@@ -5,9 +5,7 @@ import React from "react";
 
 const upcoming = () => {
 
-    return <div>
-        <Sidebar_Com type='upcomingPage' />
-    </div>;
+    return <Sidebar_Com type='upcomingPage' />;
 };
 
 export default upcoming;

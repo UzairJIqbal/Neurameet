@@ -25,12 +25,26 @@ import { useUser } from "@clerk/nextjs";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { getMeetingIdFromLink } from "@/lib/utils";
+import { createScheduledMeetingRow } from "@/actions/meetings";
+import { withStreamConnectionRetry } from "@/lib/streamRetry";
 
 type MeetingType =
   | "isInstantMeeting"
   | "isScheduleMeeting"
   | "isJoinMeeting"
   | "isRecordedMeeting";
+
+// Creating/scheduling a call runs the SDK's device setup, which auto-enables the
+// camera and mic (call settings default `camera_default_on`). When no camera is
+// available that logs a red "[devices]: Failed to get video stream". Disabling both
+// devices first keeps their status out of the "undefined/pristine" state, so the SDK
+// never tries to acquire a stream during call creation. This call object is local to
+// this modal; the later join (MeetingRoom) creates its own call instance.
+const prepareCallDevices = async (call: Call) => {
+  await call.camera.disable().catch(() => {});
+  await call.microphone.disable().catch(() => {});
+};
+
 const MeetingModel = ({
   type,
   onClose,
@@ -48,14 +62,18 @@ const MeetingModel = ({
     setOpen(true);
   }, [setOpen]);
   const [meetingLink, setMeetingLink] = useState("");
+  const [creating, setCreating] = useState(false);
+  const isCreated =
+    !!callDetails &&
+    (type === "isInstantMeeting" || type === "isScheduleMeeting");
 
   const handleClick = ({ type }: { type: MeetingType }) => {
-    if (type === "isInstantMeeting") {
+    if (isCreated && callDetails) {
+      copyMeetingLink(callDetails);
+    } else if (type === "isInstantMeeting") {
       createMeeting();
     } else if (type === "isScheduleMeeting" && !callDetails) {
       ScheduleMeeting();
-    } else if (type === "isScheduleMeeting" && callDetails) {
-      copyMeetingLink(callDetails);
     } else if (type === "isJoinMeeting") {
       const meetingId = getMeetingIdFromLink(meetingLink);
 
@@ -70,11 +88,11 @@ const MeetingModel = ({
     }
   };
 
-  const copyMeetingLink = async (call: Call) => {
+  const copyMeetingLink = async (call: Call, message?: string) => {
     const link = `${window.location.origin}/meeting/${call.id}`;
     try {
       await navigator.clipboard.writeText(link);
-      toast.success("Meeting link copied to clipboard");
+      toast.success(message ?? "Meeting link copied to clipboard");
     } catch {
       toast.error("Couldn't copy the link");
     }
@@ -82,58 +100,118 @@ const MeetingModel = ({
 
   const [values, setValues] = useState({
     dateTime: new Date(),
+    title: "",
     description: "",
   });
+  const [guestAdmissionMode, setGuestAdmissionMode] =
+    useState<"open" | "approval">("approval");
   const client = useStreamVideoClient();
   const { user } = useUser();
 
   const createMeeting = async () => {
     try {
       if (!user || !client) return;
+      setCreating(true);
       const id = uuidv4();
       const call = client.call("default", id);
-      await call.getOrCreate({
-        data: {
-          starts_at: new Date().toISOString(),
-          members: [{ user_id: user.id }],
-          custom: {
-            description: "Instant Meeting",
-            owner_id: user.id,
+      await prepareCallDevices(call);
+      await withStreamConnectionRetry(client, () =>
+        call.getOrCreate({
+          data: {
+            starts_at: new Date().toISOString(),
+            members: [{ user_id: user.id, role: "admin" }],
+            custom: {
+              description: "Instant Meeting",
+              owner_id: user.id,
+            },
+            settings_override: {
+              frame_recording: { mode: "available", quality: "720p", capture_interval_in_seconds: 2 },
+              individual_recording: { mode: "available" },
+            },
           },
-        },
-      });
-      router.push(`/meeting/${call?.id}`);
+        }),
+      );
+      if (!call?.id) {
+        console.error("createMeeting: call created without an id");
+        toast.error("Couldn't start the meeting. Please try again.");
+        setCreating(false);
+        return;
+      }
       setCallDetails(call);
-      toast("Meeting created Successfully");
+      // Persist a Supabase meetings row so the meeting shows in Meeting
+      // Intelligence immediately. Best-effort: the Stream call is already
+      // created, so a DB failure must not block the user.
+      try {
+        await createScheduledMeetingRow({
+          streamCallId: call.id,
+          title: "Instant Meeting",
+          startsAt: new Date().toISOString(),
+          guestAdmissionMode,
+        });
+      } catch (dbErr) {
+        console.error("Instant meeting row not persisted:", dbErr);
+      }
+      await copyMeetingLink(call, "Meeting ready. Link copied to clipboard");
+      setCreating(false);
     } catch (error) {
       console.error("Error occured in creating meeting", error);
+      toast.error("Couldn't start the meeting. Check your connection and try again.");
+      setCreating(false);
     }
   };
 
   const ScheduleMeeting = async () => {
     try {
       if (!user || !client) return;
+      if (!values.title?.trim()) {
+        toast("Please add a meeting title");
+        return;
+      }
       if (!values.dateTime) {
         toast("Please Select Date and Time");
         return;
       }
       const startsAt = values.dateTime.toISOString();
-      const description = values.description || "Scheduled Meeting";
+      const title = values.title.trim();
+      const description = values.description || "";
       const id = uuidv4();
       const call = client.call("default", id);
-      await call.getOrCreate({
-        data: {
-          starts_at: startsAt,
-          members: [{ user_id: user.id }],
-          custom: {
-            description,
-            owner_id: user.id,
+      await prepareCallDevices(call);
+      await withStreamConnectionRetry(client, () =>
+        call.getOrCreate({
+          data: {
+            starts_at: startsAt,
+            members: [{ user_id: user.id, role: "admin" }],
+            custom: {
+              title,
+              description,
+              owner_id: user.id,
+            },
+            settings_override: {
+              frame_recording: { mode: "available", quality: "720p", capture_interval_in_seconds: 2 },
+              individual_recording: { mode: "available" },
+            },
           },
-        },
-      });
+        }),
+      );
       setCallDetails(call);
+
+      // Persist a Supabase meetings row at schedule time so the meeting shows in
+      // Meeting Intelligence with its real title immediately. Best-effort: the
+      // Stream call is already created, so a DB failure must not block the user.
+      try {
+        await createScheduledMeetingRow({
+          streamCallId: call.id,
+          title,
+          startsAt,
+          guestAdmissionMode,
+        });
+      } catch (dbErr) {
+        console.error("Scheduled meeting row not persisted:", dbErr);
+      }
     } catch (error) {
       console.error("Error occur in scheduling meeting", error);
+      toast.error("Couldn't schedule the meeting. Check your connection and try again.");
     }
   };
 
@@ -142,54 +220,90 @@ const MeetingModel = ({
       <ModalBody onClose={onClose}>
         <ModalContent>
           <h4 className="mb-6 text-center text-lg font-bold text-on-surface md:text-2xl">
-            {type === "isInstantMeeting"
-              ? "Start an instant meeting"
-              : type === "isJoinMeeting"
-                ? "Join meeting via"
-                : ""}
-            {!callDetails &&
-              type === "isScheduleMeeting" &&
-              "Schedule your meeting for"}
-            {callDetails && type === "isScheduleMeeting" && "Meeting"}
-            <span className="px-1 py-0.5 rounded-md border border-primary-container bg-primary-container text-on-primary">
-              {type === "isInstantMeeting"
-                ? "NOW"
+            {isCreated
+              ? type === "isInstantMeeting"
+                ? "Your meeting is ready"
+                : "Meeting"
+              : type === "isInstantMeeting"
+                ? "Start an instant meeting"
                 : type === "isJoinMeeting"
-                  ? "LINK"
-                  : ""}
-              {!callDetails && type === "isScheduleMeeting" && "NOW"}
-              {callDetails && type === "isScheduleMeeting" && "Created"}
+                  ? "Join meeting via"
+                  : "Schedule your meeting for"}
+            <span className="px-1 py-0.5 rounded-md border border-primary-container bg-primary-container text-on-primary">
+              {isCreated
+                ? type === "isInstantMeeting"
+                  ? "Ready"
+                  : "Created"
+                : type === "isInstantMeeting"
+                  ? "NOW"
+                  : type === "isJoinMeeting"
+                    ? "LINK"
+                    : "NOW"}
             </span>
           </h4>
-          {type === "isInstantMeeting" && (
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:gap-0">
-              {instantMeetingModelImages.map((image, idx) => (
-                <motion.div
-                  key={"images" + idx}
-                  style={{
-                    rotate: Math.random() * 20 - 10,
-                  }}
-                  whileHover={{
-                    scale: 1.1,
-                    rotate: 0,
-                    zIndex: 100,
-                  }}
-                  whileTap={{
-                    scale: 1.1,
-                    rotate: 0,
-                    zIndex: 100,
-                  }}
-                  className="mt-2 shrink-0 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low p-1 sm:-mr-4 sm:mt-4 sm:rounded-xl"
-                >
-                  <Image
-                    src={image}
-                    alt="bali images"
-                    width="500"
-                    height="500"
-                    className="h-20 w-20 shrink-0 rounded-lg object-cover sm:h-28 sm:w-28 md:h-36 md:w-36"
-                  />
-                </motion.div>
-              ))}
+          {type === "isInstantMeeting" && !callDetails && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:gap-0">
+                {instantMeetingModelImages.map((image, idx) => (
+                  <motion.div
+                    key={"images" + idx}
+                    style={{
+                      rotate: Math.random() * 20 - 10,
+                    }}
+                    whileHover={{
+                      scale: 1.1,
+                      rotate: 0,
+                      zIndex: 100,
+                    }}
+                    whileTap={{
+                      scale: 1.1,
+                      rotate: 0,
+                      zIndex: 100,
+                    }}
+                    className="mt-2 shrink-0 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low p-1 sm:-mr-4 sm:mt-4 sm:rounded-xl"
+                  >
+                    <Image
+                      src={image}
+                      alt="bali images"
+                      width="500"
+                      height="500"
+                      className="h-20 w-20 shrink-0 rounded-lg object-cover sm:h-28 sm:w-28 md:h-36 md:w-36"
+                    />
+                  </motion.div>
+                ))}
+              </div>
+              {/* Guest admission mode — owner chooses before creating */}
+              <div className="flex flex-col gap-2">
+                <label className="text-base font-normal leading-[22.4px] text-white text-center">
+                  Guest Admission
+                </label>
+                <div className="flex gap-2 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setGuestAdmissionMode("open")}
+                    disabled={guestAdmissionMode === "open"}
+                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
+                      guestAdmissionMode === "open"
+                        ? "bg-primary-container text-on-primary"
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    } disabled:opacity-60`}
+                  >
+                    Anyone can join
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGuestAdmissionMode("approval")}
+                    disabled={guestAdmissionMode === "approval"}
+                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
+                      guestAdmissionMode === "approval"
+                        ? "bg-primary-container text-on-primary"
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    } disabled:opacity-60`}
+                  >
+                    Approval required
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           {type === "isJoinMeeting" && (
@@ -206,6 +320,20 @@ const MeetingModel = ({
           )}
           {!callDetails && type === "isScheduleMeeting" && (
             <>
+              <div className="flex flex-col gap-2.5">
+                <label className="text-base font-normal leading-[22.4px] text-on-surface-variant">
+                  Meeting title
+                </label>
+                <input
+                  type="text"
+                  value={values.title}
+                  onChange={(e) =>
+                    setValues({ ...values, title: e.target.value })
+                  }
+                  placeholder="e.g. Weekly product sync"
+                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none"
+                />
+              </div>
               <div className="flex flex-col gap-2.5">
                 <label className="text-base font-normal leading-[22.4px] text-on-surface-variant">
                   Add a description
@@ -235,13 +363,52 @@ const MeetingModel = ({
                   className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
                 />
               </div>
+              {/* Guest admission mode — owner chooses before scheduling */}
+              <div className="flex flex-col gap-2 mt-4">
+                <label className="text-base font-normal leading-[22.4px] text-white">
+                  Guest Admission
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGuestAdmissionMode("open")}
+                    disabled={guestAdmissionMode === "open"}
+                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
+                      guestAdmissionMode === "open"
+                        ? "bg-primary-container text-on-primary"
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    } disabled:opacity-60`}
+                  >
+                    Anyone can join
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGuestAdmissionMode("approval")}
+                    disabled={guestAdmissionMode === "approval"}
+                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
+                      guestAdmissionMode === "approval"
+                        ? "bg-primary-container text-on-primary"
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    } disabled:opacity-60`}
+                  >
+                    Approval required
+                  </button>
+                </div>
+              </div>
             </>
           )}
-          {callDetails && type === "isScheduleMeeting" && (
+          {isCreated && (
             <div className="mt-6 flex w-full flex-col items-center gap-3 px-2 text-center sm:mt-10">
               <p className="text-base font-medium text-on-surface">
-                Your meeting is scheduled
+                {type === "isInstantMeeting"
+                  ? "Your meeting is ready"
+                  : "Your meeting is scheduled"}
               </p>
+              {type === "isScheduleMeeting" && values.title?.trim() && (
+                <p className="text-sm text-on-surface-variant">
+                  {values.title.trim()}
+                </p>
+              )}
               <div className="flex w-full max-w-sm items-center rounded-xl border border-outline-variant bg-surface-container-lowest p-2">
                 <input
                   readOnly
@@ -263,25 +430,30 @@ const MeetingModel = ({
           >
             Cancel
           </button>
-          {callDetails && type === "isScheduleMeeting" && (
+          {isCreated && (
             <button
               className="w-full rounded-md border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface hover:bg-surface-container-low sm:w-28"
-              onClick={() => router.push(`/meeting/${callDetails.id}`)}
+              onClick={() => {
+                if (callDetails?.id)
+                  router.push(`/meeting/${callDetails.id}`);
+              }}
             >
               Join
             </button>
           )}
           <button
-            className="w-full rounded-md border border-primary-container bg-primary-container px-2 py-2 text-sm text-on-primary hover:bg-primary sm:w-28"
+            className="w-full rounded-md border border-primary-container bg-primary-container px-2 py-2 text-sm text-on-primary hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60 sm:w-28"
             onClick={() => handleClick({ type })}
+            disabled={creating}
+            aria-busy={creating}
           >
-            {type === "isInstantMeeting"
-              ? "Create Now"
-              : type === "isJoinMeeting"
-                ? "Join"
-                : ""}
-            {!callDetails && type === "isScheduleMeeting" && "Schedule"}
-            {callDetails && type === "isScheduleMeeting" && "Copy link"}
+            {isCreated
+              ? "Copy link"
+              : type === "isInstantMeeting"
+                ? "Create Now"
+                : type === "isJoinMeeting"
+                  ? "Join"
+                  : "Schedule"}
           </button>
         </ModalFooter>
       </ModalBody>
