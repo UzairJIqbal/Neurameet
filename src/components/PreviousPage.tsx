@@ -1,122 +1,82 @@
 /* eslint-disable prettier/prettier */
-
-/* eslint-disable prettier/prettier */
-/* eslint-disable @next/next/no-img-element */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
-/* eslint-disable prettier/prettier */
+"use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useGetCall } from "@/hooks/useGetCall";
-import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card";
 import { Call } from "@stream-io/video-react-sdk";
-import { TypewriterEffectSmooth } from "@/components/ui/typewriter-effect";
-import { LampContainer } from "./ui/lamp";
-import { motion } from "motion/react";
-import SideTitles from "./SideTitles";
-
-const words = [
-	{
-		text: "No",
-	},
-	{
-		text: "previous",
-	},
-	{
-		text: "meetings",
-	},
-	{
-		text: "are",
-	},
-	{
-		text: "Available.",
-		className: "text-blue-500 dark:text-blue-500",
-	},
-];
+import { Calendar } from "lucide-react";
+import { LoaderOne } from "./ui/loader";
 
 const PreviousPage = () => {
-	const getPreveiousPageMeetings = useGetCall();
-	const getPreviousMeetings = getPreveiousPageMeetings.previousCalls;
+	const router = useRouter();
+	const { previousCalls, isLoading } = useGetCall();
 
-	if (getPreviousMeetings.length === 0) {
-		return (
-			<div className="px-2 text-center text-xl font-bold text-white sm:text-2xl">
-				<TypewriterEffectSmooth words={words} />
-			</div>
-		);
-	}
+	if (isLoading) return <LoaderOne />;
 
 	return (
-		<>
-			{getPreviousMeetings && getPreviousMeetings.length > 0 ? (
-				<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
-					<LampContainer>
-						<motion.h1
-							initial={{ opacity: 0.5, y: 100 }}
-							whileInView={{ opacity: 1, y: 0 }}
-							transition={{
-								delay: 0.3,
-								duration: 0.8,
-								ease: "easeInOut",
-							}}
-						></motion.h1>
-						<div className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-[20px] sm:min-h-[260px]">
-							<SideTitles type="presSideTitle" />
-						</div>
-						<div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-1 sm:grid-cols-2 lg:grid-cols-3">
-							{getPreviousMeetings.map(
-								(getPreviousMeeting: Call, index: number) => (
-									<CardContainer
-										className="inter-var w-full overflow-hidden"
-										key={index}
-									>
-										<CardBody className="relative h-full w-full overflow-hidden rounded-lg border border-black bg-dark-3 p-4 group/card dark:border-white dark:bg-black dark:hover:shadow-2xl dark:hover:shadow-emerald-500/[0.1] sm:p-6">
-											<CardItem
-												translateZ="50"
-												className="break-words text-lg font-bold text-slate-100 dark:text-white sm:text-xl"
-											>
-												{(
-													getPreviousMeeting as Call
-												).state.custom?.description?.substring(0, 30) ||
-													"No title given"}
-											</CardItem>
-											<CardItem
-												as="p"
-												translateZ="60"
-												className="text-slate-200 text-sm max-w-sm mt-2 dark:text-neutral-300"
-											>
-												{(
-													getPreviousMeeting as Call
-												).state.startsAt?.toLocaleString() ||
-													"Date went missing—try again!"}
-											</CardItem>
-											<CardItem translateZ="100" className="w-full mt-4">
-												<img
-													src="/icons/previous_meeting.png"
-													height="800"
-													width=""
-													className="h-44 w-full rounded-lg object-cover group-hover/card:shadow-xl sm:h-56"
-													alt="thumbnail"
-												/>
-											</CardItem>
-										</CardBody>
-									</CardContainer>
-								),
-							)}
-						</div>
-					</LampContainer>
-				</section>
+		<section className="flex w-full flex-col gap-6 px-6 py-8">
+			<header className="flex flex-col gap-1">
+				<h1 className="text-display-lg-mobile font-display-lg text-on-surface md:text-display-lg">
+					Previous Meetings
+				</h1>
+				<p className="text-body-md text-on-surface-variant">
+					{previousCalls.length} past meeting
+					{previousCalls.length === 1 ? "" : "s"}
+				</p>
+			</header>
+
+			{previousCalls.length === 0 ? (
+				<div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest px-6 py-16 text-center">
+					<Calendar className="h-10 w-10 text-on-surface-variant" />
+					<p className="text-body-lg text-on-surface-variant">
+						No previous meetings yet.
+					</p>
+				</div>
 			) : (
-				<div className="px-2 text-center text-xl font-bold text-white sm:text-2xl">
-					<TypewriterEffectSmooth words={words} />
+				<div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+					<div className="grid grid-cols-12 gap-4 border-b border-surface-variant bg-surface-container-low/50 px-6 py-4 text-label-caps uppercase tracking-wider text-on-surface-variant">
+						<div className="col-span-6 md:col-span-5">Meeting Title</div>
+						<div className="col-span-6 md:col-span-4">Date</div>
+						<div className="col-span-12 hidden text-right md:col-span-3 md:block">
+							Action
+						</div>
+					</div>
+					<div className="divide-y divide-surface-variant">
+						{previousCalls.map((call: Call, index: number) => (
+							<div
+								key={index}
+								className="grid grid-cols-12 items-center gap-4 px-6 py-4 transition-colors hover:bg-surface-container-low"
+							>
+								<div className="col-span-6 flex items-center gap-3 md:col-span-5">
+									<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container text-primary">
+										<Calendar className="h-4 w-4" />
+									</div>
+									<span className="break-words font-body-md font-medium text-on-surface">
+										{call.state.custom?.description?.substring(0, 40) ||
+											"Untitled meeting"}
+									</span>
+								</div>
+								<div className="col-span-6 text-body-md text-on-surface-variant md:col-span-4">
+									{call.state.startsAt
+										? new Date(call.state.startsAt).toLocaleString()
+										: "Date unavailable"}
+								</div>
+								<div className="col-span-12 mt-2 md:col-span-3 md:mt-0 md:text-right">
+									<button
+										onClick={() => router.push(`/meeting/${call.id}`)}
+										className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-4 py-2 text-sm font-medium text-primary transition-colors hover:border-primary hover:bg-primary/5"
+									>
+										Open
+									</button>
+								</div>
+							</div>
+						))}
+					</div>
 				</div>
 			)}
-		</>
+		</section>
 	);
 };
+
 export default PreviousPage;

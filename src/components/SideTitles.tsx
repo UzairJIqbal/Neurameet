@@ -18,7 +18,7 @@ const recTitle = [
     },
     {
         text: "Anytime.",
-        className: "text-blue-500 dark:text-blue-500",
+        className: "text-blue-1 dark:text-blue-1",
     },
 ];
 
@@ -38,7 +38,7 @@ const upcgTitle = [
     },
     {
         text: "Below.",
-        className: "text-blue-500 dark:text-blue-500",
+        className: "text-blue-1 dark:text-blue-1",
     },
 ];
 
@@ -57,7 +57,7 @@ const presTitle = [
     },
     {
         text: "Instantly.",
-        className: "text-blue-500 dark:text-blue-500",
+        className: "text-blue-1 dark:text-blue-1",
     },
 ];
 

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meeting Details - AI Chat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    fontFamily: {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 bg-inverse-surface dark:bg-on-surface shadow-xl flex flex-col h-full py-lg">
+<div class="px-lg mb-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container dark:text-primary-fixed-dim text-3xl" data-weight="fill">hub</span>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant">AI Intelligence</p>
+</div>
+</div>
+<div class="flex-1 px-4 space-y-1">
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-label-sm font-label-sm">Dashboard</span>
+</a>
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all rounded-r-lg" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="text-label-sm font-label-sm font-bold">Meeting Intelligence</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="text-label-sm font-label-sm">AI Chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="text-label-sm font-label-sm">Recordings</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-label-sm font-label-sm">Follow-ups</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-sm font-label-sm">Settings</span>
+</a>
+</div>
+<div class="mt-auto px-4 pt-4 border-t border-on-surface-variant/20">
+<div class="flex items-center gap-3 px-2 py-2">
+<span class="material-symbols-outlined text-on-primary text-3xl">account_circle</span>
+<div>
+<p class="text-label-sm font-label-sm text-on-primary font-bold">Waqas Ahmad</p>
+<p class="text-label-caps font-label-caps text-on-surface-variant">waqas@example.com</p>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="ml-[260px] flex-1 flex flex-col h-screen overflow-hidden">
+<!-- TopNavBar (Simulated as Page Header) -->
+<header class="bg-surface border-b border-surface-variant px-lg py-md flex items-center justify-between z-30 shrink-0">
+<div class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">arrow_back</span>
+<span class="text-label-sm font-label-sm">Back to Overview</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-container-low">notifications</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-lg flex flex-col">
+<!-- Header Section -->
+<div class="mb-lg">
+<h2 class="text-display-lg font-display-lg text-on-surface mb-2">Sprint Planning</h2>
+<div class="flex items-center gap-4 text-on-surface-variant text-label-sm font-label-sm">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">calendar_today</span> Jul 29, 2024</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> 52 min</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">group</span> 6 Participants</span>
+<span class="bg-surface-container-low text-primary-container px-2 py-1 rounded-full text-label-caps font-label-caps flex items-center gap-1 border border-surface-variant">
+<span class="material-symbols-outlined text-[12px] text-primary">auto_awesome</span> AI Analysis Complete
+                    </span>
+</div>
+</div>
+<!-- Tabs -->
+<div class="flex gap-6 border-b border-surface-variant mb-lg">
+<a class="text-on-surface-variant pb-2 text-label-sm font-label-sm hover:text-primary transition-colors" href="#">Overview</a>
+<a class="text-on-surface-variant pb-2 text-label-sm font-label-sm hover:text-primary transition-colors" href="#">Summary</a>
+<a class="text-on-surface-variant pb-2 text-label-sm font-label-sm hover:text-primary transition-colors" href="#">Action Items</a>
+<a class="text-on-surface-variant pb-2 text-label-sm font-label-sm hover:text-primary transition-colors" href="#">Recording</a>
+<a class="text-primary border-b-2 border-primary pb-2 text-label-sm font-label-sm font-bold" href="#">AI Chat</a>
+</div>
+<!-- Chat Area -->
+<div class="flex-1 bg-surface-container-lowest border border-surface-variant rounded-xl shadow-sm flex flex-col overflow-hidden">
+<div class="flex-1 overflow-y-auto p-lg flex flex-col gap-6">
+<!-- User Message -->
+<div class="flex justify-end">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm px-4 py-3 max-w-[70%]">
+<p class="text-body-md font-body-md">What are the key decisions from this meeting?</p>
+</div>
+</div>
+<!-- AI Message -->
+<div class="flex justify-start">
+<div class="bg-surface-container-low text-on-surface rounded-2xl rounded-tl-sm px-4 py-3 max-w-[70%] border-l-4 border-primary">
+<p class="text-body-md font-body-md mb-2">Here are the key decisions from this meeting:</p>
+<ul class="list-disc list-inside text-body-md font-body-md space-y-1 text-on-surface-variant">
+<li>OAuth flow will be implemented</li>
+<li>Deployment on Friday</li>
+<li>Sprint duration set to 3 weeks</li>
+</ul>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex justify-end">
+<div class="bg-primary text-on-primary rounded-2xl rounded-tr-sm px-4 py-3 max-w-[70%]">
+<p class="text-body-md font-body-md">Who is responsible for API integration?</p>
+</div>
+</div>
+<!-- AI Message -->
+<div class="flex justify-start">
+<div class="bg-surface-container-low text-on-surface rounded-2xl rounded-tl-sm px-4 py-3 max-w-[70%] border-l-4 border-primary">
+<p class="text-body-md font-body-md text-on-surface-variant">Ali Hassan is responsible for completing the API integration.</p>
+</div>
+</div>
+</div>
+<!-- Input Area -->
+<div class="p-4 bg-surface border-t border-surface-variant">
+<div class="flex items-center gap-2 bg-surface-container-lowest border border-surface-variant rounded-full p-1 pl-4 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+<input class="flex-1 bg-transparent border-none focus:ring-0 text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 py-2" placeholder="Ask anything about this meeting..." type="text"/>
+<button class="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center hover:bg-primary-container transition-colors shrink-0">
+<span class="material-symbols-outlined text-lg">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

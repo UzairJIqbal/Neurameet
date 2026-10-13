@@ -24,29 +24,75 @@ const config = {
 				border: "hsl(var(--border))",
 				foreground: "hsl(var(--foreground))",
 				background: "hsl(var(--background))",
-				dark: {
-					1: "#1C1F2E",
-					2: "#161925",
-					3: "#252A41",
-					4: "#1E2757",
+
+				// Primary
+				primary: "#6500C4",
+				"primary-container": "#830EF9",
+				"on-primary": "#FFFFFF",
+				"on-primary-container": "#E9D5FF",
+
+				// Secondary
+				secondary: "#525B8E",
+				"secondary-container": "#BBC3FD",
+				"on-secondary-container": "#464F81",
+
+				// Tertiary
+				tertiary: "#7B3500",
+				"tertiary-container": "#A04700",
+
+				// Error
+				error: "#BA1A1A",
+				"error-container": "#FFDAD6",
+				"on-error-container": "#93000A",
+
+				// Surface
+				surface: "#FAF8FF",
+				"surface-dim": "#D7D9EA",
+				"surface-bright": "#FAF8FF",
+				"surface-container-lowest": "#FFFFFF",
+				"surface-container-low": "#F3F2FF",
+				"surface-container": "#EBEDFE",
+				"surface-container-high": "#E6E7F8",
+				"surface-container-highest": "#E0E1F3",
+				"surface-variant": "#E0E1F3",
+
+				// Text
+				"on-surface": "#181B27",
+				"on-surface-variant": "#4C4356",
+
+				// Inverse (dark sidebar/shell)
+				"inverse-surface": "#2D303D",
+				"inverse-on-surface": "#EFF0FF",
+				"inverse-primary": "#D7BAFF",
+
+				// Outline
+				outline: "#7D7388",
+				"outline-variant": "#CEC2D9",
+
+				// Background (shadcn compat)
+				"on-background": "#181B27",
+
+				// Sidebar active nav fill (Material 3 token from locked design)
+				"on-secondary-fixed-variant": "#3A4375",
+
+				// Status — keep green-1 for small visual indicators (online dot)
+				green: {
+					1: "#00C48C",
 				},
-				blue: {
-					1: "#0E78F9",
-				},
-				sky: {
-					1: "#C9DDFF",
-					2: "#ECF0FF",
-					3: "#F5FCFF",
-				},
-				orange: {
-					1: "#FF742E",
-				},
-				purple: {
-					1: "#830EF9",
-				},
-				yellow: {
-					1: "#F9A90E",
-				},
+			},
+			fontFamily: {
+				sans: ["var(--font-hanken-grotesk)", "ui-sans-serif", "system-ui", "sans-serif"],
+				mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
+			},
+			fontSize: {
+				"display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+				"display-lg-mobile": ["26px", { lineHeight: "32px", fontWeight: "700" }],
+				"headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+				"headline-sm": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+				"body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+				"body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+				"label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
+				"label-mono": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }],
 			},
 			keyframes: {
 				"accordion-down": {

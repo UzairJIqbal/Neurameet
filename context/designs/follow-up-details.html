@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Follow-up Details - NeuraMeet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    fontFamily: {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav aria-label="Sidebar" class="fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 bg-inverse-surface shadow-xl flex flex-col h-full py-lg">
+<!-- Header -->
+<div class="px-lg pb-md mb-md border-b border-surface-variant/20 flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[24px]" data-icon="hub">hub</span>
+</div>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</h1>
+<p class="text-label-caps font-label-caps text-on-surface-variant text-gray-400">AI Intelligence</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 overflow-y-auto py-sm flex flex-col gap-1 px-sm">
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg text-gray-300" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-label-sm font-label-sm">Dashboard</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg text-gray-300" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="text-label-sm font-label-sm">Meeting Intelligence</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg text-gray-300" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="text-label-sm font-label-sm">AI Chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg text-gray-300" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="text-label-sm font-label-sm">Recordings</span>
+</a>
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all translate-x-1 duration-150 rounded-r-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="text-label-sm font-label-sm font-semibold">Follow-ups</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg text-gray-300 mt-auto border-t border-surface-variant/20 pt-md" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-label-sm font-label-sm">Settings</span>
+</a>
+</div>
+<!-- Footer Profile -->
+<div class="mt-auto px-lg pt-md border-t border-surface-variant/20 flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="A professional headshot of an executive in a modern office environment, high contrast lighting, neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBE9DmXypakZUEu0FHuCtdgfM4AAmhN_hXrYUAjoApY5a3XB40y24JdgRbaFmuyXeWq-XC42TGRJTtbQ-SSq6feh09IOvTodYfgBlPxllp8qcek7rOaEarb0-UYBE4GfdSiC_6czOX7g1_vNz4DmMv0B0S5kGk-ea1Hh7XCXxcyrpppPEWs5i93PiZuJ3hjY0Nj8llj6N8VMdmg_DpFzlyJFTMSOeYmytsao9UGmPek4GioZjLyia98Kg"/>
+</div>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm font-semibold text-white">Waqas Ahmad</span>
+<span class="text-label-caps font-label-caps text-gray-400">waqas@example.com</span>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-[260px] flex-1 h-full overflow-y-auto bg-background p-container-margin">
+<!-- Header -->
+<div class="mb-xl flex items-center justify-between">
+<div>
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors text-body-md font-body-md mb-xs" href="#">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                    Back to Follow-ups
+                </a>
+<div class="flex items-center gap-4">
+<h2 class="text-display-lg font-display-lg text-on-surface">Follow-up Details</h2>
+<span class="px-3 py-1 rounded-full bg-error-container/20 text-error text-label-caps font-label-caps uppercase border border-error/20">High Priority</span>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant mt-1">From Sprint Planning</p>
+</div>
+</div>
+<!-- Content Grid -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Left Column: Details -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-lg">
+<!-- Info Card -->
+<div class="bg-surface-container-lowest rounded-xl p-lg border border-surface-variant shadow-[0px_4px_20px_rgba(0,0,0,0.04)]">
+<h3 class="text-headline-sm font-headline-sm mb-md text-on-surface">Task Information</h3>
+<div class="grid grid-cols-3 gap-md mb-lg">
+<div class="flex flex-col gap-1">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase">Assigned To</span>
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small avatar of a male professional, brightly lit, simple background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNVvomax4jJR5gd8fowKMuZeWYdHomYAyId3C-y5lWP8d7VmT1t2Z470CrhLyAsDnjtomteflI_BWGW0Uu2sM-Jx3UtbQyO5I9OhXsTFrKgqPWd68X4dm7ZufrjCZZqlyRjSIxWH8SjHzfbrNkBaUi9nZCryEXKa3ZvsKVxroF-h-lMPBoy0M8FiAPQNbflccZG4gAsfFu9C5iKZp8Gju90JNmlrZ7vMzb9aAP20RNhXvP9X7-6ZdpnQ"/>
+</div>
+<span class="text-body-md font-body-md font-medium">Ali Hassan</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase">Due Date</span>
+<span class="text-body-md font-body-md font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">calendar_today</span>
+                                Aug 5, 2024
+                            </span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase">Status</span>
+<span class="px-2 py-1 rounded-md bg-tertiary-fixed-dim/20 text-tertiary-container text-label-caps font-label-caps uppercase border border-tertiary-container/20 w-fit">Pending</span>
+</div>
+</div>
+<div class="mb-lg">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase block mb-1">Related Meeting</span>
+<a class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container-low text-primary hover:bg-surface-variant transition-colors text-body-md font-body-md font-medium" href="#">
+<span class="material-symbols-outlined text-[18px]">videocam</span>
+                            Sprint Planning
+                        </a>
+</div>
+<div class="mb-lg">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase block mb-2">Description</span>
+<p class="text-body-lg font-body-lg text-on-surface leading-relaxed">
+                            Implement the complete API integration as discussed in the meeting. Ensure all endpoints are documented and tested before the next review cycle. Coordinate with the backend team for any blocked tasks.
+                        </p>
+</div>
+</div>
+</div>
+<!-- Right Column: Notes & Actions -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-lg">
+<!-- Notes Card -->
+<div class="bg-surface-container-lowest rounded-xl p-lg border border-surface-variant shadow-[0px_4px_20px_rgba(0,0,0,0.04)] h-full flex flex-col">
+<h3 class="text-headline-sm font-headline-sm mb-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container">notes</span>
+                        Notes
+                    </h3>
+<div class="flex-1 bg-surface-container-low rounded-lg p-md text-body-md font-body-md text-on-surface-variant mb-xl">
+                        Ensure all endpoints are working before next review. Check authentication flow specifics mentioned in the transcript.
+                    </div>
+<!-- Action Button -->
+<button class="w-full bg-primary-container text-on-primary py-3 px-6 rounded-lg font-body-md font-medium hover:bg-on-primary-fixed-variant transition-colors flex items-center justify-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+                        Mark as Completed
+                    </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

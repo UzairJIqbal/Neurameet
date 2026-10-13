@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meeting Details - Recording</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary": "#6500c4",
+                      "on-primary-fixed-variant": "#6100bd",
+                      "inverse-surface": "#2d303d",
+                      "surface-container": "#ebedfe",
+                      "on-surface-variant": "#4c4356",
+                      "surface-container-lowest": "#ffffff",
+                      "tertiary-container": "#a04700",
+                      "on-tertiary": "#ffffff",
+                      "secondary": "#525b8e",
+                      "on-error": "#ffffff",
+                      "on-tertiary-container": "#ffd4bf",
+                      "inverse-on-surface": "#eff0ff",
+                      "error": "#ba1a1a",
+                      "surface-variant": "#e0e1f3",
+                      "on-error-container": "#93000a",
+                      "on-surface": "#181b27",
+                      "surface-dim": "#d7d9ea",
+                      "on-primary": "#ffffff",
+                      "outline-variant": "#cec2d9",
+                      "on-secondary-fixed": "#0d1647",
+                      "secondary-container": "#bbc3fd",
+                      "background": "#faf8ff",
+                      "on-background": "#181b27",
+                      "on-primary-container": "#e9d5ff",
+                      "tertiary-fixed": "#ffdbca",
+                      "on-primary-fixed": "#280056",
+                      "surface-container-highest": "#e0e1f3",
+                      "tertiary-fixed-dim": "#ffb68e",
+                      "primary-container": "#830ef9",
+                      "primary-fixed-dim": "#d7baff",
+                      "outline": "#7d7388",
+                      "inverse-primary": "#d7baff",
+                      "surface-tint": "#8000f6",
+                      "primary-fixed": "#eddcff",
+                      "on-secondary": "#ffffff",
+                      "surface-container-high": "#e6e7f8",
+                      "secondary-fixed-dim": "#bbc3fd",
+                      "on-secondary-container": "#464f81",
+                      "secondary-fixed": "#dee0ff",
+                      "surface": "#faf8ff",
+                      "on-tertiary-fixed-variant": "#763300",
+                      "error-container": "#ffdad6",
+                      "on-secondary-fixed-variant": "#3a4375",
+                      "on-tertiary-fixed": "#331200",
+                      "tertiary": "#7b3500",
+                      "surface-container-low": "#f3f2ff",
+                      "surface-bright": "#faf8ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "sm": "12px",
+                      "lg": "24px",
+                      "md": "16px",
+                      "xs": "8px",
+                      "container-margin": "40px",
+                      "gutter": "24px",
+                      "base": "4px",
+                      "xl": "32px"
+              },
+              "fontFamily": {
+                      "headline-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-caps": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-mono": [
+                              "JetBrains Mono"
+                      ],
+                      "display-lg-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "headline-sm": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-mono": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg-mobile": [
+                              "26px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+      </style>
+</head>
+<body class="bg-background text-on-background h-full font-body-md flex antialiased">
+<!-- SideNavBar Shell -->
+<nav class="bg-inverse-surface text-on-primary-container dark:text-primary-fixed-dim hidden md:flex flex-col fixed left-0 top-0 h-full w-[260px] z-40 shadow-xl py-lg">
+<!-- Brand Header -->
+<div class="px-lg mb-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-on-primary text-[32px]">hub</span>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</h1>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<div class="flex-1 flex flex-col gap-1">
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all translate-x-1 duration-150 shadow-[0_4px_20px_rgba(0,0,0,0.1)]" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-body-md text-body-md font-medium">Meeting Intelligence</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="font-body-md text-body-md">AI Chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="font-body-md text-body-md">Recordings</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="font-body-md text-body-md">Follow-ups</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</div>
+<!-- Footer User Info -->
+<div class="px-lg mt-auto pt-6 border-t border-on-surface-variant/20 flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border-2 border-primary-container" data-alt="A small circular avatar portrait of a professional man, well-lit, corporate headshot style, set against a neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5fgSulhSmRpGFW_sU8xiS2ImFhZX2if7ecVhcItpRlQGEYDeJEpg4OjRdiJvH0GfdCblHlDbOLFibswgOt-ucBEJQASqlbutXSjU4fAc2fxT5knXYdwOGhA7VWVud0o4wBaioGXuzKa1DUw-Wm_KsXu_5CE_lnmBhJsyzthYXke8vJhDtSUTEs1B1p5v-0Zf8UxtSPPwhsaRkPh6SHx7Fg7BTdrnz8yASgSIJhbNR10nRmCYCVLrRHA"/>
+<div class="flex flex-col">
+<span class="text-on-primary font-body-md text-body-md font-medium">Waqas Ahmad</span>
+<span class="text-on-surface-variant font-label-mono text-label-mono text-xs">waqas@example.com</span>
+</div>
+<button class="ml-auto text-on-surface-variant hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-[260px] flex flex-col min-h-screen relative">
+<!-- TopNavBar Component within Main Canvas context -->
+<header class="bg-surface dark:bg-background border-b border-surface-variant sticky top-0 z-30 flex justify-between items-center px-lg py-md">
+<!-- Contextual Breadcrumb / Back Navigation -->
+<div class="flex items-center gap-2">
+<button class="text-on-surface-variant hover:text-on-surface flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-sm">arrow_back</span>
+<span class="font-body-md text-body-md">Back to Overview</span>
+</button>
+</div>
+<!-- Page Title Area (Replaces Search for context) -->
+<div class="hidden lg:flex items-center gap-4">
+<h2 class="text-headline-sm font-headline-sm font-bold text-on-surface">Sprint Planning</h2>
+<div class="flex items-center gap-3 text-on-surface-variant font-body-md text-body-md">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">calendar_today</span> Jul 29, 2024</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> 52 min</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">group</span> 6 Participants</span>
+<span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> AI Analysis Complete
+                    </span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary-container hover:bg-primary-container/90 text-on-primary px-4 py-2 rounded-lg font-body-md text-body-md flex items-center gap-2 transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span> Ask AI About This Meeting
+                </button>
+<button class="text-on-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface p-2 rounded-lg transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Tab Navigation (TopNavBar extracted links for this specific view) -->
+<div class="px-lg pt-4 bg-surface border-b border-surface-variant">
+<nav class="flex gap-8">
+<a class="text-on-surface-variant hover:text-on-surface pb-3 font-body-md text-body-md transition-colors" href="#">Overview</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-3 font-body-md text-body-md transition-colors" href="#">Summary</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-3 font-body-md text-body-md transition-colors" href="#">Action Items</a>
+<a class="text-primary border-b-2 border-primary pb-3 font-body-md text-body-md font-bold transition-all" href="#">Recording</a>
+<a class="text-on-surface-variant hover:text-on-surface pb-3 font-body-md text-body-md transition-colors" href="#">Category</a>
+</nav>
+</div>
+<!-- Canvas Content -->
+<div class="p-lg flex-1">
+<div class="max-w-5xl mx-auto space-y-6">
+<!-- Video Player Container -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+<!-- Video Area (Simulated) -->
+<div class="relative w-full aspect-video bg-on-secondary-fixed group flex items-center justify-center">
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<!-- Big Play Button -->
+<button class="bg-primary-container/90 hover:bg-primary text-on-primary w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-transform transform group-hover:scale-105 z-10">
+<span class="material-symbols-outlined text-[32px]" data-weight="fill">play_arrow</span>
+</button>
+<!-- Controls Overlay -->
+<div class="absolute bottom-0 left-0 right-0 p-4 flex flex-col gap-2 z-10 text-white">
+<div class="flex justify-between text-sm font-label-mono mb-1">
+<span>0:00 / 52:13</span>
+</div>
+<!-- Progress Bar -->
+<div class="h-1.5 bg-white/20 rounded-full w-full cursor-pointer relative">
+<div class="absolute left-0 top-0 h-full bg-primary-container rounded-full w-0"></div>
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="flex justify-between items-center mt-2">
+<div class="flex items-center gap-4">
+<button class="hover:text-primary-container transition-colors"><span class="material-symbols-outlined" data-weight="fill">play_arrow</span></button>
+<button class="hover:text-primary-container transition-colors"><span class="material-symbols-outlined">volume_up</span></button>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:text-primary-container transition-colors"><span class="material-symbols-outlined">closed_caption</span></button>
+<button class="hover:text-primary-container transition-colors"><span class="material-symbols-outlined">settings</span></button>
+<button class="hover:text-primary-container transition-colors"><span class="material-symbols-outlined">fullscreen</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Meta/Actions -->
+<div class="p-4 bg-surface-container-lowest flex justify-between items-center border-t border-surface-variant">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Sprint Planning Meeting</h3>
+</div>
+<button class="text-primary hover:text-primary-container flex items-center gap-2 font-body-md text-body-md font-medium transition-colors border border-surface-variant px-4 py-2 rounded-lg hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-[18px]">download</span> Download Recording
+                        </button>
+</div>
+</div>
+<!-- Transcript / Segments Placeholder (Optional structural suggestion) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 opacity-60 pointer-events-none">
+<div class="col-span-2 bg-surface-container-lowest border border-surface-variant rounded-xl p-lg h-32 flex items-center justify-center">
+<span class="text-on-surface-variant">Transcript Panel</span>
+</div>
+<div class="col-span-1 bg-surface-container-lowest border border-surface-variant rounded-xl p-lg h-32 flex items-center justify-center">
+<span class="text-on-surface-variant">Highlights</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -32,7 +32,7 @@
 }
 
 .str-video__participant-list {
-  background-color: #1c1f2e;
+  background-color: #2D303D;
   padding: 10px;
   border-radius: 10px;
   color: white;
@@ -98,7 +98,7 @@
   height: 40px;
 }
 .cl-dividerLine {
-  background: #252a41;
+  background: #CEC2D9;
   height: 2px;
 }
 
@@ -212,5 +212,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif;
   }
+}
+
+/* Design-faithful subtle card shadow (context/designs/dashboard.html) */
+.card-shadow {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }

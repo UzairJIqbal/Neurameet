@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Follow-ups - NeuraMeet</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#6500c4",
+                        "on-primary-fixed-variant": "#6100bd",
+                        "inverse-surface": "#2d303d",
+                        "surface-container": "#ebedfe",
+                        "on-surface-variant": "#4c4356",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#a04700",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#525b8e",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#ffd4bf",
+                        "inverse-on-surface": "#eff0ff",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e1f3",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#181b27",
+                        "surface-dim": "#d7d9ea",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#cec2d9",
+                        "on-secondary-fixed": "#0d1647",
+                        "secondary-container": "#bbc3fd",
+                        "background": "#faf8ff",
+                        "on-background": "#181b27",
+                        "on-primary-container": "#e9d5ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-primary-fixed": "#280056",
+                        "surface-container-highest": "#e0e1f3",
+                        "tertiary-fixed-dim": "#ffb68e",
+                        "primary-container": "#830ef9",
+                        "primary-fixed-dim": "#d7baff",
+                        "outline": "#7d7388",
+                        "inverse-primary": "#d7baff",
+                        "surface-tint": "#8000f6",
+                        "primary-fixed": "#eddcff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e7f8",
+                        "secondary-fixed-dim": "#bbc3fd",
+                        "on-secondary-container": "#464f81",
+                        "secondary-fixed": "#dee0ff",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#763300",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a4375",
+                        "on-tertiary-fixed": "#331200",
+                        "tertiary": "#7b3500",
+                        "surface-container-low": "#f3f2ff",
+                        "surface-bright": "#faf8ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "8px",
+                        "container-margin": "40px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "label-mono": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                },
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex antialiased">
+<!-- SideNavBar -->
+<nav class="bg-inverse-surface dark:bg-on-surface text-primary-container dark:text-primary-fixed-dim Headlines: text-headline-sm font-headline-sm. Labels: text-label-sm font-label-sm. fixed left-0 top-0 h-full w-[260px] flex flex-col z-40 bg-inverse-surface dark:bg-on-surface shadow-xl flex flex-col h-full py-lg hidden md:flex">
+<div class="px-lg pb-md mb-md border-b border-on-surface-variant/20 flex items-center gap-3">
+<span class="material-symbols-outlined text-on-primary text-3xl" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span class="text-headline-md font-headline-md font-bold text-on-primary">NeuraMeet</span>
+</div>
+<div class="flex-1 overflow-y-auto mt-4 px-2 space-y-1">
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="text-body-md font-body-md">Dashboard</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+<span class="text-body-md font-body-md">Meeting Intelligence</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">chat</span>
+<span class="text-body-md font-body-md">AI Chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">videocam</span>
+<span class="text-body-md font-body-md">Recordings</span>
+</a>
+<a class="bg-on-secondary-fixed-variant text-on-primary border-l-4 border-primary-container px-4 py-3 flex items-center gap-3 transition-all translate-x-1 duration-150 rounded-r-lg rounded-l-sm" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">assignment</span>
+<span class="text-body-md font-body-md font-semibold">Follow-ups</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-all hover:bg-on-secondary-fixed-variant/50 duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="text-body-md font-body-md">Settings</span>
+</a>
+</div>
+<div class="mt-auto px-lg pt-md border-t border-on-surface-variant/20 flex items-center gap-3 cursor-pointer hover:bg-on-secondary-fixed-variant/50 p-2 rounded-lg transition-colors mx-2 mb-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[32px]">account_circle</span>
+<div class="flex flex-col">
+<span class="text-body-md font-body-md text-on-primary font-medium">Waqas Ahmad</span>
+<span class="text-label-caps font-label-caps text-on-surface-variant mt-1">waqas@example.com</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant ml-auto text-[18px]">keyboard_arrow_down</span>
+</div>
+</nav>
+<!-- Main Canvas -->
+<main class="flex-1 md:ml-[260px] min-h-screen bg-background relative flex flex-col">
+<!-- TopAppBar (Empty shell for spacing if no nav provided, but let's add a basic header) -->
+<header class="h-[72px] flex items-center px-lg border-b border-surface-variant bg-surface-container-lowest sticky top-0 z-20">
+<div class="flex items-center justify-between w-full">
+<h1 class="text-headline-md font-headline-md text-on-surface">Follow-ups</h1>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full bg-surface-variant/50 flex items-center justify-center text-on-surface-variant hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Content Area -->
+<div class="p-lg max-w-5xl w-full mx-auto flex-1 flex flex-col">
+<!-- Filters -->
+<div class="flex items-center justify-between mb-lg flex-wrap gap-4">
+<div class="flex items-center gap-2 bg-surface-container-low p-1 rounded-lg border border-surface-variant">
+<button class="px-4 py-2 text-body-md font-body-md font-medium rounded-md bg-surface-container-lowest text-primary shadow-sm">All</button>
+<button class="px-4 py-2 text-body-md font-body-md font-medium rounded-md text-on-surface-variant hover:bg-surface-variant/50 transition-colors">Due Soon</button>
+<button class="px-4 py-2 text-body-md font-body-md font-medium rounded-md text-on-surface-variant hover:bg-surface-variant/50 transition-colors">Needs Attention</button>
+<button class="px-4 py-2 text-body-md font-body-md font-medium rounded-md text-on-surface-variant hover:bg-surface-variant/50 transition-colors">Completed</button>
+</div>
+<button class="flex items-center gap-2 text-on-surface-variant text-body-md font-body-md hover:text-on-surface transition-colors border border-surface-variant px-4 py-2 rounded-lg bg-surface-container-lowest hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+                    Filter
+                </button>
+</div>
+<!-- Follow-ups List -->
+<div class="flex flex-col gap-4">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-lg flex items-start gap-4 hover:shadow-md transition-shadow cursor-pointer group">
+<div class="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-error">warning</span>
+</div>
+<div class="flex-1 flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<h3 class="text-body-lg font-body-lg font-semibold text-on-surface group-hover:text-primary transition-colors">API integration is due in 2 days</h3>
+<span class="text-body-md font-body-md text-error font-medium">Due Aug 5</span>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant">From Sprint Planning</p>
+</div>
+<div class="flex items-center shrink-0 ml-4">
+<span class="bg-error-container text-on-error-container text-label-caps font-label-caps px-2 py-1 rounded-full">High</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-lg flex items-start gap-4 hover:shadow-md transition-shadow cursor-pointer group">
+<div class="w-10 h-10 rounded-full bg-secondary-container/30 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary">group</span>
+</div>
+<div class="flex-1 flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<h3 class="text-body-lg font-body-lg font-semibold text-on-surface group-hover:text-primary transition-colors">2 action items need assignee</h3>
+<span class="text-body-md font-body-md text-on-surface-variant">—</span>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant">From Client Discussion</p>
+</div>
+<div class="flex items-center shrink-0 ml-4">
+<span class="bg-tertiary-container/10 text-tertiary text-label-caps font-label-caps px-2 py-1 rounded-full">Medium</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-xl p-lg flex items-start gap-4 hover:shadow-md transition-shadow cursor-pointer group">
+<div class="w-10 h-10 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary">description</span>
+</div>
+<div class="flex-1 flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<h3 class="text-body-lg font-body-lg font-semibold text-on-surface group-hover:text-primary transition-colors">Client demo preparation</h3>
+<span class="text-body-md font-body-md text-outline">Due Aug 7</span>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant">From Client Discussion</p>
+</div>
+<div class="flex items-center shrink-0 ml-4">
+<span class="bg-tertiary-container/10 text-tertiary text-label-caps font-label-caps px-2 py-1 rounded-full">Medium</span>
+</div>
+</div>
+</div>
+<div class="mt-8 flex justify-center">
+<button class="text-primary hover:text-primary-fixed-dim text-body-md font-body-md font-semibold flex items-center gap-1 transition-colors">
+                    View All Follow-ups <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+</body></html>

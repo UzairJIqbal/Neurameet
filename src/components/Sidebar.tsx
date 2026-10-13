@@ -1,167 +1,139 @@
-/* eslint-disable prettier/prettier */
-
-/* eslint-disable prettier/prettier */
-
-/* eslint-disable prettier/prettier */
 "use client";
-import React, { useState } from "react";
-import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
-import { motion } from "motion/react";
+import React from "react";
 import { cn } from "@/lib/utils";
 import { sidebarLinks } from "../../constants";
-import MeetingTypeLists from "@/components/MeetingTypeLists";
-import { LampContainer } from "@/components/ui/lamp";
+import { usePathname } from "next/navigation";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { ChevronDown } from "lucide-react";
+import DashboardContent from "@/components/DashboardContent";
 import PreviousPage from "./PreviousPage";
 import RecordingPage from "./RecordingPage";
 import UpcomingPage from "./UpcomingPage";
 import PersonalRoomPage from "./PersonalRoomPage";
-import { useGetCall } from "@/hooks/useGetCall";
-import { Call } from "@stream-io/video-react-sdk";
+import JoinMeetingPage from "./JoinMeetingPage";
+import MeetingList from "./meeting-intelligence/MeetingList";
+import FollowUpList from "./follow-ups/FollowUpList";
+import SettingsPage from "./SettingsPage";
+import GeneralChat from "./meeting-intelligence/GeneralChat";
+import Navbar from "./Navbar";
 
 export type SidebarPagesTypes =
-	| "Home"
-	| "upcomingPage"
-	| "previousPage"
-	| "recordingsPage"
-	| "personalRoom";
+  | "Home"
+  | "upcomingPage"
+  | "previousPage"
+  | "recordingsPage"
+  | "personalRoom"
+  | "joinMeeting"
+  | "meetingIntelligence"
+  | "followUps"
+  | "aiChat"
+  | "settings";
 
-export const Sidebar_Com = ({ type }: { type: SidebarPagesTypes }) => {
-	const [open, setOpen] = useState(false);
-	return (
-		<div
-			className={cn(
-				"mx-auto flex w-full max-w-full flex-1 flex-col rounded-md border-none bg-dark-2 md:flex-row dark:border-neutral-700 dark:bg-neutral-800",
-				"min-h-screen mt-0 left-0 overflow-x-hidden",
-			)}
-		>
-			<Sidebar open={open} setOpen={setOpen}>
-				<SidebarBody className="justify-between gap-52">
-					<div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
-						{open ? <Logo /> : <LogoIcon />}
-						<div className="mt-8 flex flex-col gap-24">
-							{sidebarLinks.map((link, idx) => (
-								<SidebarLink key={idx} link={link} />
-							))}
-						</div>
-					</div>
-					<div className="mt-8 flex flex-col ">
-						<SidebarLink
-							link={{
-								label: "Uzair Javaid",
-								href: "/",
-								icon: (
-									// eslint-disable-next-line @next/next/no-img-element
-									<img
-										src="/icons/images/Uzair Javaid.png"
-										className="h-7 w-7 shrink-0 rounded-full"
-										width={50}
-										height={50}
-										alt="Avatar"
-									/>
-								),
-							}}
-						/>
-					</div>
-				</SidebarBody>
-			</Sidebar>
-			{type === "Home" && <HomePage />}
-			{type === "previousPage" && <PreviousPage />}
-			{type === "recordingsPage" && <RecordingPage />}
-			{type === "upcomingPage" && <UpcomingPage />}
-			{type === "personalRoom" && <PersonalRoomPage />}
-		</div>
-	);
+const Sidebar = () => {
+  const pathname = usePathname();
+  const { signOut } = useClerk();
+  const { user } = useUser();
+
+  const fullName = user?.fullName ?? "Uzair Iqbal";
+  const email = user?.primaryEmailAddress?.emailAddress ?? "uzair@example.com";
+  const avatar = user?.imageUrl ?? "/icons/images/Uzair Javaid.png";
+
+  return (
+    <aside className="fixed left-0 top-0 z-40 flex h-full w-[260px] flex-col bg-inverse-surface py-6">
+      {/* Brand */}
+      <div className="mb-8 flex items-center gap-3 px-6">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-container text-[18px] font-bold text-on-primary">
+          N
+        </span>
+        <div>
+          <h1 className="text-headline-md font-bold leading-tight text-on-primary">
+            NeuraMeet
+          </h1>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-inverse-on-surface/60">
+            AI Intelligence
+          </p>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex flex-1 flex-col gap-2 px-3">
+        {sidebarLinks.map((link, idx) => {
+          const isActive = pathname === link.href;
+          return (
+            <a
+              key={idx}
+              href={link.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
+                isActive
+                  ? "border-l-4 border-primary-container bg-on-secondary-fixed-variant text-on-primary"
+                  : "text-outline hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary",
+              )}
+            >
+              <span className="flex h-5 w-5 items-center justify-center">
+                {link.icon}
+              </span>
+              <span className="text-label-caps">{link.label}</span>
+            </a>
+          );
+        })}
+      </nav>
+
+      {/* User profile + sign out */}
+      <div className="mt-auto px-3">
+        <button
+          type="button"
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={avatar}
+            alt={fullName}
+            className="h-8 w-8 shrink-0 rounded-full object-cover"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-bold text-on-primary">
+              {fullName}
+            </p>
+            <p className="truncate text-[10px] text-outline">{email}</p>
+          </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-outline" />
+        </button>
+      </div>
+    </aside>
+  );
 };
 
-export const Logo = () => {
-	return (
-		<a
-			href="#"
-			className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-white"
-		>
-			<div className="h-5 w-6 shrink-0 rounded-tl-lg rounded-tr-sm rounded-br-lg rounded-bl-sm bg-dark-2 dark:bg-white" />
-			<motion.span
-				initial={{ opacity: 0 }}
-				animate={{ opacity: 1 }}
-				className="font-medium whitespace-pre text-white dark:text-black"
-			>
-				Neuro_Meet
-			</motion.span>
-		</a>
-	);
-};
-export const LogoIcon = () => {
-	return (
-		<a
-			href="#"
-			className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-white"
-		>
-			<div className="h-5 w-6 shrink-0 rounded-tl-lg rounded-tr-sm rounded-br-lg rounded-bl-sm bg-white dark:bg-white" />
-		</a>
-	);
-};
-
-const HomePage = () => {
-	const getUpcomingPageMeetings = useGetCall();
-	const getUpcomingMeetings = getUpcomingPageMeetings.upcomingCalls;
-	const now = new Date();
-	const time = now.toLocaleTimeString("en-US", {
-		hour: "2-digit",
-		minute: "2-digit",
-	});
-	const date = now.toLocaleDateString("en-US", {
-		dateStyle: "full",
-	});
-	return (
-		<section className="flex min-h-screen w-full flex-col gap-5 overflow-x-hidden text-white">
-			<LampContainer>
-				<motion.h1
-					initial={{ opacity: 0.5, y: 100 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					transition={{
-						delay: 0.3,
-						duration: 0.8,
-						ease: "easeInOut",
-					}}
-				>
-					<div className="min-h-[220px] w-full rounded-[20px] bg-cover sm:min-h-[303px]">
-						<div className="flex h-full min-h-[220px] flex-col justify-between px-4 py-6 sm:min-h-[303px] sm:px-6 lg:p-11">
-							<h2 className="glassmorphism mb-7 max-w-full rounded px-3 py-2 text-center text-sm font-normal text-white sm:max-w-[360px] sm:text-xl">
-								Upcoming Meeting at:{" "}
-								{getUpcomingMeetings.map((meeting: Call, index: number) => (
-									<span key={index} className="block break-words text-xs sm:text-sm">
-										{meeting.state.startsAt?.toLocaleString() ||
-											"Date went missing—try again!"}
-									</span>
-								))}
-							</h2>
-
-							<div className="flex flex-col gap-2">
-								<h1 className="text-4xl font-extrabold sm:text-5xl lg:text-7xl">{time}</h1>
-								<p className="text-base font-medium text-sky-1 sm:text-lg lg:text-2xl">
-									{date}
-								</p>
-							</div>
-						</div>
-					</div>
-				</motion.h1>
-				<div className="relative mt-8 flex min-h-[28rem] w-full items-start justify-center overflow-visible bg-dark-2 dark:bg-white sm:mt-12 lg:mt-20 lg:min-h-[25rem] lg:items-center">
-					<div
-						className={cn(
-							"absolute inset-0",
-							"[background-size:40px_40px]",
-							"[background-image:linear-gradient(to_right,#e4e4e7_1px,transparent_1px),linear-gradient(to_bottom,#e4e4e7_1px,transparent_1px)]",
-							"dark:[background-image:linear-gradient(to_right,#262626_1px,transparent_1px),linear-gradient(to_bottom,#262626_1px,transparent_1px)]",
-						)}
-					/>
-					<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-dark-2 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)] dark:bg-black"></div>
-					<div className="relative z-0 w-full bg-dark-2 bg-clip-text py-6 text-transparent lg:mt-[-100px]">
-						<MeetingTypeLists />
-					</div>
-				</div>
-			</LampContainer>
-		</section>
-	);
+export const Sidebar_Com = ({
+  type,
+  children,
+}: {
+  type: SidebarPagesTypes;
+  children?: React.ReactNode;
+}) => {
+  return (
+    <>
+      <Sidebar />
+      <div className="ml-0 flex min-h-full flex-col bg-surface lg:ml-[260px]">
+        {type !== "Home" && <Navbar />}
+        {children ?? (
+          <>
+            {type === "Home" && <DashboardContent />}
+            {type === "previousPage" && <PreviousPage />}
+            {type === "recordingsPage" && <RecordingPage />}
+            {type === "upcomingPage" && <UpcomingPage />}
+            {type === "personalRoom" && <PersonalRoomPage />}
+            {type === "joinMeeting" && <JoinMeetingPage />}
+            {type === "meetingIntelligence" && <MeetingList />}
+            {type === "followUps" && <FollowUpList />}
+            {type === "aiChat" && <GeneralChat />}
+            {type === "settings" && <SettingsPage />}
+          </>
+        )}
+      </div>
+    </>
+  );
 };
 
 export default Sidebar_Com;

@@ -2,26 +2,23 @@
 import type { Metadata } from "next";
 import "react-datepicker/dist/react-datepicker.css";
 import "./globals.css";
-import localFont from "next/font/local";
+import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { dark } from "@clerk/themes";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "react-hot-toast";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 
-const suseMono = localFont({
-	src: [
-		{
-			path: "./fonts/SUSEMono-Italic-VariableFont_wght.ttf",
-			style: "italic",
-			weight: "100 900",
-		},
-		{
-			path: "./fonts/SUSEMono-VariableFont_wght.ttf",
-			style: "normal",
-			weight: "100 900",
-		},
-	],
-	variable: "--font-suse-mono",
+const hankenGrotesk = Hanken_Grotesk({
+	variable: "--font-hanken-grotesk",
+	weight: ["400", "500", "600", "700", "800"],
+	subsets: ["latin"],
+	display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+	variable: "--font-jetbrains-mono",
+	weight: ["400", "500", "700"],
+	subsets: ["latin"],
 	display: "swap",
 });
 
@@ -41,10 +38,10 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body
-				className={`${suseMono.className} bg-dark-2`}
+				className={`${hankenGrotesk.variable} ${jetbrainsMono.variable} bg-inverse-surface`}
 				suppressHydrationWarning
 			>
-				<div id="root">
+				<div id="root" className="h-screen overflow-hidden">
 					<ClerkProvider
 						appearance={{
 							variables: {
@@ -64,7 +61,7 @@ export default function RootLayout({
 							},
 							baseTheme: dark,
 							elements: {
-								formButtonPrimary: "bg-slate-500 hover:bg-slate-400 text-sm",
+								formButtonPrimary: "bg-primary-container hover:bg-primary text-sm font-medium",
 							},
 						}}
 					>
@@ -81,7 +78,7 @@ export default function RootLayout({
 								style: {
 									background: "#19232d",
 									color: "white",
-									fontFamily: "suseMono",
+									fontFamily: "var(--font-hanken-grotesk)",
 									fontSize: "15px",
 								},
 							}}
