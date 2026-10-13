@@ -10,8 +10,8 @@ describe("GuestStreamClientProvider guest identity", () => {
   const providerSource = readFileSync(providerPath, "utf-8");
 
   it("connects the server minted guest through the token path", () => {
-    expect(providerSource).toContain(
-      "c.connectUser(\n\t\t\t\t{ id: guestUserId, name: guestDisplayName },\n\t\t\t\taccessToken,",
+    expect(providerSource).toMatch(
+      /c\.connectUser\(\s*\{\s*id:\s*guestUserId,\s*name:\s*guestDisplayName\s*\},\s*accessToken\s*,/,
     );
   });
 
