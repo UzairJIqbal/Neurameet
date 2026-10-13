@@ -110,6 +110,21 @@ Dark left sidebar (existing `Sidebar.tsx`): Dashboard, Meeting Intelligence, AI 
 
 All Advanced features reuse the existing Gemini primary + Groq fallback and pgvector; no new paid provider, vector store, or PDF service.
 
+### Meeting Experience Polish (new — Steps D0 to D3+, before Deploy)
+- Meeting Setup redesign — device preview, controls, layout, modern Zoom/Google Meet-quality aesthetic
+- Meeting Room redesign — call layout, controls, participant grid, modern aesthetic
+- New professional Stream Video SDK functionality (per a D0 architect audit against Stream's real, current API via the official Stream `stream`/`stream-react` skill) — better layouts, reactions, screen-share polish, noise cancellation if free-tier, etc., one feature per step
+- All zero cost, Stream free tier only — every candidate Stream feature confirmed free via the Stream skill before adoption. No paid Stream plan.
+
+### Transcript Generation (new — Steps F0 to F6, before Deploy)
+- Auto-generated, speaker-labeled transcripts from real meeting audio — the primary path replaces manual paste/upload (manual upload stays as a fallback, not removed)
+- Reuse Stream `individual_recording` (one audio track per participant) so speaker identity is known without a diarization model
+- Transcribe each participant track via Groq Whisper free tier (English + Urdu, auto language detection, timestamped segments)
+- Merge tracks chronologically into a "SpeakerName: text" formatted transcript
+- Feed the result into the existing Upload Transcript → AI Processing pipeline unchanged (Summary, Action Items, Category, RAG embeddings)
+- F0 architect gate: confirm Stream individual recording actually yields per-participant audio on this account (the D3.4 recovery proved composite recording non-functional and the `individual_recording` override may be a no-op) before committing F1
+- All zero cost — Stream individual recording + Groq Whisper free tier only. No paid transcription service or second provider.
+
 ## Features Out of Scope
 
 - Auto-transcription vendor lock-in beyond one provider (Stream's own transcription or a single chosen provider — decide once, do not add a second)

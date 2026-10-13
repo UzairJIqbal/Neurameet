@@ -149,12 +149,25 @@ User asks a question (meeting-scoped or general)
         ↓
 POST /api/ai/chat { meetingId?, message }
         ↓
-agent/rag.ts — if meetingId present: embed question, pgvector similarity search on meeting_chunks
+General branch (no meetingId): inject the signed-in user's real context so the
+assistant can answer identity/account questions instead of claiming no access:
+  - Clerk `currentUser()` → display name + primary email
+  - Supabase `meetings` (user-scoped) → list + per-status count summary
+  - Stream recordings (`getUserRecordings`, src/lib/recordings.ts) fetched lazily
+    only when the message mentions "record"
         ↓
-Relevant chunks + question → Gemini (fallback Groq) via AI SDK streaming
+Meeting-scoped branch (meetingId present): agent/rag.ts embeds the question and
+runs pgvector similarity search on that meeting's meeting_chunks
+        ↓
+System prompt + (context | relevant chunks) + question
+        → Gemini (fallback Groq) via AI SDK streaming
         ↓
 Streamed response to ChatPanel (AI SDK useChat)
 ```
+Note: the model is instructed to use the injected counts verbatim rather than
+re-counting the (truncated to 12) meeting list, so "how many scheduled" answers
+are accurate. All context lookups are isolated in try/catch so a Clerk/DB/Stream
+failure degrades to "less personalized" instead of crashing the request.
 
 ---
 
@@ -249,6 +262,12 @@ Writes happen server-side only (API route + `supabaseServer()`), never from the 
 
 > **Layer 3 (C1–C3) reuses existing tables** — `meeting_chunks` (embeddings for cross-meeting search + prep) and `attendance_events` (speaker engagement talk-time). No additional tables are expected; confirmed at each feature's `/architect` pass.
 
+### Meeting Experience Polish (Phase D — planned, before Deploy)
+Stream-SDK UX/redesign work only: Meeting Setup + Meeting Room redesign to Zoom/Meet quality, plus new professional Stream functionality discovered via a D0 architect audit against the live Stream API (official Stream `stream`/`stream-react` skill). **No new database tables expected** — all work reuses the existing `meetings` / `attendance_events` data and the existing Stream SDK wrappers in `src/actions/stream.actions.ts` and `src/Providers/`. Every candidate Stream feature must be confirmed zero-cost (free tier) via the Stream skill before it is proposed; no paid Stream plan. The Stream SDK verification rule (Invariants) applies to every D-step.
+
+### Transcript Generation (Phase F — planned, before Deploy)
+Automatic speaker-labeled transcript creation from real meeting audio (Steps F0–F7). **No new database tables expected** — the merged transcript is fed into the existing pipeline unchanged: `POST /api/transcript/upload` stores it, then `POST /api/ai/process` produces Summary / Action Items / Category, and `POST /api/ai/embed` writes `meeting_chunks` (pgvector) for RAG. The only new server-side work is fetching per-participant audio from Stream (`individual_recording` / `recording` setting), transcribing each track via Groq Whisper free tier (English + Urdu, timestamped), and merging chronologically into "SpeakerName: text" lines before the upload call. **F0 architect verification gate:** the D3.4 recovery (2026-08-21) proved composite frame recording is non-functional on this account and the per-call `individual_recording` override may be a no-op — verify against the installed Stream SDK (or the connected Stream MCP tool) that per-participant audio is actually retrievable before committing F1. All zero-cost: Stream individual recording + Groq Whisper free tier only; no paid transcription service or second provider. **F7 — After-meeting recap (built):** when a call ends (owner ends it, or any participant leaves), `MeetingRoom.tsx` routes everyone to the new public post-call page `/after-meeting/[id]` (outside the `(root)` sidebar group, readable while logged-out) instead of home. The page shows the meeting title, description, total duration, and participant list (from `attendance_events`) plus a Generate Transcript button — the button moved OFF the Recording tab to this page. The page is powered by a new PUBLIC server helper `getMeetingRecap(id)` in `src/lib/meeting-recap.ts` (no auth/owner filter, because every participant incl. logged-out viewers can open it); the owner-only `GET /api/meetings/[id]` is untouched. Generation from the recap page enforces auth (any signed-in participant) on the server via `POST /api/transcript/download` and never triggers AI; the full pipeline (Summary/Action Items/Category/RAG) runs only via the Upload Transcript flow.
+
 ---
 
 ## Supabase Client Pattern
@@ -293,3 +312,4 @@ Rules the AI agent must never violate:
 - Always scope Supabase queries by `user_id` (via the owning `meeting_id` → `meetings.user_id`) — never query across users.
 - `transcripts.raw_text` is never saved empty.
 - Stream video/session logic stays inside existing Stream wrappers — the AI layer never touches call state directly.
+- Before modifying Stream SDK code (event handlers, hooks, call lifecycle, device state), verify event names, payload shapes, and API behavior against the installed SDK version via the official Stream `stream`/`stream-react` skill (or the package type definitions in `node_modules/@stream-io/*/dist/**/*.d.ts`). Never assume from memory. Version specific Stream behavior has already caused real bugs here (camera loop, sfuClient crash, red device errors).

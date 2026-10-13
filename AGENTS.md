@@ -27,11 +27,11 @@ Read in this exact order before any implementation:
 5. Write a detailed implementation prompt file in `prompts/`.
 6. Ask: "I prepared the implementation prompt at prompts/<name>.md. Good to execute?"
 7. Implement only after approval.
-8. Run available checks (typecheck, lint, build).
+8. Run available checks (typecheck, lint, build). Unit tests run via vitest: `npx vitest run` (config `vitest.config.mjs`, tests under `src/**/*.test.{ts,tsx}`; component tests add `// @vitest-environment jsdom`).
 9. Share exact test steps.
 
 ## Product — In Scope / Out of Scope
-In scope, in three phases:
+In scope, in these phases:
 
 Phase 1, Core NeuraMeet Pipeline (built, Steps 0 to 9): New Meeting, Join Meeting, Schedule Meeting, Meeting Room (Stream video), Upload Transcript, AI Processing (summary, action items, category), Meeting Intelligence (list plus tabs Overview, Summary, Action Items, Recording, Category, AI Chat), meeting scoped RAG chat, Follow ups (list and details, generated from action items), Recordings library, Settings, Clerk auth.
 
@@ -43,7 +43,24 @@ Phase 2, Advanced Pipeline Features (new — sequential Steps A0 to C3, after Co
   Steps C1–C3, AI engagement intelligence: cross-meeting search (C1), meeting prep suggestions (C2), per-speaker engagement insights (C3) — all reusing Gemini/Groq/pgvector, no new paid tool.
   ZERO-COST RULE (explicit): every Advanced step must use only the free tiers already in use (Supabase, Gemini, Groq, Vercel, Stream, Clerk). No paid API, paid vector DB, paid PDF service, or second provider. Reuse the existing Gemini + Groq + pgvector setup for all new AI features.
 
-Phase 3, Deploy: deploy to Vercel free tier and harden (re-enable Clerk email verification before production, verify every path, confirm no secret leaks, confirm free tier limits). Deploy sits after the Advanced Pipeline Features, not before.
+Phase 3, Meeting Experience Polish (new — sequential Steps D0 to D3+, after Advanced, before Deploy):
+  Step D0, Architect audit: audit current Meeting Setup + Meeting Room against Stream's current capabilities (via the official Stream `stream` / `stream-react` skill, installed via the `getstream` CLI) and against Zoom/Google Meet quality UX patterns; decide what is outdated, missing, and the redesign scope. Zero-cost only — no paid Stream tier, no paid design tool.
+  Step D1, Meeting Setup redesign (device preview, controls, layout) — aesthetic pass first, then current Stream functionality.
+  Step D2, Meeting Room redesign (call layout, controls, participant grid) — aesthetic pass first, then current Stream functionality.
+  Step D3+, new professional Stream functionality (whatever D0's Stream skill audit finds available and worth adding — better layouts, reactions, screen-share polish, noise cancellation if free-tier, etc.) — one feature per step, same pattern as every other step. Every candidate feature confirmed zero-cost via the Stream skill before proposing (no paid plan).
+  ZERO-COST RULE applies as for Advanced: Stream free tier only.
+
+Transcript Generation (new — sequential Steps F0 to F6, after Meeting Experience Polish, before Deploy):
+  Step F0, Architect: verify Stream individual recording access + Groq Whisper API shape + zero-cost feasibility for both; confirm the D3.4 finding (composite frame recording proven non-functional on this account; the per-call `individual_recording` override may be a no-op — verify against the installed Stream SDK before assuming it works) and decide the exact trigger (on call end vs an on-demand button) and where the merge/format logic lives.
+  Step F1, Fetch individual audio recordings per participant after a call ends (or on trigger).
+  Step F2, Transcribe each track via Groq Whisper free tier (English + Urdu, auto language detection, timestamped segments).
+  Step F3, Merge tracks into a chronological speaker-labeled transcript ("SpeakerName: text" per line).
+  Step F4, Wire into the existing pipeline (reuse, don't duplicate): feed the merged transcript into `POST /api/transcript/upload` then `POST /api/ai/process` — Summary, Action Items, Category, and RAG embeddings follow unchanged.
+  Step F5, UI trigger + status (e.g. a "Generate Transcript" button on the meeting detail page, processing state, link to result).
+  Step F6, Verify end-to-end with a real bilingual test meeting (English + Urdu).
+  ZERO-COST RULE applies: Stream individual recording + Groq Whisper free tier only. No paid API, paid transcription service, or second provider.
+
+Phase 4, Deploy: deploy to Vercel free tier and harden (re-enable Clerk email verification before production, verify every path, confirm no secret leaks, confirm free tier limits). Deploy sits after the Meeting Experience Polish phase, not before.
 
 Out of scope (do not build unless explicitly asked): auto-transcription vendor lock-in beyond one provider, multi-tenant/org accounts, payments/billing, mobile app, calendar integrations, live collaborative transcript editing, custom LLM fine-tuning. Do not overbuild.
 
@@ -53,6 +70,9 @@ Out of scope (do not build unless explicitly asked): auto-transcription vendor l
 - API routes (`app/api/**`) own AI/agent operations: transcript processing, embeddings, RAG chat, action-item extraction.
 - All AI calls, Supabase service-role queries, and API keys stay server-side only. Never reach the browser.
 - Video/call logic stays inside Stream SDK wrappers already in `src/actions/stream.actions.ts` and `src/Providers/`.
+
+## Build approach
+Extend (add features to the working Core Pipeline without re-architecting). Mirrors the `Build approach` line in `docs/scope/scope.md`.
 
 ## Tech Stack — Use / Do Not Use
 Use: Next.js 15 (App Router) + TypeScript, Clerk (auth), Stream Video SDK (meetings/recordings), **Supabase** (Postgres + pgvector + Storage) for all AI/meeting data, **Vercel AI SDK** for all LLM calls and streaming, **Google Gemini** (`@ai-sdk/google`) as primary model provider, **Groq** (`@ai-sdk/groq`) as fallback/alternate provider — both free-tier, Tailwind CSS + existing Aceternity-style UI kit.
@@ -66,13 +86,27 @@ See `context/architecture.md` for full Supabase schema (`meetings`, `transcripts
 
 ## API Contracts
 ```
-POST /api/transcript/upload      → accepts file/text, stores transcript, kicks off processing
+POST /api/transcript/upload      → accepts file/text (+ optional owned meetingId to attach the transcript to an existing meeting instead of creating a duplicate), stores transcript, kicks off processing
 POST /api/ai/process              → summary + action items + category extraction (Gemini/Groq via AI SDK)
 POST /api/ai/embed                → chunk + embed transcript into meeting_chunks (pgvector)
 POST /api/ai/chat                 → RAG chat for a given meetingId, streamed response
 GET  /api/meetings                → list meetings for Meeting Intelligence
-GET  /api/meetings/[id]           → selected meeting + insights
-POST /api/follow-ups/[id]/status  → update follow-up status
+GET  /api/meetings/[id]           → selected meeting + insights (includes guest_admission_mode + hasInsights)
+GET  /api/meetings/by-call/[callId] → lookup a meeting by its Stream call id (used by guest/attendance flows)
+POST /api/follow-ups/[id]/status   → update follow-up status
+POST /api/guest/request-join       → mint a Stream guest token + emit guest.request_join event or short-circuit admit (G3 open mode)
+GET  /api/guest/status             → poll a guest's admission status (pending/admitted/denied/expired/not_found)
+POST /api/guest/admit               → owner-only: admit a pending guest (401/403/409 guarded)
+POST /api/guest/deny                → owner-only: deny a pending guest (401/403/409 guarded)
+POST /api/attendance/event          → record a join/leave/mic/camera attendance event to attendance_events (service-role, server-only)
+GET  /api/attendance/report          → owner-only PDF report for a meeting (?meetingId=), application/pdf with Content-Disposition attachment
+GET  /api/search                    → cross-meeting semantic search across the user's meeting_chunks (pgvector, user-scoped)
+POST /api/prep                     → meeting prep suggestions from related past meetings (Gemini/Groq via AI SDK)
+POST /api/transcript/download      → generate + download merged speaker-labeled transcript (.txt) for an ended meeting (any signed-in participant)
+GET  /api/transcript/status          → poll transcript generation state (not_started/pending/ready/no_recording/too_short/failed)
+DELETE /api/meetings/[id]           → cascade delete a meeting + transcripts + chunks + action items + follow-ups + attendance (owner-only)
+DELETE /api/recordings/[id]         → delete a Stream recording via call.deleteRecording (owner-only)
+DELETE /api/follow-ups/[id]         → delete a follow-up (owner-only)
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 
@@ -82,6 +116,7 @@ Never run from the browser: embedding generation, RAG retrieval, LLM calls, Supa
 
 ## Code Standards
 Small functions. Explicit types, `strict` TypeScript, no `any`. No changes outside the current task's scope. No over-engineering. No unrelated refactors. Every AI/agent call wrapped in try/catch, failures logged, never crash the whole run.
+- Every loading state must use the shared `useLoadingTimeout` hook (`src/hooks/useLoadingTimeout.ts`) with the `LoadError` component (`src/components/ui/load-error.tsx`) as its fallback — never leave an unguarded spinner. A fetch that never settles (dead socket, hung network) is only caught by a timer, not by a `finally`.
 
 ## Rules That Never Change
 - Never use hardcoded hex values or raw Tailwind color classes
@@ -92,6 +127,7 @@ Small functions. Explicit types, `strict` TypeScript, no `any`. No changes outsi
 - Every third party tool in this project, including new features, must be zero cost. No paid API, paid vector DB, paid PDF service, or paid host beyond the free tiers already in use (Supabase, Gemini, Groq, Vercel, Stream, Clerk). Reuse the existing Gemini plus Groq and pgvector setup for all new AI features; add no second provider or vector store.
   - **Zero-cost clarification (precedent set at Step A2 — do NOT re-litigate):** a free-tier third-party tool that requires **no payment method** (e.g. Resend's free email API — 3,000 emails/month, no card) is acceptable on the same standard as the named free tiers. It is not a "paid API", and an email-only delivery service is not a second AI/vector provider. Resend free tier is therefore an approved tool for transactional email. Apply this same bar to any future free-tier tool: no card required + free tier only = allowed; anything that needs a payment method or bills past free = forbidden.
 - If the same problem persists after one corrective prompt — stop immediately and run /recover
+- Stream SDK verification rule (permanent): before writing or modifying any Stream Video SDK code (event handlers, hooks, call lifecycle, device state), consult the official Stream `stream` / `stream-react` skill (installed via the `getstream` CLI) to verify current event names, payload shapes, and API behavior against the actual installed SDK version. Never assume from memory or prior sessions. Stream's SDK has already caused real bugs here (camera loop, sfuClient crash, red device errors) traced to version specific behavior. If the Stream skill is not available, verify against the installed package type definitions in `node_modules/@stream-io/*/dist/**/*.d.ts` before coding.
 
 ## Fallback Rule
 When unsure: keep it small, ask one focused question, save a prompt, get approval, then build. Rule of thumb: if you'd have to repeat it in more than one prompt, it belongs in AGENTS.md or context/.
@@ -103,3 +139,18 @@ When unsure: keep it small, ask one focused question, save a prompt, get approva
 - `/recover` — when something breaks after one failed correction.
 - `/remember save` — when a feature spans multiple sessions.
 - `/remember restore` — when returning after a multi-session feature.
+
+## Agent skills
+- [stream](https://getstream.io): official Stream agent skills, installed via the `getstream` CLI (`curl -fsSL https://getstream.io/cli.sh | bash`, then `getstream skills stream-react --claude`). Wires `stream`, `stream-react`, `stream-docs`, `stream-builder` into `.claude/skills/` (symlinked to `~/.stream/skills/`). `stream-react` holds the authoritative `references/VIDEO.md` (Video/Call APIs, role-based capability and grant model, event names, device state) — consult it before any Stream SDK work. It is the connected tool the permanent Stream SDK verification rule points at and it resolved the D3.4 recording-capability question (capabilities are role-based, server-enforced, UI-hiding is bypassable via the API). The older local copy at `.agents/skills/stream/` is kept only as an offline backup; the active skill is the official one.
+- [architect](.claude/skills/architect/): `jsmastery-pro/skills`, architecture decision alignment — run before complex features to lock decisions
+- [audit](.claude/skills/audit/): `jsmastery-pro/skills`, code quality and security auditing
+- [check](.claude/skills/check/): `jsmastery-pro/skills`, verification and review checks
+- [debug](.claude/skills/debug/): `jsmastery-pro/skills`, debugging assistance
+- [develop](.claude/skills/develop/): `jsmastery-pro/skills`, turns specs into working code
+- [document](.claude/skills/document/): `jsmastery-pro/skills`, documentation generation
+- [scope](.claude/skills/scope/): `jsmastery-pro/skills`, feature scoping and planning
+- [sync](.claude/skills/sync/): `jsmastery-pro/skills`, AGENTS.md and scope reconciliation after changes
+- [test](.claude/skills/test/): `jsmastery-pro/skills`, test writing and verification
+
+## Context files
+- [`.claude/skills/`](.claude/skills/): local symlink to installed agent skills (also mirrored at `.agents/skills/`)

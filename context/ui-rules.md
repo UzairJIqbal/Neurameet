@@ -6,13 +6,13 @@ Concise rules for building NeuraMeet UI. The supplied UI reference (Dashboard, M
 
 ## Font
 
-`SUSE Mono` via `next/font/local`, already configured in `src/app/layout.tsx`. Never introduce a second font family for new screens.
+**Hanken Grotesk** (UI text) + **JetBrains Mono** (labels/meta — timestamps, meeting codes) via `next/font/google`, configured in `src/app/layout.tsx`. This supersedes the earlier `SUSE Mono` decision in `ui-tokens.md`. Never a third family.
 
 ---
 
 ## Layout
 
-- Sidebar: fixed left, `bg-dark-1`, full height, matches existing `Sidebar.tsx`
+- Sidebar: fixed left, `bg-inverse-surface`, full height, matches existing `Sidebar.tsx`
 - Main content max-width: 1440px
 - Main content padding: 24-32px
 - Gap between dashboard sections: 24px
@@ -24,8 +24,8 @@ Concise rules for building NeuraMeet UI. The supplied UI reference (Dashboard, M
 
 Items: Dashboard, Meeting Intelligence, AI Chat, Recordings, Follow-ups, Settings.
 
-- Active item: `bg-dark-4` background, `text-white`
-- Inactive item: `text-sky-1`
+- Active item: `bg-primary-container` background, `text-on-primary` (filled pill) or `text-inverse-primary` (text-only)
+- Inactive item: `text-inverse-on-surface`
 - No underline — active state is background + text color change only
 
 ---
@@ -33,9 +33,9 @@ Items: Dashboard, Meeting Intelligence, AI Chat, Recordings, Follow-ups, Setting
 ## Cards (Meeting Intelligence / Dashboard insight cards)
 
 ```
-background: bg-surface (white)
-border: 1px solid theme(colors.sky.2)
-border-radius: 16px (rounded-2xl)
+background: bg-surface-container-lowest (#FFFFFF)
+border: 1px solid theme(colors.outline-variant)
+border-radius: 12px (rounded-xl)
 padding: 24px (p-6)
 ```
 
@@ -45,9 +45,9 @@ Dashboard quick-action cards and meeting-list rows follow the same card treatmen
 
 ## Typography Hierarchy
 
-**Page/section heading** — 18-24px, weight 600-700, `text-white` on dark shell / `text-dark-2` on light cards
-**Body text** — 14px, weight 400-500
-**Muted/label text** — 12-14px, `text-sky-1`
+**Page/section heading** — 18-24px, weight 600-700, `text-on-primary` on dark shell / `text-on-surface` on light cards
+**Body text** — 14px, weight 400-500, `text-on-surface`
+**Muted/label text** — 12-14px, `text-on-surface-variant`
 
 ---
 
@@ -61,17 +61,17 @@ Pill shape (`rounded-full`), `px-2 py-0.5`, `text-xs font-medium`. Colors per ui
 
 **Primary (AI actions):**
 ```
-background: bg-purple-1
-color: white
+background: bg-primary-container
+color: white (text-on-primary)
 border-radius: rounded-xl
 padding: px-4 py-2
 ```
 
 **Secondary:**
 ```
-background: bg-dark-3
-border: 1px solid theme(colors.dark.4)
-color: white
+background: bg-surface-container-low
+border: 1px solid theme(colors.outline-variant)
+color: text-on-surface
 border-radius: rounded-xl
 padding: px-4 py-2
 ```
@@ -82,7 +82,7 @@ Reuse the existing `Button` (`stateful-button.tsx`) component — do not create 
 
 ## AI Chat Panel
 
-- Message bubbles: user messages right-aligned `bg-purple-1 text-white`; AI messages left-aligned `bg-dark-3 text-white` (dark shell) or `bg-surface-muted text-dark-2` (light card context)
+- Message bubbles: user messages right-aligned `bg-primary-container text-on-primary`; AI messages left-aligned `bg-surface-container text-on-surface` (light card context) or `bg-inverse-surface text-inverse-on-surface` (dark shell)
 - Streaming responses render token-by-token via AI SDK `useChat` — always show a loading/typing indicator while streaming
 - Input bar pinned to bottom of the chat panel, matches mockup
 
@@ -92,7 +92,7 @@ Reuse the existing `Button` (`stateful-button.tsx`) component — do not create 
 
 - Row: title, date, action ("Open Insights")
 - No alternating row colors
-- Row separator: `border-b border-sky-2` (light) or `border-dark-3` (dark)
+- Row separator: `border-b border-surface-variant` (light) or `border-surface-container-high` (dark)
 - Hover state: subtle background shift, no layout shift
 
 ---
