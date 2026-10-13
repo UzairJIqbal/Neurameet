@@ -1,9 +1,15 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable prettier/prettier */
 import { useUser } from "@clerk/nextjs";
 import { Call, useStreamVideoClient } from "@stream-io/video-react-sdk";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+// A transient WebSocket drop (code 1006) that is worth retrying.
+const isWsFailure = (err: unknown): boolean => {
+	if (typeof err !== "object" || err === null) return false;
+	const e = err as { code?: unknown; isWSFailure?: unknown };
+	return e.code === 1006 || e.isWSFailure === true;
+};
 
 export const useGetCall = (reloadNonce = 0) => {
 	const client = useStreamVideoClient();
@@ -13,11 +19,18 @@ export const useGetCall = (reloadNonce = 0) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	// Each load takes a new id; only the latest may write state, so an earlier
+	// overlapping run (boot query vs. reconnect reload) can't apply stale data.
+	const requestIdRef = useRef(0);
+
 	useEffect(() => {
 		let cancelled = false;
 
 		const loadCalls = async () => {
 			if (cancelled || !client || !user?.id) return;
+
+			const requestId = ++requestIdRef.current;
+			const isCurrent = () => !cancelled && requestId === requestIdRef.current;
 
 			setIsLoading(true);
 			setError(null);
@@ -27,52 +40,60 @@ export const useGetCall = (reloadNonce = 0) => {
 			const maxRetries = 3;
 			const retryDelayMs = 500;
 
-			const queryWithTimeout = () => {
-				return Promise.race([
-					client.queryCalls({
-						filter_conditions: {
-							starts_at: { $exists: true },
-							$or: [
-								{ created_by_user_id: user.id },
-								{ members: { $in: [user.id] } },
-							],
-						},
-						sort: [
-							{ field: "starts_at", direction: -1 },
-						],
-					}),
-					new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs))
-				]) as Promise<{ calls: Call[] }>;
+			const queryWithTimeout = async (): Promise<{ calls: Call[] }> => {
+				let timer: ReturnType<typeof setTimeout> | undefined;
+				const timeout = new Promise<never>((_, reject) => {
+					timer = setTimeout(
+						() => reject(new Error(`Timeout after ${timeoutMs}ms`)),
+						timeoutMs,
+					);
+				});
+				try {
+					return await Promise.race([
+						client.queryCalls({
+							filter_conditions: {
+								starts_at: { $exists: true },
+								$or: [
+									{ created_by_user_id: user.id },
+									{ members: { $in: [user.id] } },
+								],
+							},
+							sort: [{ field: "starts_at", direction: -1 }],
+						}),
+						timeout,
+					]);
+				} finally {
+					clearTimeout(timer);
+				}
 			};
 
 			try {
 				let attempts = 0;
-				let callsResult: any = [];
+				let callsResult: Call[] = [];
 				while (attempts < maxRetries) {
 					try {
 						const { calls } = await queryWithTimeout();
 						callsResult = calls;
 						break; // success
-					} catch (err: any) {
+					} catch (err: unknown) {
 						attempts++;
-						const isWsFailure = err?.code === 1006 || err?.isWSFailure === true;
-						if (attempts < maxRetries && isWsFailure) {
-							await new Promise(res => setTimeout(res, retryDelayMs));
+						if (attempts < maxRetries && isWsFailure(err)) {
+							await new Promise((res) => setTimeout(res, retryDelayMs));
 							continue;
 						}
 						throw err;
 					}
 				}
 
-				if (cancelled) return;
+				if (!isCurrent()) return;
 				setCalls(callsResult ?? []);
-			} catch (err: any) {
-				if (cancelled) return;
+			} catch (err: unknown) {
+				if (!isCurrent()) return;
 				console.error("Error loading calls:", err);
-				setError(err?.message ?? "Failed to load calls");
+				setError(err instanceof Error ? err.message : "Failed to load calls");
 				setCalls([]);
 			} finally {
-				if (!cancelled) setIsLoading(false);
+				if (isCurrent()) setIsLoading(false);
 			}
 		};
 

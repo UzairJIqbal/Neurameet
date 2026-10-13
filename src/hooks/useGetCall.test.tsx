@@ -49,15 +49,26 @@ describe("useGetCall boot 1006 resilience", () => {
 	});
 
 	it("repopulates the call list after the socket reconnects", async () => {
-		// First query (boot) fails with a transient WS drop; later queries succeed.
+		// The boot query hits a transient WS drop on every in-hook retry (3
+		// attempts); later queries succeed.
+		const wsDrop = () =>
+			Object.assign(new Error("WS failed with code: 1006"), {
+				code: 1006,
+				isWSFailure: true,
+			});
 		h.queryCalls
-			.mockRejectedValueOnce(new Error("WS failed with code: 1006"))
+			.mockRejectedValueOnce(wsDrop())
+			.mockRejectedValueOnce(wsDrop())
+			.mockRejectedValueOnce(wsDrop())
 			.mockResolvedValue({ calls: [{ id: "call_1", state: {} }] });
 
 		const { result } = renderHook(() => useGetCall());
 
-		// The initial failed attempt should not populate the list.
-		await waitFor(() => expect(h.queryCalls).toHaveBeenCalled());
+		// The retry branch runs all 3 attempts, then gives up with an empty list.
+		await waitFor(() => expect(result.current.error).not.toBeNull(), {
+			timeout: 3000,
+		});
+		expect(h.queryCalls).toHaveBeenCalledTimes(3);
 		expect(result.current.allCalls).toHaveLength(0);
 
 		// SDK auto-reconnects and emits connection.changed with online: true.

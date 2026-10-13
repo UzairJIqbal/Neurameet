@@ -155,7 +155,11 @@ const UpcomingPage = () => {
 											}
 										>
 											<PlayCircle className="h-4 w-4" />
-											{isStarted ? "Start" : formatCountdown(startsAt! - now)}
+											{isStarted
+												? "Start"
+												: startsAt === null
+													? "Time unavailable"
+													: formatCountdown(startsAt - now)}
 										</button>
 										<button
 											onClick={() => onJoin(call)}

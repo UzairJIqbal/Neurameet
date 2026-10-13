@@ -29,6 +29,15 @@ test.describe("Stream client connects on mount (queryCalls no timeout)", () => {
       }
     });
 
+    // queryCalls is a POST to Stream's /video/calls endpoint. Wait for it to
+    // complete instead of sleeping a fixed time.
+    const callsQuery = page.waitForResponse(
+      (res) =>
+        res.request().method() === "POST" &&
+        /\/video\/calls(\?|$)/.test(res.url()),
+      { timeout: 15000 },
+    );
+
     await page.goto("/previous");
 
     // The list header renders once queryCalls settles (success OR catch path).
@@ -37,8 +46,8 @@ test.describe("Stream client connects on mount (queryCalls no timeout)", () => {
       page.getByRole("heading", { name: "Previous Meetings" }),
     ).toBeVisible({ timeout: 15000 });
 
-    // Flush any late console error before asserting.
-    await page.waitForTimeout(2000);
+    // The query has settled, so a timeout error would already be logged.
+    await callsQuery;
 
     expect(
       timeoutErrors,

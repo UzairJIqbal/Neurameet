@@ -142,12 +142,15 @@ const MeetingModel = ({
       // Intelligence immediately. Best-effort: the Stream call is already
       // created, so a DB failure must not block the user.
       try {
-        await createScheduledMeetingRow({
+        const result = await createScheduledMeetingRow({
           streamCallId: call.id,
           title: "Instant Meeting",
           startsAt: new Date().toISOString(),
           guestAdmissionMode,
         });
+        if (!result.ok) {
+          console.error("Instant meeting row not persisted:", result.error);
+        }
       } catch (dbErr) {
         console.error("Instant meeting row not persisted:", dbErr);
       }
@@ -200,12 +203,15 @@ const MeetingModel = ({
       // Meeting Intelligence with its real title immediately. Best-effort: the
       // Stream call is already created, so a DB failure must not block the user.
       try {
-        await createScheduledMeetingRow({
+        const result = await createScheduledMeetingRow({
           streamCallId: call.id,
           title,
           startsAt,
           guestAdmissionMode,
         });
+        if (!result.ok) {
+          console.error("Scheduled meeting row not persisted:", result.error);
+        }
       } catch (dbErr) {
         console.error("Scheduled meeting row not persisted:", dbErr);
       }
@@ -274,7 +280,7 @@ const MeetingModel = ({
               </div>
               {/* Guest admission mode — owner chooses before creating */}
               <div className="flex flex-col gap-2">
-                <label className="text-base font-normal leading-[22.4px] text-white text-center">
+                <label className="text-base font-normal leading-[22.4px] text-on-surface-variant text-center">
                   Guest Admission
                 </label>
                 <div className="flex gap-2 justify-center">
@@ -365,7 +371,7 @@ const MeetingModel = ({
               </div>
               {/* Guest admission mode — owner chooses before scheduling */}
               <div className="flex flex-col gap-2 mt-4">
-                <label className="text-base font-normal leading-[22.4px] text-white">
+                <label className="text-base font-normal leading-[22.4px] text-on-surface-variant">
                   Guest Admission
                 </label>
                 <div className="flex gap-2">
