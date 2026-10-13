@@ -4,9 +4,7 @@ import React from "react";
 
 
 const Previous = () => {
-    return <div>
-        <Sidebar_Com type='previousPage' />
-    </div>;
+    return <Sidebar_Com type='previousPage' />;
 };
 
 export default Previous;
