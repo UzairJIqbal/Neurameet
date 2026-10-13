@@ -72,29 +72,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Idempotent retry: clear any prior insights, action items, and their
-    // follow-ups for this meeting before regenerating. A retry (or any re-run
-    // of this route) must not create duplicate rows, since the detail API does
-    // a single-row fetch on meeting_insights. Safe no-op on first run.
-    {
-      const { error: delInsightsErr } = await supabase
-        .from("meeting_insights")
-        .delete()
-        .eq("meeting_id", meetingId);
-      if (delInsightsErr)
-        console.error("Failed to clear prior insights:", delInsightsErr);
-
-      const { data: priorItems } = await supabase
-        .from("action_items")
-        .select("id")
-        .eq("meeting_id", meetingId);
-      if (priorItems && priorItems.length > 0) {
-        const priorIds = priorItems.map((i) => i.id);
-        await supabase.from("follow_ups").delete().in("action_item_id", priorIds);
-        await supabase.from("action_items").delete().in("id", priorIds);
-      }
-    }
-
     // Bound the input size before extraction. Long recordings (multiple 10-min
     // chunks concatenated) can push the model's structured-output response past
     // what it can complete, which makes the AI SDK throw
@@ -139,6 +116,30 @@ Extraction rules:
 - Detected topics: specific topics discussed.
 - Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, and a due date (ISO YYYY-MM-DD) if stated.`,
     });
+
+    // Idempotent retry: clear any prior insights, action items, and their
+    // follow-ups for this meeting before writing the new ones. This runs only
+    // after extraction succeeded, so a failed AI call keeps the old results. A retry (or any re-run
+    // of this route) must not create duplicate rows, since the detail API does
+    // a single-row fetch on meeting_insights. Safe no-op on first run.
+    {
+      const { error: delInsightsErr } = await supabase
+        .from("meeting_insights")
+        .delete()
+        .eq("meeting_id", meetingId);
+      if (delInsightsErr)
+        console.error("Failed to clear prior insights:", delInsightsErr);
+
+      const { data: priorItems } = await supabase
+        .from("action_items")
+        .select("id")
+        .eq("meeting_id", meetingId);
+      if (priorItems && priorItems.length > 0) {
+        const priorIds = priorItems.map((i) => i.id);
+        await supabase.from("follow_ups").delete().in("action_item_id", priorIds);
+        await supabase.from("action_items").delete().in("id", priorIds);
+      }
+    }
 
     // Write meeting insights
     const { error: insightsError } = await supabase

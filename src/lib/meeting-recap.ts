@@ -106,6 +106,8 @@ export async function getMeetingRecap(id: string): Promise<MeetingRecap | null> 
     endedAt: meeting.ended_at,
     createdAt: meeting.created_at,
     user_id: meeting.user_id,
-    participants,
+    // The recap page is public (anyone with the link), so attendee emails never
+    // leave the server here; names and times are enough for the recap.
+    participants: participants.map((p) => ({ ...p, email: null })),
   };
 }

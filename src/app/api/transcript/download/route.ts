@@ -42,14 +42,31 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!meetingId || !streamCallId) {
-      return NextResponse.json(
-        { error: "meetingId and streamCallId are required" },
-        { status: 400 },
-      );
-    }
-
     const supabase = supabaseServer();
+
+    // Authorize against the stored meeting, never the request body: the call id
+    // must be this meeting's, and the caller must be its owner or a recorded
+    // attendee. Otherwise any signed-in user could transcribe any meeting.
+    const { data: meeting } = await supabase
+      .from("meetings")
+      .select("user_id, stream_call_id")
+      .eq("id", meetingId)
+      .maybeSingle();
+    if (!meeting || meeting.stream_call_id !== streamCallId) {
+      return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
+    }
+    if (meeting.user_id !== userId) {
+      const { data: attended } = await supabase
+        .from("attendance_events")
+        .select("id")
+        .eq("meeting_id", meetingId)
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+      if (!attended) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
 
     // Cache read: only serve a ready transcript that actually has text. A row in
     // `pending` / `no_recording` / `failed` must not be returned as a success,

@@ -67,6 +67,8 @@ const UploadTranscriptModal = ({
       if (!file.name.endsWith(".txt")) {
         toast.error("Only .txt files are supported");
         setParsedMeetingId(null);
+        setFileName(null);
+        setFileContent(null);
         return;
       }
 
@@ -92,6 +94,8 @@ const UploadTranscriptModal = ({
     if (!file.name.endsWith(".txt")) {
       toast.error("Only .txt files are supported");
       setParsedMeetingId(null);
+      setFileName(null);
+      setFileContent(null);
       return;
     }
 
@@ -151,15 +155,23 @@ const UploadTranscriptModal = ({
         throw new Error(uploadData.error || "Upload failed");
       }
 
-      const { meetingId: returnedMeetingId } = (await uploadRes.json()) as {
-        meetingId: string;
-      };
+      const { meetingId: returnedMeetingId, canProcess } =
+        (await uploadRes.json()) as { meetingId: string; canProcess?: boolean };
 
       // Respect the "AI auto-summary on upload" preference. When OFF, store the
       // transcript only and skip AI processing + embedding (no insights/chunks).
       const { aiAutoSummary, emailNotifications } = readUserPrefs();
       if (!aiAutoSummary) {
         toast.success("Transcript uploaded");
+        onClose();
+        router.push(`/meeting-intelligence/${returnedMeetingId}`);
+        return;
+      }
+
+      // A participant may attach a transcript, but only the owner can run AI
+      // processing on the meeting, so stop here instead of failing.
+      if (canProcess === false) {
+        toast.success("Transcript uploaded. The meeting owner can generate insights.");
         onClose();
         router.push(`/meeting-intelligence/${returnedMeetingId}`);
         return;
@@ -197,6 +209,9 @@ const UploadTranscriptModal = ({
           console.error("Embedding failed:", embedData.error || "unknown");
         }
       } catch (embedErr) {
+        // Cancel or the timeout aborted the request: end the flow instead of
+        // redirecting as if processing had finished.
+        if (controller.signal.aborted) throw embedErr;
         embedFailed = true;
         console.error("Embedding request failed:", embedErr);
       }

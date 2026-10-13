@@ -274,21 +274,29 @@ export function mergeSegmentsToTranscript(segments: Segment[]): string {
     .join("\n");
 }
 
-// Bug 3 dedup (pure, unit-tested): chunk i (i>=1) overlaps the previous chunk
-// by OVERLAP_SECONDS. Its leading OVERLAP_SECONDS of speech is a duplicate of
-// the prior chunk, so drop it. Only when we have REAL Whisper segments, though:
-// the single-segment fallback for an unsegmented result (one segment spanning
-// the whole chunk, start 0) must be kept whole. Chunk 0 always returns as-is.
+// Bug 3 dedup (pure, unit-tested): chunk i covers [i*S, (i+1)*S + overlap], so
+// the first OVERLAP_SECONDS of chunk i+1 is also the tail of chunk i. Each side
+// keeps the segments it owns so no speech is lost across the seam:
+//   - chunk i >= 1 drops only segments that END inside the overlap (fully heard
+//     by the previous chunk); a segment that starts in the overlap but runs on
+//     past it is kept.
+//   - a non-last chunk drops segments that START at or after `tailCutSeconds`
+//     (its own segment length), since the next chunk transcribes them in full.
+// Only applied to REAL Whisper segments: the single-segment fallback for an
+// unsegmented result (one segment spanning the chunk, start 0) is kept whole.
 export function filterBoundarySegments(
   segments: WhisperSegment[],
   chunkIndex: number,
   overlapSeconds: number,
   hasSegments: boolean,
+  tailCutSeconds?: number,
 ): WhisperSegment[] {
-  if (chunkIndex >= 1 && hasSegments) {
-    return segments.filter((s) => s.start >= overlapSeconds);
-  }
-  return segments;
+  if (!hasSegments) return segments;
+  return segments.filter(
+    (s) =>
+      (chunkIndex === 0 || s.end > overlapSeconds) &&
+      (tailCutSeconds === undefined || s.start < tailCutSeconds),
+  );
 }
 
 async function resolveSpeakerName(
@@ -538,15 +546,15 @@ async function processTrack(
         const segs: WhisperSegment[] = hasSegments
           ? rawSegments
           : [{ start: 0, end: 0, text: result.text }];
-        // Bug 3 dedup: chunk i (i>=1) overlaps the previous chunk by
-        // OVERLAP_SECONDS. Its leading OVERLAP_SECONDS of speech is a duplicate
-        // of the prior chunk, so drop it (only when we have real segments — the
-        // single-segment fallback for an unsegmented result must be kept whole).
+        // Bug 3 dedup: split the overlap between neighbouring chunks (see
+        // filterBoundarySegments) so the seam neither drops nor doubles speech.
+        const isLast = i === flacChunks.length - 1;
         const filtered = filterBoundarySegments(
           segs,
           i,
           OVERLAP_SECONDS,
           hasSegments,
+          isLast ? undefined : SEGMENT_SECONDS,
         );
         return filtered.map((s) => ({
           speaker: displayName,

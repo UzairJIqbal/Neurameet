@@ -91,8 +91,8 @@ describe("normUserId (Bug 1 prefix normalization)", () => {
 
 // ─── Bug 3: chunk-boundary dedup (no word loss, no doubling) ─────────────────
 // Chunk i (i>=1) overlaps the prior chunk by OVERLAP_SECONDS. Its leading
-// overlap is a duplicate of the prior chunk's tail, so drop segments with
-// start < overlap — but ONLY when there are real Whisper segments. The
+// overlap is a duplicate of the prior chunk's tail, so drop segments that
+// end inside the overlap — but ONLY when there are real Whisper segments. The
 // single-segment fallback (one segment spanning the whole chunk, start 0) must
 // be kept whole, and chunk 0 is never filtered.
 describe("filterBoundarySegments (Bug 3 dedup)", () => {
@@ -121,14 +121,30 @@ describe("filterBoundarySegments (Bug 3 dedup)", () => {
 
   it("respects a custom overlap value", () => {
     const input = [seg(0, "a"), seg(2, "b"), seg(4, "c")];
-    expect(filterBoundarySegments(input, 2, 3, true)).toEqual([seg(4, "c")]);
+    // overlap 3 -> drop only segments ending at or before 3
+    expect(filterBoundarySegments(input, 2, 3, true)).toEqual([
+      seg(2, "b"),
+      seg(4, "c"),
+    ]);
+  });
+
+  it("keeps a segment that starts in the overlap but runs past it", () => {
+    const long: WhisperSegment = { start: 1, end: 18, text: "long" };
+    expect(filterBoundarySegments([long], 1, 5, true)).toEqual([long]);
+  });
+
+  it("drops a non-last chunk's segments that start in its tail overlap", () => {
+    const input = [seg(590, "owned"), seg(600, "next chunk owns this")];
+    expect(filterBoundarySegments(input, 0, 5, true, 600)).toEqual([
+      seg(590, "owned"),
+    ]);
   });
 
   it("does not double-count: tail of chunk N is preserved on chunk N+1", () => {
     // Chunk 2's leading OVERLAP_SECONDS (relative start 0..5) is the duplicate of
-    // chunk 1's tail. A duplicate sits at start 3 (< 5) and is dropped; genuinely
-    // new speech at start 8 is kept. (start 5 exactly == overlap is kept, since
-    // the filter is `>=`.)
+    // chunk 1's tail. A duplicate at 3..5 ends inside the overlap and is dropped; genuinely
+    // new speech at start 8 is kept. (A segment ending exactly at the overlap is
+    // dropped, since the filter keeps `end > overlap`.)
     const chunk2 = [seg(3, "dup"), seg(8, "new")];
     expect(filterBoundarySegments(chunk2, 2, 5, true)).toEqual([seg(8, "new")]);
   });

@@ -221,6 +221,15 @@ describe("AfterMeetingRecap renders all participants distinctly", () => {
   });
 });
 
+describe("AfterMeetingRecap keeps attendee emails private", () => {
+  afterEach(cleanup);
+
+  it("never renders participant emails on the public recap", () => {
+    render(<AfterMeetingRecap recap={recapWithGuestParticipants} />);
+    expect(screen.queryByText(/@example\.com/)).toBeNull();
+  });
+});
+
 describe("AfterMeetingRecap call timeline presence and talk time clarity", () => {
   afterEach(cleanup);
 
@@ -303,6 +312,39 @@ describe("AfterMeetingRecap — no contradictory transcript messages (F-series r
     expect(
       screen.getByText(/no recording was captured for this meeting/i),
     ).toBeTruthy();
+
+    vi.useRealTimers();
+  });
+});
+
+describe("AfterMeetingRecap polling never overlaps a running request", () => {
+  afterEach(cleanup);
+
+  it("skips poll ticks while a download request is still in flight", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          ok: true,
+          json: async () => ({ status: "no_recording", message: "wait" }),
+        };
+      }
+      // The first poll request hangs for 40s (longer than two poll ticks).
+      await new Promise((r) => setTimeout(r, 40000));
+      return { ok: true, json: async () => ({ status: "no_recording" }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AfterMeetingRecap recap={recap} />);
+    fireEvent.click(screen.getByRole("button", { name: /generate transcript/i }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Tick 1 starts the slow request; ticks 2 and 3 land while it is running.
+    await vi.advanceTimersByTimeAsync(45000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     vi.useRealTimers();
   });

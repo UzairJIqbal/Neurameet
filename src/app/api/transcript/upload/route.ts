@@ -39,6 +39,9 @@ export async function POST(request: Request) {
     // attendance + recording, fixing P11 (a) Attendance Report + (d) Recording
     // tab. The caller must own the meeting.
     let meetingIdResolved: string;
+    // AI processing (/api/ai/process) is owner-only, so tell the client whether
+    // to run it instead of letting a participant hit a failure after upload.
+    let canProcess = true;
     if (meetingId) {
       const { data: existing, error: existingErr } = await supabase
         .from("meetings")
@@ -81,15 +84,7 @@ export async function POST(request: Request) {
         }
       }
       meetingIdResolved = existing.id;
-      // Replace any prior transcript for this meeting so a re-upload is
-      // idempotent (the process route then clears prior insights/items).
-      const { error: delErr } = await supabase
-        .from("transcripts")
-        .delete()
-        .eq("meeting_id", meetingIdResolved);
-      if (delErr) {
-        console.error("Failed to clear prior transcript:", delErr);
-      }
+      canProcess = existing.user_id === userId;
     } else {
       // No meetingId supplied, so this is an external transcript (a meeting from
       // another platform with no NeuraMeet call): create a fresh meetings row to
@@ -121,15 +116,19 @@ export async function POST(request: Request) {
         meetingIdResolved = meeting.id;
     }
 
-    // Store the transcript
+    // Store the transcript. Upsert on the unique meeting_id so a re-upload
+    // replaces the prior transcript in one write: if it fails, the old one stays.
     const { error: transcriptError } = await supabase
       .from("transcripts")
-      .insert({
-        meeting_id: meetingIdResolved,
-        source: "upload",
-        raw_text: rawText.trim(),
-        processing_state: "ready",
-      });
+      .upsert(
+        {
+          meeting_id: meetingIdResolved,
+          source: "upload",
+          raw_text: rawText.trim(),
+          processing_state: "ready",
+        },
+        { onConflict: "meeting_id" },
+      );
 
     if (transcriptError) {
       console.error("Failed to store transcript:", transcriptError);
@@ -139,7 +138,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ meetingId: meetingIdResolved });
+    return NextResponse.json({ meetingId: meetingIdResolved, canProcess });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed";
     console.error("Transcript upload error:", err);

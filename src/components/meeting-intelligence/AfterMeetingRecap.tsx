@@ -87,6 +87,9 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   const [noRecordingTimedOut, setNoRecordingTimedOut] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
+  // A transcription can outlast the 15s poll interval; this keeps a tick from
+  // starting a second /api/transcript/download while one is still running.
+  const inFlightRef = useRef(false);
 
   const stopPoll = () => {
     if (pollRef.current) {
@@ -116,6 +119,7 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
         setGen("no_recording");
         return;
       }
+      if (inFlightRef.current) return;
       try {
         await executeDownload(true);
       } catch {
@@ -148,6 +152,7 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
     // stuck /api/transcript/download surfaces a failure instead of spinning.
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
+    inFlightRef.current = true;
     try {
       const res = await fetch("/api/transcript/download", {
         method: "POST",
@@ -216,6 +221,7 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
       }
     } finally {
       clearTimeout(timeoutId);
+      inFlightRef.current = false;
     }
   };
 
@@ -268,9 +274,10 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   // Determine if the signed‑in user is the meeting owner
   const isOwner = user?.id === recap.user_id;
 
-  // Find the participant entry for the current user (match by Clerk user ID or email)
+  // Find the participant entry for the current user (by Clerk user ID; the
+  // public recap carries no emails)
   const currentParticipant = recap.participants.find(
-    (p) => p.userId === user?.id || p.email === (user?.primaryEmailAddress?.emailAddress ?? ''),
+    (p) => p.userId === user?.id,
   );
 
   // For guests, show their own presence duration instead of the full meeting duration
@@ -429,11 +436,6 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
                     <span className="text-body-md font-medium text-on-surface">
                       {p.name}
                     </span>
-                    {p.email && (
-                      <span className="text-body-sm text-on-surface-variant">
-                        {p.email}
-                      </span>
-                    )}
                     <span className="text-body-sm text-on-surface-variant">
                       {formatDuration(p.joinedAt, p.leftAt ?? effectiveEnd)} present
                       {p.talkTimeSeconds > 0
