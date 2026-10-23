@@ -2,6 +2,10 @@
 
 An AI-integrated meeting platform. Host or join real-time video meetings, then turn each meeting into searchable intelligence: a summary, action items, a category, and a chat that answers questions grounded in that meeting's transcript.
 
+**Live:** https://neurameet.vercel.app
+
+![The NeuraMeet landing page: "Capture, understand, and act on every meeting", with Get Started and Sign in buttons](docs/screenshots/landing.png)
+
 ## Features
 
 - **Video meetings:** instant, scheduled, and personal-room calls with device preview, screen sharing, reactions, and recording (Stream Video).
@@ -93,3 +97,7 @@ src/
 supabase/       database schema
 context/        architecture and design docs
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
