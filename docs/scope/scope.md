@@ -530,10 +530,10 @@ Pull every decision and every promise (who, what, by when) out of each meeting, 
   - [x] Review (confirm, reject, undo), overdue on read, reversal card and tab badge (AC-9, AC-10, AC-11)
   - [x] Meeting date on upload, plus the prep hook (AC-5, AC-15)
   - [x] Evaluation script with per language metrics and kappa, plus the demo seed (AC-16)
-- [ ] Verify it: `/check verify promise ledger`
-- [ ] Test it: `/test promise ledger`
-- [ ] Review it (fresh model): `/check review promise ledger`
-- [ ] Document it: `/document promise ledger`
+- [x] Verify it: `/check verify promise ledger`
+- [x] Test it: `/test promise ledger`
+- [x] Review it (fresh model): `/check review promise ledger`
+- [x] Document it: `/document promise ledger`
 
 ## Deploy
 

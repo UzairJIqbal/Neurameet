@@ -260,6 +260,7 @@ Chosen 2026-10-30 from the deep research report `reports/NeuraMeet unique FYP fe
 - **Resend free tier approved (A2 precedent):** a free-tier third-party tool requiring no payment method (Resend, 3k emails/mo) is acceptable on the same standard as the named free tiers — not a "paid API", and an email-only delivery service is not a second AI/vector provider. Precedent clarified in AGENTS.md; do not re-litigate for future steps.
 
 - **Signature feature (2026-10-30):** the Promise Ledger is NeuraMeet's one standout feature (cross meeting decision and promise tracking with quote evidence, Urdu English aware). Build it deep before adding any second headline feature. Panel claim stays narrow: "none of the major platforms or notetakers we reviewed".
+- **Gemini time limit (2026-10-30):** `generateStructuredWithFallback` now aborts the Gemini call after 30 s (`PRIMARY_STRUCTURED_TIMEOUT_MS`) and falls back to Groq; transcript cleanup passes 90 s. Found during `/check verify promise ledger`, where a stalled Gemini call held process and match for 5+ min, past the UI's 120 s budget. Tests in `src/agent/models.test.ts`.
 
 ## Dev-Only Settings
 

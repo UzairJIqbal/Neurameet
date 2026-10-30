@@ -3,7 +3,11 @@ import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import MeetingTabs from "./MeetingTabs";
-import type { MeetingDetailData, MeetingInsights, ActionItem } from "@/lib/meeting-types";
+import type {
+  MeetingDetailData,
+  MeetingInsights,
+  ActionItem,
+} from "@/lib/meeting-types";
 
 // CategoryTab pulls in @/actions/meetings, which imports `server-only`. Stub it
 // so the suite loads in jsdom (the Category tab is not exercised here).
@@ -38,8 +42,11 @@ describe("Meeting Intelligence tabs responsive (P13.4)", () => {
 
   it("Overview attendance card stacks on mobile (flex-col sm:flex-row)", async () => {
     render(<MeetingTabs {...baseProps} />);
-    const cardText = (await screen.findByText("Attendance Report")) as HTMLElement;
-    const card = (cardText.parentElement?.parentElement as HTMLElement) ?? cardText;
+    const cardText = (await screen.findByText(
+      "Attendance Report",
+    )) as HTMLElement;
+    const card =
+      (cardText.parentElement?.parentElement as HTMLElement) ?? cardText;
     const tokens = card.className.split(" ");
     expect(tokens).toContain("flex-col");
     expect(tokens).toContain("sm:flex-row");
@@ -71,5 +78,36 @@ describe("Ledger tab reversal badge (spec 0001 AC-11)", () => {
     render(<MeetingTabs {...baseProps} />);
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(screen.queryByLabelText(/reversed/)).toBeNull();
+  });
+});
+
+describe("Ledger tab is owner only (spec 0001 AC-12)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("hides the Ledger tab and skips the ledger fetch for a participant", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<MeetingTabs {...baseProps} isOwner={false} />);
+
+    expect(await screen.findByText("Attendance Report")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Ledger/ })).toBeNull();
+    expect(screen.queryByText("Ledger")).toBeNull();
+    expect(
+      fetchMock.mock.calls.some(([u]) => String(u).includes("/api/ledger")),
+    ).toBe(false);
+  });
+
+  it("shows the Ledger tab for the owner", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ items: [], incoming: [], reversalCount: 0 }),
+      })),
+    );
+    render(<MeetingTabs {...baseProps} />);
+    expect(await screen.findByText("Ledger")).toBeTruthy();
   });
 });

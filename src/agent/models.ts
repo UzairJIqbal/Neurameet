@@ -89,12 +89,19 @@ export async function withFallback<T>(
 // Optional fields would make the Groq fallback 400 with
 // "`required` ... must be supplied ... including every key in properties",
 // which only surfaces when Gemini is down and the call falls back to Groq.
+// Gemini can stall without answering until the 300 s HTTP headers timeout,
+// which outlasts the client's 120 s budget. Abort the primary early so the
+// Groq fallback still answers in time.
+export const PRIMARY_STRUCTURED_TIMEOUT_MS = 30_000;
+
 export async function generateStructuredWithFallback<OBJECT>({
   schema,
   prompt,
+  primaryTimeoutMs = PRIMARY_STRUCTURED_TIMEOUT_MS,
 }: {
   schema: z.ZodType<OBJECT>;
   prompt: string;
+  primaryTimeoutMs?: number;
 }): Promise<{ object: OBJECT }> {
   try {
     // No retries on the primary: when Gemini is rate-limited we want to fail
@@ -105,6 +112,7 @@ export async function generateStructuredWithFallback<OBJECT>({
       schema,
       prompt,
       maxRetries: 0,
+      abortSignal: AbortSignal.timeout(primaryTimeoutMs),
     });
   } catch (error) {
     console.warn("Gemini structured call failed, falling back to Groq:", error);

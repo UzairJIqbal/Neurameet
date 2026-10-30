@@ -130,11 +130,16 @@ export function fallbackToRawIfTooShort(
   return cleaned.length >= minRatio * raw.length ? cleaned : raw;
 }
 
+// Cleanup rewrites the whole transcript, so Gemini needs longer than the
+// default primary limit on long meetings.
+const CLEANUP_PRIMARY_TIMEOUT_MS = 90_000;
+
 export async function cleanupTranscript(raw: string): Promise<string> {
   try {
     const { object } = await generateStructuredWithFallback({
       schema: cleanupSchema,
       prompt: buildCleanupPrompt(raw),
+      primaryTimeoutMs: CLEANUP_PRIMARY_TIMEOUT_MS,
     });
 
     const cleaned = object.cleanedTranscript?.trim() ?? "";
@@ -157,6 +162,7 @@ export async function cleanupTranscript(raw: string): Promise<string> {
       const retry = await generateStructuredWithFallback({
         schema: cleanupSchema,
         prompt: buildTranslateOnlyPrompt(raw),
+        primaryTimeoutMs: CLEANUP_PRIMARY_TIMEOUT_MS,
       });
       const cleanedRetry = retry.object.cleanedTranscript?.trim() ?? "";
       if (cleanedRetry && !isMostlyNonEnglish(cleanedRetry)) {
