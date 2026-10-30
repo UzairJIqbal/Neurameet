@@ -1,0 +1,13 @@
+Sara: Assalam o alaikum sab ko, aaj launch planning finalize karni hai
+Bilal: Walaikum salam, pehle hosting ka decide kar lete hain
+Sara: Mera khayal hai Vercel best rahega, free tier bhi hai aur Next.js ke saath seedha deploy hota hai
+Bilal: Haan agreed, setup bhi easy hai
+Sara: Theek hai, final decision: hum Vercel pe deploy karenge
+Ali: Launch se pehle users ka feedback bhi chahiye
+Sara: Bilkul, customer survey kaun bhejega?
+Ali: Main Friday tak survey bhej dunga, Google Form ready hai
+Sara: Perfect, thanks Ali
+Hina: Main landing page ka copy review kar ke Monday tak share kar dungi
+Bilal: I will set up the error monitoring dashboard before the launch
+Sara: Great, launch date hum agli meeting mein confirm karenge
+Sara: Thanks everyone, Allah Hafiz

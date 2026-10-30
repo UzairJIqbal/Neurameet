@@ -1,46 +1,45 @@
-# Memory — Guest Stream Identity Rewrapping Fix
+# Memory — Promise Ledger S1 slice 5 (Evaluation script plus demo seed)
 
-Last updated: 2026-09-19T12:18:24+05:00
+Last updated: 2026-10-30
 
 ## What was built
 
-- Updated [src/components/GuestStreamClientProvider.tsx](./src/components/GuestStreamClientProvider.tsx) so an already server-minted guest connects with `{ id, name }` and its access token, without a client-side guest type marker.
-- Added [src/components/GuestStreamClientProvider.test.tsx](./src/components/GuestStreamClientProvider.test.tsx) regression guards for the authenticated connection shape and absence of the guest marker.
-- Updated [context/progress-tracker.md](./context/progress-tracker.md) with the identity rewrapping fix and verification status.
+Slice 5 of spec `docs/specs/0001-promise-ledger/index.md` (AC-16, Build plan item 6). Prompt: `prompts/step-S5-promise-ledger-slice5.md`.
+
+- `src/lib/ledger-eval-metrics.ts` (new, pure): `precisionRecall`, `accuracy`, `cohensKappa` (null on empty denominators; single label edge case handled). Test: `src/lib/ledger-eval-metrics.test.ts` (8 tests).
+- `scripts/ledger-eval.ts` (new): `npm run eval:ledger -- [--limit N] [--out file] [--delay ms]` (default delay 4000). Loads `.env.local` via dotenv at run time, validates `pairs.json` with zod, runs production `judgeLedgerCandidates` then `filterVerdicts` per pair (one candidate per call), prints precision and recall for kept and reversed per `en`/`ur`/`mixed`/`all`, accuracy, kappa, wrong ids. Judge errors are skipped, not scored as none.
+- `scripts/ledger-eval/pairs.json` (new): 40 pairs (20 mixed, 12 en, 8 ur script; 15 kept, 12 reversed, 13 none).
+- `scripts/ledger-demo/` (new): `01-launch-planning.txt` (2026-10-01), `02-infra-review.txt` (2026-10-08), `03-launch-check.txt` (2026-10-15), plus `README.md` with upload order and expected results.
+- `package.json`: added `eval:ledger` script.
+- Bookkeeping: scope.md slice 5 milestone and the `Build it` box ticked (feature stays `in-progress`, GA); progress-tracker updated; slice 5 section appended to `docs/scope/verify.md`.
 
 ## Decisions made
 
-- `POST /api/guest/request-join` remains the single guest-minting point. The client must use the returned Stream user id and token directly.
-- Do not pass `type: "guest"` to the installed Stream SDK after server-side minting. That SDK branch calls `/guest` again and creates a second wrapped guest identity.
-- Guest permissions remain server-authorized by the access token and Stream call permissions; omitting the client-side type does not promote the guest to a full user.
+- Eval scores what the app would store: judge output passes through `filterVerdicts` (0.7 threshold plus quote check) before comparison.
+- `label_a` in pairs.json is an AI DRAFT; every `label_b` is null. Real numbers need a human to review `label_a` and a second person to fill `label_b` blind. Kappa prints "needs label_b" until then.
+- Metrics live under `src/lib/` so the existing vitest config covers them.
 
 ## Problems solved
 
-- Prevented chained Stream ids such as `guest-...-guest-...`, which were caused by the SDK re-minting a guest when the provider passed the guest type.
-- Preserved the existing guest display name, participant flow, admission flow, redirect logic, and owner-only recordings UI.
+- Gemini returned 503 "high demand" during the smoke run; Groq fallback answered. The 3 pair run took about 3 minutes, so a full 40 pair run may take 15+ minutes on free tier.
+- `tsx` scripts can import `src/agent/ledger.ts` (no `server-only` there); the ledger module is loaded with a dynamic import after dotenv.
+- Carried over: dev server on port 3100 (3000 is storeit); never read `.env.local`; Claude in Chrome cannot load localhost, so UI checks are manual.
 
 ## Current state
 
-- Installed SDK source was verified:
-  - `StreamVideoClient.connectUser()` routes users with `type === "guest"` to `connectGuestUser()`.
-  - `connectGuestUser()` POSTs to `/guest` and connects with the newly returned credentials.
-  - Omitting `type` uses the normal authenticated `connectUser(user, token)` path.
-- No `type: "guest"` remains in `GuestStreamClientProvider`.
-- Verification passed:
-  - `npx tsc --noEmit`
-  - Focused guest tests: 16/16
-  - Full Vitest: 204/204
-  - `npm run build`
-- A live Clerk/Stream meeting was not available in this environment, so fresh guest id persistence, participant count, after-meeting redirect, and recordings denial still need real-account verification.
-- The worktree contains unrelated pre-existing changes; do not revert them.
+- tsc clean, vitest 47 files / 311 tests green, `npm run build` ok, eslint clean on new files.
+- Smoke run `--limit 3`: 3/3 correct.
+- Slices 1 to 5 all built; all uncommitted on `main`.
+- Demo seed not yet run in the app; manual verify for slices 2 to 5 not run.
 
 ## Next session starts with
 
-1. Run the owner-controlled live G9 guest walkthrough with real Clerk, Stream, and Supabase credentials.
-2. Verify a fresh guest join creates one clean `stream_user_id` with no concatenated guest id.
-3. Confirm the owner sees exactly one participant, the guest reaches the after-meeting redirect, and the guest cannot access recordings while the owner can.
-4. If live verification passes, update the pending G9 status in [context/progress-tracker.md](./context/progress-tracker.md) and run the final checks again.
+1. Commit slices 1 to 5 on a branch (not on `main`).
+2. Run `/check verify promise ledger` (includes the demo upload from `scripts/ledger-demo/README.md`, done by hand).
+3. Get `label_a` reviewed and `label_b` filled, then a full `npm run eval:ledger -- --out scripts/ledger-eval/results.json`.
+4. Then `/test`, `/check review`, `/document` for the Promise Ledger.
 
 ## Open questions
 
-- Live end-to-end behavior remains unconfirmed because no authenticated meeting session was available during this session.
+- Who is the second labeller for `label_b`?
+- Whether the judge actually produces the demo outcomes the README describes (unconfirmed until the manual run).

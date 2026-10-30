@@ -2,7 +2,7 @@
 
 Order matters — each step depends on the one before it being real, not assumed. Each step gets its own `/architect` pass (where noted), its own approved prompt in `prompts/`, and its own verification before moving on.
 
-The plan is in these phases: Core NeuraMeet Pipeline (Steps 0 to 9, built), FYP Polish Pass (Step 9.5, built), Advanced Pipeline Features (Steps A0 to C3, built), **Meeting Experience Polish (Steps D0 to D3+, built, before Deploy)**, **Transcript Generation (Steps F0 to F8, built, before Deploy)**, **Guest Join with Owner Approval (Steps G0 to G1.5, G2 to G4, G8 integration audit, G9 manual walkthrough, new, before Deploy)**, then Deploy (Step 11). Every third party tool in every phase must be zero cost.
+The plan is in these phases: Core NeuraMeet Pipeline (Steps 0 to 9, built), FYP Polish Pass (Step 9.5, built), Advanced Pipeline Features (Steps A0 to C3, built), **Meeting Experience Polish (Steps D0 to D3+, built, before Deploy)**, **Transcript Generation (Steps F0 to F8, built, before Deploy)**, **Guest Join with Owner Approval (Steps G0 to G1.5, G2 to G4, G8 integration audit, G9 manual walkthrough, new, before Deploy)**, Product Final Polishing (Steps P0 to P13), **Signature Feature: Promise Ledger (Steps S0+, new, before Deploy)**, then Deploy (Step 11). Every third party tool in every phase must be zero cost.
 
 ---
 
@@ -613,6 +613,22 @@ An audit first, then a fix pass over responsiveness across the entire app, so th
 ### Step P13.10 — Shared dropdown menu tokens ⬜
 - (Spawned from P13.0; underpins P13.4 / P13.6 / P13.7.) The shared `ui/dropdown-menu.tsx` uses inert shadcn tokens (missing `bg-popover`, `bg-accent`, and similar), so every dropdown from it renders unstyled or broken, including on mobile: the account menu (partially fixed locally), the layout/audio-type selectors in Meeting Setup, and the category selector in Meeting Intelligence. Add the missing token definitions (or map them to the existing `context/ui-tokens.md` values) so all dropdowns render correctly at every breakpoint. Owner-only and read surfaces unaffected.
 - **Verification:** Settings, the Meeting Setup audio-type selector, and the Meeting Intelligence category selector all open and render correctly at 375/768; `npx tsc --noEmit` clean, `npm run build` exit 0.
+
+---
+
+## Signature Feature: Promise Ledger (Steps S0+, new, before Deploy)
+
+The one feature meant to make NeuraMeet stand out to the FYP panel. Research and reasoning: `reports/NeuraMeet unique FYP feature.md`. Scope row: `docs/scope/scope.md` #17 (workflow tier GA: verify, test, a fresh review, then document).
+
+### Step S0 — Promise Ledger architect ⬜
+- Run `/architect promise ledger` before any code. Decide: the data model for ledger items (decisions and promises) and the links between them across meetings; where extraction runs (extend the existing `/api/ai/process` rather than duplicate it); how a new meeting is matched against open items (pgvector similarity over existing embeddings, then one LLM judgment call); the new API route(s), to be added to the AGENTS.md contract list; how Urdu English and Roman Urdu quotes are kept as evidence; and the owner confirm or reject flow
+- Fix the claim wording now: "none of the major platforms or notetakers we reviewed", never "no app in the world". Check Gong's next steps tracking before the viva
+- Output: a spec with a build plan; the S1+ steps below are filled from it
+
+### Steps S1+ — Build (filled from the S0 spec) ⬜
+- Expected shape, from the research report: extract decisions and promises with quote + timestamp; store and embed them; match each new meeting against open items and set kept / open / overdue / reversed; ledger UI (a tab or page) with evidence quotes, reversal alerts, and confirm or reject; feed open items into meeting prep; seeded three meeting bilingual demo
+- **Verification:** a hand labelled set of 30 to 50 meeting pairs (about half Urdu English), precision and recall reported per language; `npx tsc --noEmit` clean, `npm run build` exit 0, vitest green
+- **Zero cost:** about 2 to 3 Gemini calls per meeting (Groq fallback) plus one embedding batch; no extra Whisper calls; no new provider
 
 ---
 

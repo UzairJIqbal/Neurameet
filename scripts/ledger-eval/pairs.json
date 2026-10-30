@@ -1,0 +1,285 @@
+{
+  "note": "label_a is a DRAFT written by the AI (Claude). Before you report any number, review and correct every label_a, and have a second person fill label_b without looking at label_a. Resolve disagreements into label_a. Labels: kept, reversed, none.",
+  "pairs": [
+    {
+      "id": "m01",
+      "item": { "kind": "promise", "statement": "Ali will send the customer survey by Friday.", "quote": "main Friday tak survey bhej dunga", "language": "mixed", "assignee": "Ali", "dueDate": "2026-10-02" },
+      "evidence": "Sara: chalo updates se start karte hain\nAli: survey maine Friday ko hi bhej diya tha, 40 responses aa gaye hain\nSara: zabardast, thanks Ali",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "m02",
+      "item": { "kind": "decision", "statement": "The team will deploy the app on Vercel.", "quote": "theek hai, hum Vercel pe deploy karenge", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Bilal: Vercel ki limits humare liye kam pad rahi hain\nSara: phir decide karte hain, ab hum AWS pe shift kar rahe hain, Vercel drop\nBilal: ok, main migration plan bana deta hoon",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "m03",
+      "item": { "kind": "promise", "statement": "Hina will fix the login bug before the demo.", "quote": "login wala bug main demo se pehle fix kar dungi", "language": "mixed", "assignee": "Hina", "dueDate": "2026-10-10" },
+      "evidence": "Hina: login bug pe kaam chal raha hai, thora tricky hai\nUsman: koi help chahiye?\nHina: shayad, kal batati hoon",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "m04",
+      "item": { "kind": "promise", "statement": "Usman will share the budget sheet with the client.", "quote": "budget sheet client ko main share kar doon ga", "language": "mixed", "assignee": "Usman", "dueDate": null },
+      "evidence": "Usman: budget sheet client ko share kar di hai, unhon ne approve bhi kar di\nSara: perfect",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "m05",
+      "item": { "kind": "decision", "statement": "Weekly standups move to Monday mornings.", "quote": "standup ab Monday subah hoga", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Sara: Monday subah sab late aate hain\nAli: haan, to standup wapis Wednesday pe kar dete hain\nSara: done, Wednesday final",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "m06",
+      "item": { "kind": "promise", "statement": "Bilal will write the API documentation.", "quote": "API docs main likh doon ga is week", "language": "mixed", "assignee": "Bilal", "dueDate": "2026-10-09" },
+      "evidence": "Sara: API docs ka kya scene hai?\nBilal: next week pakka likh doon ga, abhi release mein busy tha",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "m07",
+      "item": { "kind": "decision", "statement": "The team will use Supabase as the database.", "quote": "database ke liye Supabase use karenge", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Usman: Supabase pe saari tables migrate ho gayi hain aur production usi pe chal raha hai\nHina: nice",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "m08",
+      "item": { "kind": "promise", "statement": "Hina will call the vendor about the late delivery.", "quote": "vendor ko main call kar ke poochti hoon delivery late kyun hai", "language": "mixed", "assignee": "Hina", "dueDate": null },
+      "evidence": "Hina: vendor se baat ho gayi, unhon ne kaha Monday tak delivery ho jaye gi\nSara: acha, theek hai",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "m09",
+      "item": { "kind": "decision", "statement": "The mobile app is postponed to next quarter.", "quote": "mobile app next quarter tak postpone kar rahe hain", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Ali: client ne pressure dala hai, mobile app isi quarter mein chahiye\nSara: phir postpone wala faisla cancel, mobile app abhi start karte hain",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "m10",
+      "item": { "kind": "promise", "statement": "Usman will set up the staging server.", "quote": "staging server main set up kar doon ga", "language": "mixed", "assignee": "Usman", "dueDate": "2026-10-05" },
+      "evidence": "Sara: staging ka kya hua?\nUsman: Bilal ne kaha tha woh kare ga\nBilal: haan main dekh raha hoon",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "m11",
+      "item": { "kind": "promise", "statement": "Sara will book the venue for the launch event.", "quote": "launch event ke liye venue main book kar loon gi", "language": "mixed", "assignee": "Sara", "dueDate": null },
+      "evidence": "Sara: venue book ho gaya hai, Pearl Continental ka hall, 20 tareekh\nAli: great",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "m12",
+      "item": { "kind": "decision", "statement": "The pricing stays at 10 dollars a month.", "quote": "price 10 dollar per month hi rakhenge", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Bilal: competitors 15 charge kar rahe hain\nSara: to hum bhi 15 dollar kar dete hain, 10 wala plan khatam\nAli: agreed",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "m13",
+      "item": { "kind": "promise", "statement": "Ali will review the pull request from Hina.", "quote": "Hina ka PR main review kar doon ga aaj", "language": "mixed", "assignee": "Ali", "dueDate": null },
+      "evidence": "Hina: PR abhi bhi pending hai\nAli: sorry yaar, bhool gaya, aaj sham ko dekhta hoon",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "m14",
+      "item": { "kind": "decision", "statement": "Urdu support will be added in the first release.", "quote": "pehli release mein Urdu support bhi hoga", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Usman: Urdu support release ho gaya hai, users Urdu mein transcripts upload kar rahe hain\nSara: amazing",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "m15",
+      "item": { "kind": "promise", "statement": "Bilal will hire a designer this month.", "quote": "is mahine designer main hire kar loon ga", "language": "mixed", "assignee": "Bilal", "dueDate": "2026-10-31" },
+      "evidence": "Bilal: budget cut ki wajah se designer hire nahi kar rahe, woh plan cancel hai\nSara: samajh gayi",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "m16",
+      "item": { "kind": "promise", "statement": "Hina will prepare the investor deck.", "quote": "investor deck main bana doon gi", "language": "mixed", "assignee": "Hina", "dueDate": null },
+      "evidence": "Ali: investor meeting kab hai?\nSara: agle mahine, deck ka zikr baad mein karenge",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "m17",
+      "item": { "kind": "decision", "statement": "Customer support will run through WhatsApp.", "quote": "support WhatsApp pe hi denge", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Usman: WhatsApp support line live hai, kal 30 queries aayi\nHina: response time bhi acha hai",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "m18",
+      "item": { "kind": "promise", "statement": "Usman will send the invoice to the client.", "quote": "invoice client ko main bhej doon ga", "language": "mixed", "assignee": "Usman", "dueDate": null },
+      "evidence": "Sara: invoice bhejna hai is week\nUsman: haan yaad hai, list mein hai",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "m19",
+      "item": { "kind": "decision", "statement": "Office will stay closed on Fridays.", "quote": "Friday ko office band rahega", "language": "mixed", "assignee": null, "dueDate": null },
+      "evidence": "Sara: deadlines ki wajah se Friday ko bhi office khula rahega ab se\nAli: theek hai",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "m20",
+      "item": { "kind": "promise", "statement": "Ali will update the website homepage.", "quote": "homepage main update kar doon ga", "language": "mixed", "assignee": "Ali", "dueDate": null },
+      "evidence": "Hina: homepage dekha? naya hero section laga hai\nAli: haan maine kal raat update push kar diya tha",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "e01",
+      "item": { "kind": "promise", "statement": "Maria will send the contract draft by Wednesday.", "quote": "I'll send the contract draft by Wednesday", "language": "en", "assignee": "Maria", "dueDate": "2026-10-07" },
+      "evidence": "John: Did the contract go out?\nMaria: Yes, I sent the draft on Wednesday and legal already replied.\nJohn: Great.",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "e02",
+      "item": { "kind": "decision", "statement": "The team will use Slack for internal chat.", "quote": "Let's go with Slack for internal chat", "language": "en", "assignee": null, "dueDate": null },
+      "evidence": "Priya: Slack pricing went up a lot.\nJohn: Then we drop Slack and move everyone to Microsoft Teams starting Monday.\nPriya: Agreed.",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "e03",
+      "item": { "kind": "promise", "statement": "Tom will run the load test before launch.", "quote": "I'll run the load test before launch", "language": "en", "assignee": "Tom", "dueDate": null },
+      "evidence": "Maria: How is the load test going?\nTom: Still setting up the scripts, should start it tomorrow.",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "e04",
+      "item": { "kind": "decision", "statement": "The release is scheduled for November 1.", "quote": "We ship on November 1", "language": "en", "assignee": null, "dueDate": null },
+      "evidence": "John: QA found too many blockers.\nMaria: Then November 1 is off, we push the release to November 15.\nTom: Makes sense.",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "e05",
+      "item": { "kind": "promise", "statement": "Priya will onboard the two new interns.", "quote": "I'll take care of onboarding the two interns", "language": "en", "assignee": "Priya", "dueDate": null },
+      "evidence": "Priya: Both interns are onboarded, they have laptops and access now.\nJohn: Thanks Priya.",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "e06",
+      "item": { "kind": "promise", "statement": "John will renew the domain name.", "quote": "I'll renew the domain this week", "language": "en", "assignee": "John", "dueDate": "2026-10-09" },
+      "evidence": "Tom: Our SSL certificate expires soon too.\nJohn: Right, I'll look at certificates and the domain together next sprint.",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "e07",
+      "item": { "kind": "decision", "statement": "The team adopts two week sprints.", "quote": "We'll move to two week sprints", "language": "en", "assignee": null, "dueDate": null },
+      "evidence": "Maria: Sprint 3 wrapped yesterday, two weeks felt right.\nTom: Sprint 4 planning is on Monday, same two week length.",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "e08",
+      "item": { "kind": "promise", "statement": "Tom will migrate the old user data.", "quote": "I'll migrate the old user data", "language": "en", "assignee": "Tom", "dueDate": null },
+      "evidence": "Tom: We decided not to migrate the old user data at all, it's too messy, we start fresh.\nMaria: Fine by me.",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "e09",
+      "item": { "kind": "decision", "statement": "Free trials last 14 days.", "quote": "Free trials will be 14 days", "language": "en", "assignee": null, "dueDate": null },
+      "evidence": "Priya: Marketing asked whether trials could be longer.\nJohn: Let's look at the conversion data first before we change anything.",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "e10",
+      "item": { "kind": "promise", "statement": "Maria will publish the blog post about the launch.", "quote": "I'll publish the launch blog post", "language": "en", "assignee": "Maria", "dueDate": null },
+      "evidence": "John: The launch post got a lot of traffic.\nMaria: Yes, I published it Tuesday morning and shared it on LinkedIn.",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "e11",
+      "item": { "kind": "decision", "statement": "Hiring is frozen until January.", "quote": "No new hires until January", "language": "en", "assignee": null, "dueDate": null },
+      "evidence": "John: We closed the funding round.\nMaria: So the hiring freeze is lifted, we can open two engineering roles now.\nPriya: Great news.",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "e12",
+      "item": { "kind": "promise", "statement": "Priya will fix the broken checkout button.", "quote": "I'll fix the checkout button", "language": "en", "assignee": "Priya", "dueDate": null },
+      "evidence": "Tom: Somebody mentioned the checkout button again.\nPriya: Yeah, it is on my list.",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "u01",
+      "item": { "kind": "promise", "statement": "Ahmed will send the report by Monday.", "quote": "میں پیر تک رپورٹ بھیج دوں گا", "language": "ur", "assignee": "Ahmed", "dueDate": "2026-10-05" },
+      "evidence": "عائشہ: رپورٹ کا کیا بنا؟\nAhmed: رپورٹ میں نے پیر کو بھیج دی تھی، آپ کے ای میل میں ہے\nعائشہ: شکریہ",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "u02",
+      "item": { "kind": "decision", "statement": "The meeting will be held every Tuesday.", "quote": "میٹنگ ہر منگل کو ہو گی", "language": "ur", "assignee": null, "dueDate": null },
+      "evidence": "عائشہ: منگل کو سب مصروف ہوتے ہیں\nAhmed: تو اب میٹنگ منگل کے بجائے جمعرات کو ہو گی\nعائشہ: ٹھیک ہے",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "u03",
+      "item": { "kind": "promise", "statement": "Aisha will prepare the training material.", "quote": "تربیتی مواد میں تیار کر دوں گی", "language": "ur", "assignee": "Aisha", "dueDate": null },
+      "evidence": "Ahmed: تربیتی مواد کہاں تک پہنچا؟\nعائشہ: ابھی آدھا ہوا ہے، اگلے ہفتے مکمل ہو گا",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "u04",
+      "item": { "kind": "decision", "statement": "The office will move to Lahore.", "quote": "دفتر لاہور منتقل کریں گے", "language": "ur", "assignee": null, "dueDate": null },
+      "evidence": "Ahmed: لاہور والا دفتر کل سے کھل گیا ہے، سب لوگ وہاں منتقل ہو گئے\nعائشہ: بہت خوب",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "u05",
+      "item": { "kind": "promise", "statement": "Ahmed will talk to the bank about the loan.", "quote": "بینک سے قرض کی بات میں کروں گا", "language": "ur", "assignee": "Ahmed", "dueDate": null },
+      "evidence": "عائشہ: قرض کا معاملہ؟\nAhmed: ہم نے فیصلہ کیا ہے کہ قرض نہیں لیں گے، بینک والی بات ختم\nعائشہ: ٹھیک",
+      "label_a": "reversed",
+      "label_b": null
+    },
+    {
+      "id": "u06",
+      "item": { "kind": "promise", "statement": "Aisha will order new chairs for the office.", "quote": "نئی کرسیاں میں منگوا لوں گی", "language": "ur", "assignee": "Aisha", "dueDate": null },
+      "evidence": "عائشہ: نئی کرسیاں آ گئی ہیں، سب کمروں میں لگ گئی ہیں\nAhmed: شکریہ",
+      "label_a": "kept",
+      "label_b": null
+    },
+    {
+      "id": "u07",
+      "item": { "kind": "decision", "statement": "Salaries will be paid on the first of the month.", "quote": "تنخواہ مہینے کی پہلی تاریخ کو دی جائے گی", "language": "ur", "assignee": null, "dueDate": null },
+      "evidence": "Ahmed: اکاؤنٹس والے تنخواہ کے بارے میں پوچھ رہے تھے\nعائشہ: اگلی میٹنگ میں اس پر بات کریں گے",
+      "label_a": "none",
+      "label_b": null
+    },
+    {
+      "id": "u08",
+      "item": { "kind": "promise", "statement": "Ahmed will visit the client in Karachi.", "quote": "کراچی والے کلائنٹ سے میں ملنے جاؤں گا", "language": "ur", "assignee": "Ahmed", "dueDate": null },
+      "evidence": "عائشہ: کراچی کا دورہ؟\nAhmed: ٹکٹ ابھی نہیں ملا، کوشش کر رہا ہوں",
+      "label_a": "none",
+      "label_b": null
+    }
+  ]
+}

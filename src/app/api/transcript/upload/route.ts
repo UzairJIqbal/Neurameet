@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { parseMeetingDate } from "@/lib/meeting-date";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -11,10 +12,11 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { title, rawText, meetingId } = body as {
+    const { title, rawText, meetingId, meetingDate } = body as {
       title?: string;
       rawText?: string;
       meetingId?: string;
+      meetingDate?: unknown;
     };
 
     if (!title || title.trim().length === 0) {
@@ -93,6 +95,14 @@ export async function POST(request: Request) {
       // and the upload modal parses that back into a meetingId, so it takes the
       // branch above and attaches to the existing call — same flow, same outcome,
       // whether the user uploads from the recap page or the Dashboard.
+      // Optional meeting date (Promise Ledger AC-5): anchors relative due
+      // dates. Only a new meeting takes it; an attach ignores it entirely.
+      const date = parseMeetingDate(meetingDate, new Date());
+      if (!date.ok) {
+        return NextResponse.json({ error: date.error }, { status: 400 });
+      }
+      const startedAt = date.startedAt ?? new Date().toISOString();
+
       const { data: meeting, error: meetingError } = await supabase
         .from("meetings")
         .insert({
@@ -100,8 +110,8 @@ export async function POST(request: Request) {
           stream_call_id: `upload_${crypto.randomUUID()}`,
           title: title.trim(),
           status: "ended",
-          started_at: new Date().toISOString(),
-          ended_at: new Date().toISOString(),
+          started_at: startedAt,
+          ended_at: startedAt,
         })
         .select("id")
         .single();
@@ -111,9 +121,9 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { error: "Failed to create meeting" },
           { status: 500 },
-          );
-        }
-        meetingIdResolved = meeting.id;
+        );
+      }
+      meetingIdResolved = meeting.id;
     }
 
     // Store the transcript. Upsert on the unique meeting_id so a re-upload

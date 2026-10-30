@@ -1,0 +1,14 @@
+Sara: Chalo shuru karte hain, aaj infra review hai
+Bilal: Ek problem hai, Vercel ke free tier pe function timeout bohat kam hai, AI processing fail ho rahi hai
+Sara: Paid plan ka budget nahi hai abhi
+Bilal: AWS ke credits humare paas already hain, wahan timeout ka masla nahi
+Sara: Theek hai, decision change: Vercel drop kar rahe hain, hum AWS pe shift karenge
+Bilal: Ok, main is week migration plan bana deta hoon
+Sara: Ali, survey ka kya bana?
+Ali: Sorry yaar, survey abhi tak nahi bheja, form mein kuch questions change karne thay
+Sara: Woh Friday tak tha, please jaldi kar do
+Ali: Ji, koshish karta hoon
+Hina: Landing page copy maine Monday ko share kar di thi, sab ne dekh li hai
+Sara: Haan dekhi, achi thi
+Bilal: Error monitoring dashboard bhi live hai, alerts Slack pe aa rahe hain
+Sara: Great, thanks sab ko

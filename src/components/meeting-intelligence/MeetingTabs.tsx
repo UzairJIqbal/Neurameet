@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActionItem,
   MeetingDetailData,
@@ -14,6 +14,8 @@ import RecordingTab from "./RecordingTab";
 import CategoryTab from "./CategoryTab";
 import AiChatTab from "./AiChatTab";
 import EngagementTab from "./EngagementTab";
+import LedgerTab from "./LedgerTab";
+import { fetchLedger } from "@/lib/ledger-client";
 
 const TABS = [
   "Overview",
@@ -23,13 +25,16 @@ const TABS = [
   "Category",
   "AI Chat",
   "Engagement",
+  "Ledger",
 ] as const;
 
 type TabKey = (typeof TABS)[number];
 
 // D3.4: the Recording tab is owner-only. Non-owners never see it.
+// Spec 0001 AC-12: the Ledger tab is owner-only too.
+const OWNER_ONLY_TABS: readonly TabKey[] = ["Recording", "Ledger"];
 const VISIBLE_TABS = (isOwner: boolean): readonly TabKey[] =>
-  TABS.filter((t) => t !== "Recording" || isOwner);
+  TABS.filter((t) => isOwner || !OWNER_ONLY_TABS.includes(t));
 
 const MeetingTabs = ({
   meeting,
@@ -39,6 +44,7 @@ const MeetingTabs = ({
   attendanceCount,
   isOwner,
   onRetry,
+  ledgerVersion = 0,
 }: {
   meeting: MeetingDetailData;
   insights: MeetingInsights | null;
@@ -47,9 +53,25 @@ const MeetingTabs = ({
   attendanceCount: number;
   isOwner: boolean;
   onRetry?: () => void;
+  ledgerVersion?: number;
 }) => {
   const [active, setActive] = useState<TabKey>("Overview");
+  const [reversalCount, setReversalCount] = useState(0);
   const visibleTabs = VISIBLE_TABS(isOwner);
+
+  // Spec 0001 AC-11: the Ledger tab badge. No spinner, so a failure only hides it.
+  useEffect(() => {
+    if (!isOwner) return;
+    const controller = new AbortController();
+    fetchLedger(meetingId, controller.signal)
+      .then((json) => setReversalCount(json.reversalCount))
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) {
+          console.error("[ledger] badge fetch failed:", err);
+        }
+      });
+    return () => controller.abort();
+  }, [isOwner, meetingId, ledgerVersion]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,6 +87,14 @@ const MeetingTabs = ({
             }`}
           >
             {tab}
+            {tab === "Ledger" && reversalCount > 0 && (
+              <span
+                aria-label={`${reversalCount} reversed`}
+                className="ml-2 rounded-full bg-error-container px-2 py-0.5 text-label-caps text-error"
+              >
+                {reversalCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -94,6 +124,7 @@ const MeetingTabs = ({
         )}
         {active === "AI Chat" && <AiChatTab meetingId={meetingId} />}
         {active === "Engagement" && <EngagementTab meetingId={meetingId} />}
+        {isOwner && active === "Ledger" && <LedgerTab meetingId={meetingId} refreshKey={ledgerVersion} onReversalCount={setReversalCount} />}
       </div>
     </div>
   );

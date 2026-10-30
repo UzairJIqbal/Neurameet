@@ -16,6 +16,10 @@ import {
   MeetingDetailData,
   MeetingInsights,
 } from "@/lib/meeting-types";
+import {
+  LEDGER_MATCH_FAILED_MESSAGE,
+  requestLedgerMatch,
+} from "@/lib/ledger-match-client";
 import MeetingTabs from "./MeetingTabs";
 
 const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
@@ -25,6 +29,8 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
+  // Bumped after a retry re-runs matching, so the Ledger tab refetches.
+  const [ledgerVersion, setLedgerVersion] = useState(0);
   const { timedOut } = useLoadingTimeout(isLoading, {
     timeoutMs: 12000,
     retryNonce,
@@ -88,15 +94,47 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         setData((await refreshed.json()) as MeetingDetailResponse);
       }
       toast.success("Summary regenerated");
-    } catch (err) {
+    } catch {
       if (controller.signal.aborted) {
         toast.error("Summary generation timed out. Please try again.");
       } else {
         toast.error("Summary generation failed, try again");
       }
+      return;
     } finally {
       clearTimeout(timeoutId);
     }
+    await reindexAndMatch();
+  };
+
+  // Retry re-extracts ledger items, so re-embed the transcript and run promise
+  // matching again. Both are non-fatal: the new summary is already saved.
+  const reindexAndMatch = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    let embedOk = false;
+    try {
+      const res = await fetch("/api/ai/embed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingId }),
+        signal: controller.signal,
+      });
+      embedOk = res.ok;
+    } catch (err) {
+      console.error("Embedding request failed:", err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!embedOk) {
+      toast.error(
+        "Meeting processed, but AI chat indexing failed. Re-upload the transcript to enable AI chat.",
+      );
+    } else if (!(await requestLedgerMatch(meetingId))) {
+      toast.error(LEDGER_MATCH_FAILED_MESSAGE);
+    }
+    // Processing replaced the ledger items, so the tab refetches either way.
+    setLedgerVersion((v) => v + 1);
   };
 
   if (timedOut) {
@@ -182,6 +220,7 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         attendanceCount={attendanceCount}
         isOwner={isOwner}
         onRetry={retrySummary}
+        ledgerVersion={ledgerVersion}
       />
     </section>
   );

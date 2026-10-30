@@ -60,6 +60,12 @@ Transcript Generation (new — sequential Steps F0 to F6, after Meeting Experien
   Step F6, Verify end-to-end with a real bilingual test meeting (English + Urdu).
   ZERO-COST RULE applies: Stream individual recording + Groq Whisper free tier only. No paid API, paid transcription service, or second provider.
 
+Signature Feature: Promise Ledger (new — Steps S0+, after Product Final Polishing, before Deploy):
+  The one feature meant to make NeuraMeet stand out (chosen 2026-10-30 from `reports/NeuraMeet unique FYP feature.md`). After each meeting, extract every decision and promise (who, what, by when) in English, Urdu, or mixed Urdu English; on later meetings mark each kept, open, overdue, or reversed with the exact quote and timestamp as proof; the owner confirms or rejects each match. Runs post-meeting on existing transcripts.
+  Step S0, Architect: `/architect promise ledger` decides the data model, extraction inside `/api/ai/process` (extend, don't duplicate), cross-meeting matching via existing pgvector, and any new API route (add it to the API Contracts list before coding). Workflow tier GA.
+  Steps S1+, Build: filled from the S0 spec.
+  ZERO-COST RULE applies: Gemini + Groq + pgvector only. Claim wording stays narrow ("none of the major platforms or notetakers we reviewed").
+
 Phase 4, Deploy: deploy to Vercel free tier and harden (re-enable Clerk email verification before production, verify every path, confirm no secret leaks, confirm free tier limits). Deploy sits after the Meeting Experience Polish phase, not before.
 
 Out of scope (do not build unless explicitly asked): auto-transcription vendor lock-in beyond one provider, multi-tenant/org accounts, payments/billing, mobile app, calendar integrations, live collaborative transcript editing, custom LLM fine-tuning. Do not overbuild.
@@ -107,6 +113,12 @@ GET  /api/transcript/status          → poll transcript generation state (not_s
 DELETE /api/meetings/[id]           → cascade delete a meeting + transcripts + chunks + action items + follow-ups + attendance (owner-only)
 DELETE /api/recordings/[id]         → delete a Stream recording via call.deleteRecording (owner-only)
 DELETE /api/follow-ups/[id]         → delete a follow-up (owner-only)
+POST /api/ai/process               → (extended) also extracts up to 15 ledger items into ledger_items
+POST /api/transcript/upload        → (extended) optional meetingDate (YYYY-MM-DD) sets started_at on new meetings only
+POST /api/ledger/match             → owner only: match this meeting's transcript against earlier open ledger items, store suggested links
+GET  /api/ledger                   → owner only: ?meetingId=&today=YYYY-MM-DD, this meeting's items + links, incoming links, reversal count
+POST /api/ledger/links/[id]/review → owner only: { decision: "confirm" | "reject" | "reset" }
+POST /api/prep                     → (extended) adds a deterministic ledgerItems list (top 5 open or overdue)
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 
