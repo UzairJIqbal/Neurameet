@@ -10,6 +10,11 @@ import {
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { readUserPrefs } from "@/lib/user-prefs";
+import {
+  LEDGER_MATCH_FAILED_MESSAGE,
+  requestLedgerMatch,
+} from "@/lib/ledger-match-client";
+import { localToday } from "@/lib/ledger-client";
 
 // A transcript generated from a real call is downloaded as
 // `meeting-<meetingId>-transcript.txt` (AfterMeetingRecap stamps the call's
@@ -42,6 +47,7 @@ const UploadTranscriptModal = ({
     setOpen(true);
   }, [setOpen]);
   const [title, setTitle] = useState(defaultTitle ?? "");
+  const [meetingDate, setMeetingDate] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -146,6 +152,9 @@ const UploadTranscriptModal = ({
           title: title.trim(),
           rawText: rawText.trim(),
           ...(effectiveMeetingId ? { meetingId: effectiveMeetingId } : {}),
+          // The server ignores a date when attaching, so send it only for a
+          // new meeting.
+          ...(!effectiveMeetingId && meetingDate ? { meetingDate } : {}),
         }),
         signal: controller.signal,
       });
@@ -216,6 +225,19 @@ const UploadTranscriptModal = ({
         console.error("Embedding request failed:", embedErr);
       }
 
+      // Step 4: Promise Ledger matching needs this meeting's chunks, so it runs
+      // only after embed succeeded. It has its own 2 minute budget; Cancel
+      // still aborts it through the shared controller.
+      let matchFailed = false;
+      if (!embedFailed) {
+        clearTimeout(timeoutId);
+        matchFailed = !(await requestLedgerMatch(
+          returnedMeetingId,
+          controller.signal,
+        ));
+        if (cancelledRef.current) return;
+      }
+
       onClose();
       router.push(`/meeting-intelligence/${returnedMeetingId}`);
 
@@ -226,6 +248,7 @@ const UploadTranscriptModal = ({
       } else {
         toast.success("Transcript processed successfully!");
       }
+      if (matchFailed) toast.error(LEDGER_MATCH_FAILED_MESSAGE);
     } catch (err) {
       // An aborted request (user Cancel, or the 2-minute timeout) is not a
       // generic failure. A user click stays quiet; an unexpected abort reads as
@@ -284,6 +307,30 @@ const UploadTranscriptModal = ({
                   className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
+
+              {/* Meeting date: only a new meeting takes it (Promise Ledger AC-5) */}
+              {!effectiveMeetingId ? (
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="upload-meeting-date"
+                    className="text-sm font-medium text-on-surface-variant"
+                  >
+                    Meeting date (optional)
+                  </label>
+                  <input
+                    id="upload-meeting-date"
+                    type="date"
+                    value={meetingDate}
+                    max={localToday()}
+                    onChange={(e) => setMeetingDate(e.target.value)}
+                    className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
+                  />
+                  <p className="text-xs text-on-surface-variant">
+                    Leave empty for today. Used to work out due dates like
+                    Friday tak.
+                  </p>
+                </div>
+              ) : null}
 
               {/* Paste text area */}
               <div className="flex flex-col gap-1.5">

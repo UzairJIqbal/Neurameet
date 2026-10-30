@@ -125,6 +125,17 @@ All Advanced features reuse the existing Gemini primary + Groq fallback and pgve
 - F0 architect gate: passed 2026-08-22 — Stream individual recording yields per-participant audio on this account
 - All zero cost — Stream individual recording + Groq Whisper free tier only. No paid transcription service or second provider.
 
+### Signature Feature: Promise Ledger (new, Steps S0+, before Deploy)
+- The one feature meant to make NeuraMeet stand out. Chosen from the October 2026 research (`reports/NeuraMeet unique FYP feature.md`), which found that summaries, action items, chat, search, prep, and engagement insights already ship in Zoom, Teams, Otter, Read.ai, and Fireflies
+- After each meeting, extract every decision and every promise (who, what, by when) from the transcript, in English, Urdu, or mixed Urdu English
+- When a later meeting is processed, mark each earlier item kept, still open, overdue, or reversed, always with the exact quote and timestamp as proof
+- The owner confirms or rejects each match (human in the loop), so a wrong "broken promise" verdict is never shown as fact
+- Runs after the meeting on transcripts NeuraMeet already has; reuses Gemini + Groq, pgvector, action items, and follow ups. No live listening, no new provider
+- Panel claim (keep it this narrow): no major meeting platform or mainstream notetaker in our review checks promise follow through across meetings, and none does it for Urdu English speech
+- Step S0 is `/architect promise ledger`; it decides the data model, the new API route (to be added to the AGENTS.md contract list), and the build steps. Workflow tier GA
+- Evaluation for the thesis: accuracy on a small hand labelled set (Urdu English results reported separately) plus a 6 to 10 person task study
+- All zero cost, existing free tiers only
+
 ## Features Out of Scope
 
 - Auto-transcription vendor lock-in beyond one provider (Stream's own transcription or a single chosen provider — decide once, do not add a second)
@@ -151,4 +162,5 @@ Small teams and solo professionals who run recurring meetings, want automatic su
 - Meeting AI Chat answers are grounded in that meeting's actual transcript (RAG), not hallucinated
 - Follow-ups correctly reflect extracted action items and update status reliably
 - No secret keys or service-role credentials ever reach client bundles
+- Promise Ledger flags a reversed decision and tracks a promise across two or more meetings with a quote behind every verdict, including on a bilingual Urdu English meeting
 - Entire stack runs on free-tier services only (Supabase free tier, Gemini/Groq free tier, Stream free tier, Clerk free tier)

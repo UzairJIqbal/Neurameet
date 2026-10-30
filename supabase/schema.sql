@@ -314,3 +314,188 @@ create table if not exists guest_requests (
 create unique index if not exists idx_guest_requests_nonce_uniq
   on guest_requests (meeting_id, request_nonce)
   where status in ('pending', 'minting');
+
+-- Promise Ledger (spec 0001, slice 1): decisions and promises extracted per
+-- meeting, plus links that later meetings suggest as evidence (kept/reversed).
+-- Ownership always comes from meetings.user_id. RLS is enabled with NO policies
+-- so only the service_role client (which bypasses RLS) can touch these rows;
+-- no Supabase auth policies are added (see header note).
+create table if not exists ledger_items (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid references meetings(id) on delete cascade not null,
+  action_item_id uuid references action_items(id) on delete set null,
+  kind text not null check (kind in ('decision', 'promise')),
+  statement text not null,
+  quote text not null,
+  quote_language text not null check (quote_language in ('en', 'ur', 'mixed')),
+  speaker text,
+  assignee text,
+  due_date date,
+  line_number integer not null,
+  status text not null default 'open' check (status in ('open', 'kept', 'reversed')),
+  embedding vector(768),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists ledger_links (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid references ledger_items(id) on delete cascade not null,
+  evidence_meeting_id uuid references meetings(id) on delete cascade not null,
+  relation text not null check (relation in ('kept', 'reversed')),
+  quote text not null,
+  speaker text,
+  line_number integer not null,
+  confidence real not null,
+  state text not null default 'suggested' check (state in ('suggested', 'confirmed', 'rejected')),
+  decided_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (item_id, evidence_meeting_id)
+);
+
+create index if not exists idx_ledger_items_meeting_id on ledger_items(meeting_id);
+create index if not exists idx_ledger_links_evidence_meeting_id on ledger_links(evidence_meeting_id);
+
+alter table ledger_items enable row level security;
+alter table ledger_links enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ledger_items, ledger_links TO service_role;
+
+-- Item status = relation of the confirmed link with the latest decided_at,
+-- else 'open'. The single SQL home of this rule; the review route keeps the
+-- app side copy in one helper.
+create or replace function ledger_recompute_item_status(p_item_id uuid)
+returns void
+language sql
+set search_path = public
+as $$
+  update ledger_items li
+  set status = coalesce(
+    (
+      select ll.relation
+      from ledger_links ll
+      where ll.item_id = p_item_id and ll.state = 'confirmed'
+      order by ll.decided_at desc nulls last
+      limit 1
+    ),
+    'open'
+  )
+  where li.id = p_item_id;
+$$;
+
+-- When a confirmed link disappears (e.g. its evidence meeting was deleted and
+-- the link cascaded away), recompute the item's status from what remains. If
+-- the item itself is being cascaded, the update simply matches no row.
+create or replace function ledger_links_after_delete()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if old.state = 'confirmed' then
+    perform ledger_recompute_item_status(old.item_id);
+  end if;
+  return old;
+end;
+$$;
+
+create or replace trigger trg_ledger_links_after_delete
+  after delete on ledger_links
+  for each row execute function ledger_links_after_delete();
+
+GRANT EXECUTE ON FUNCTION ledger_recompute_item_status(uuid) TO service_role;
+
+-- Promise Ledger slice 2: the owner's open items from EARLIER meetings, ranked
+-- by their best cosine similarity to any chunk of this meeting. Only items with
+-- an embedding qualify; the judge decides which candidates really match.
+create or replace function match_ledger_candidates(
+  p_meeting_id uuid,
+  p_user_id text,
+  match_count int default 15
+)
+returns table (
+  id uuid,
+  meeting_id uuid,
+  kind text,
+  statement text,
+  quote text,
+  assignee text,
+  due_date date,
+  similarity float
+)
+language sql
+stable
+set search_path = public
+as $$
+  select
+    li.id,
+    li.meeting_id,
+    li.kind,
+    li.statement,
+    li.quote,
+    li.assignee,
+    li.due_date,
+    best.similarity
+  from ledger_items li
+  join meetings m on m.id = li.meeting_id
+  cross join lateral (
+    select max(1 - (mc.embedding <=> li.embedding)) as similarity
+    from meeting_chunks mc
+    where mc.meeting_id = p_meeting_id
+  ) best
+  where m.user_id = p_user_id
+    and li.status = 'open'
+    and li.embedding is not null
+    and li.meeting_id <> p_meeting_id
+    and m.started_at < (select started_at from meetings where id = p_meeting_id)
+    and best.similarity is not null
+  order by best.similarity desc
+  limit match_count;
+$$;
+
+GRANT EXECUTE ON FUNCTION match_ledger_candidates(uuid, text, int) TO service_role;
+
+-- Promise Ledger slice 4 (prep hook, AC-15): the owner's open items ranked by
+-- cosine similarity to the prep title plus notes embedding. Overdue is derived
+-- in code; it is a subset of open.
+create or replace function match_ledger_prep_items(
+  query_embedding vector(768),
+  p_user_id text,
+  match_count int default 5
+)
+returns table (
+  id uuid,
+  meeting_id uuid,
+  meeting_title text,
+  meeting_started_at timestamptz,
+  kind text,
+  statement text,
+  quote text,
+  assignee text,
+  due_date date,
+  similarity float
+)
+language sql
+stable
+set search_path = public
+as $$
+  select
+    li.id,
+    li.meeting_id,
+    m.title,
+    m.started_at,
+    li.kind,
+    li.statement,
+    li.quote,
+    li.assignee,
+    li.due_date,
+    1 - (li.embedding <=> query_embedding) as similarity
+  from ledger_items li
+  join meetings m on m.id = li.meeting_id
+  where m.user_id = p_user_id
+    and li.status = 'open'
+    and li.embedding is not null
+  order by li.embedding <=> query_embedding
+  limit match_count;
+$$;
+
+GRANT EXECUTE ON FUNCTION match_ledger_prep_items(vector, text, int) TO service_role;

@@ -6,6 +6,7 @@ import { normalizeDueDate } from "@/lib/normalize-date";
 import { MEETING_CATEGORIES } from "@/lib/meeting-types";
 import { generateStructuredWithFallback } from "@/agent/models";
 import { extractionResultSchema } from "@/agent/types";
+import { LEDGER_MAX_ITEMS, writeLedgerItems } from "@/agent/ledger";
 import { setTranscriptState } from "@/lib/transcript-state";
 
 // Normalize the model's free-text category to a valid MEETING_CATEGORIES
@@ -19,6 +20,21 @@ function normalizeCategory(raw: string | null | undefined): string {
     (c) => c.toLowerCase() === trimmed.toLowerCase(),
   );
   return match ?? "General";
+}
+
+// The meeting date (YYYY-MM-DD) the model resolves relative due dates against
+// ("Friday tak", "next week"). Spec 0001 AC-4: meetings.started_at, never today.
+function meetingDateFor(row: {
+  started_at: string | null;
+  created_at: string | null;
+}): string {
+  const raw = row.started_at ?? row.created_at;
+  const parsed = raw ? new Date(raw) : null;
+  if (parsed && !Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  console.warn("[ledger] meeting has no usable date, using today");
+  return new Date().toISOString().slice(0, 10);
 }
 
 export async function POST(request: Request) {
@@ -48,7 +64,7 @@ export async function POST(request: Request) {
     // Ownership check: only the meeting's owner may run extraction on it.
     const { data: owned, error: ownErr } = await supabase
       .from("meetings")
-      .select("id")
+      .select("id, started_at, created_at")
       .eq("id", meetingId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -88,9 +104,12 @@ export async function POST(request: Request) {
     // Run AI extraction via Gemini (with Groq fallback). Both paths use the
     // default json_schema structured-outputs mode, so the schema must avoid
     // `.optional()` fields (use `.nullable()`) — see generateStructuredWithFallback.
+    const meetingDate = meetingDateFor(owned);
     const { object: result } = await generateStructuredWithFallback({
       schema: extractionResultSchema,
       prompt: `Analyze the following meeting transcript and extract structured insights.
+
+Meeting date: ${meetingDate}
 
 Transcript:
 ${truncatedText}
@@ -106,6 +125,9 @@ Respond with a SINGLE JSON object only (no markdown, no prose), with exactly thi
   },
   "actionItems": [
     { "title": "A clear, actionable task", "assignee": "Person responsible or null", "dueDate": "ISO date YYYY-MM-DD or null" }
+  ],
+  "ledgerItems": [
+    { "kind": "decision | promise", "statement": "Plain English restatement", "quote": "Exact words from one transcript line", "quoteLanguage": "en | ur | mixed", "speaker": "Who said it or null", "assignee": "Who promised (promises only) or null", "dueDate": "ISO date YYYY-MM-DD or null", "actionItemIndex": 0 }
   ]
 }
 Extraction rules:
@@ -114,7 +136,15 @@ Extraction rules:
 - Decisions: explicit decisions that were made.
 - Category: choose the SINGLE most representative category from the list. Do NOT default to any one; pick the category that best matches what the meeting was actually about.
 - Detected topics: specific topics discussed.
-- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, and a due date (ISO YYYY-MM-DD) if stated.`,
+- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, and a due date (ISO YYYY-MM-DD) if stated.
+- Dates: resolve every relative date ("Friday", "Friday tak", "next week", "kal") against the meeting date above, never against today.
+- Ledger items: every decision that was made and every promise someone made (who will do what, by when). The transcript may be English, Urdu, or mixed Urdu English.
+  - quote: copy the words EXACTLY as they appear in the transcript, in the original language and script, from ONE transcript line at most. Do not translate, paraphrase, or include the "Speaker:" label.
+  - statement: a short plain English restatement.
+  - quoteLanguage: "en" for English, "ur" for Urdu (any script), "mixed" for code mixed Urdu English.
+  - assignee and dueDate apply to promises only; use null for decisions.
+  - actionItemIndex: the zero based index into the actionItems array you return when this promise is the same commitment, otherwise null.
+  - At most ${LEDGER_MAX_ITEMS} items, the most important first. Return an empty array when there are none.`,
     });
 
     // Idempotent retry: clear any prior insights, action items, and their
@@ -162,7 +192,8 @@ Extraction rules:
       );
     }
 
-    // Write action items
+    // Write action items (ids kept in insert order for ledger linking)
+    let actionItemIds: string[] = [];
     if (result.actionItems.length > 0) {
       const {
         data: insertedItems,
@@ -183,6 +214,7 @@ Extraction rules:
         console.error("Failed to write action items:", actionItemsError);
         // Non-fatal — insights are saved, action items can be retried
       } else if (insertedItems && insertedItems.length > 0) {
+        actionItemIds = insertedItems.map((ai) => ai.id as string);
         // Auto-generate a follow-up per action item (Step 7)
         const { error: followUpError } = await supabase
           .from("follow_ups")
@@ -206,6 +238,16 @@ Extraction rules:
         }
       }
     }
+
+    // Promise Ledger items (spec 0001). Line numbers are against the full
+    // raw_text; writeLedgerItems never throws, so a ledger failure cannot undo
+    // the insights and action items saved above.
+    await writeLedgerItems(supabase, {
+      meetingId,
+      rawText,
+      items: result.ledgerItems ?? [],
+      actionItemIds,
+    });
 
     // Notify the owner by email when the "Email notifications" preference is ON.
     // Non-fatal: any failure is logged and must not block the processing result.

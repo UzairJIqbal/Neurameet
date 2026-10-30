@@ -4,6 +4,8 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase-server";
 import { QUESTION_EMBEDDING } from "./rag";
 import { generateStructuredWithFallback } from "./models";
+import { deriveLedgerStatus, LEDGER_PREP_LIMIT } from "./ledger";
+import type { LedgerKind, PrepLedgerItem } from "@/lib/meeting-types";
 
 export const PrepSuggestionsSchema = z.object({
   context: z.array(z.string()),
@@ -13,6 +15,68 @@ export const PrepSuggestionsSchema = z.object({
 });
 
 export type PrepSuggestions = z.infer<typeof PrepSuggestionsSchema>;
+
+export interface PrepResult {
+  suggestions: PrepSuggestions;
+  ledgerItems: PrepLedgerItem[];
+}
+
+type PrepLedgerRow = {
+  id: string;
+  meeting_id: string;
+  meeting_title: string | null;
+  meeting_started_at: string;
+  kind: LedgerKind;
+  statement: string;
+  quote: string;
+  assignee: string | null;
+  due_date: string | null;
+};
+
+/**
+ * Promise Ledger prep hook (spec 0001, AC-15): the user's open items most
+ * similar to the prep embedding, as a deterministic list beside the LLM output.
+ * Overdue uses the server date (prep has no client date). Never throws: a
+ * ledger problem must not break prep.
+ */
+export async function findPrepLedgerItems(
+  userId: string,
+  embedding: number[],
+  today: string,
+): Promise<PrepLedgerItem[]> {
+  try {
+    const { data, error } = await supabaseServer().rpc(
+      "match_ledger_prep_items",
+      {
+        query_embedding: embedding,
+        p_user_id: userId,
+        match_count: LEDGER_PREP_LIMIT,
+      },
+    );
+    if (error) throw error;
+
+    return ((data ?? []) as PrepLedgerRow[]).map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      statement: row.statement,
+      quote: row.quote,
+      assignee: row.assignee,
+      dueDate: row.due_date,
+      derivedStatus:
+        deriveLedgerStatus("open", row.due_date, today) === "overdue"
+          ? "overdue"
+          : "open",
+      sourceMeeting: {
+        id: row.meeting_id,
+        title: row.meeting_title ?? "Untitled meeting",
+        startedAt: row.meeting_started_at,
+      },
+    }));
+  } catch (err) {
+    console.error("[ledger] prep items lookup failed", { userId, err });
+    return [];
+  }
+}
 
 // Wrap user-controlled text in a named tag so the model treats it as data.
 // Closing-tag text inside the value is stripped so it cannot break out.
@@ -32,19 +96,23 @@ type RelatedChunk = {
  * the user's PAST related meetings via embeddings, enriching with their
  * insights + open action items, then synthesizing a structured prep object.
  * Throws on a missing/throwing RPC so the failure surfaces visibly (C1 pattern).
+ * Related open Promise Ledger items ride along as a separate `ledgerItems` list.
  */
 export async function generatePrepSuggestions(
   userId: string,
   title: string,
   notes?: string,
-): Promise<PrepSuggestions> {
+): Promise<PrepResult> {
   const query = [title, notes].filter(Boolean).join("\n\n").trim();
   if (!query) {
     return {
-      context: [],
-      openActionItems: [],
-      discussionPoints: [],
-      questionsToAsk: [],
+      suggestions: {
+        context: [],
+        openActionItems: [],
+        discussionPoints: [],
+        questionsToAsk: [],
+      },
+      ledgerItems: [],
     };
   }
 
@@ -56,16 +124,18 @@ export async function generatePrepSuggestions(
     providerOptions: { google: { outputDimensionality: 768 } },
   });
 
-  // (b) related past chunks (reuse the C1 user-scoped RPC)
-  const { data: hits, error } = await supabaseServer().rpc(
-    "match_meeting_chunks_user",
-    {
+  // (b) related past chunks (reuse the C1 user-scoped RPC), plus the related
+  // open ledger items from the same embedding, in parallel.
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: hits, error }, ledgerItems] = await Promise.all([
+    supabaseServer().rpc("match_meeting_chunks_user", {
       query_embedding: embedding,
       p_user_id: userId,
       match_count: 12,
       similarity_threshold: 0.1,
-    },
-  );
+    }),
+    findPrepLedgerItems(userId, embedding, today),
+  ]);
 
   if (error) {
     throw new Error(
@@ -184,5 +254,5 @@ export async function generatePrepSuggestions(
     prompt,
   });
 
-  return object;
+  return { suggestions: object, ledgerItems };
 }

@@ -94,6 +94,19 @@ async function embedWithRetry(values: string[]): Promise<number[][]> {
   throw lastErr instanceof Error ? lastErr : new Error("Embedding failed");
 }
 
+/** Embed any list of texts (768 dims), batched and retried like transcript chunks. */
+export async function embedTexts(values: string[]): Promise<number[][]> {
+  const embeddings: number[][] = [];
+  for (let i = 0; i < values.length; i += MAX_EMBED_BATCH) {
+    const batch = values.slice(i, i + MAX_EMBED_BATCH);
+    embeddings.push(...(await embedWithRetry(batch)));
+  }
+  if (embeddings.length !== values.length) {
+    throw new Error("Embedding count mismatch");
+  }
+  return embeddings;
+}
+
 export async function embedAndStore(
   meetingId: string,
   rawText: string,
@@ -105,15 +118,7 @@ export async function embedAndStore(
 
   // Embed in sub-batches (Gemini's 100-per-request cap) so long transcripts
   // can't fail, retrying each sub-batch on transient errors.
-  const embeddings: number[][] = [];
-  for (let i = 0; i < chunks.length; i += MAX_EMBED_BATCH) {
-    const batch = chunks.slice(i, i + MAX_EMBED_BATCH);
-    embeddings.push(...(await embedWithRetry(batch)));
-  }
-
-  if (embeddings.length !== chunks.length) {
-    throw new Error("Embedding count mismatch");
-  }
+  const embeddings = await embedTexts(chunks);
 
   const supabase = supabaseServer();
 

@@ -1,0 +1,10 @@
+Sara: Launch se pehle last check in hai
+Bilal: AWS migration complete ho gayi hai, staging aur production dono wahan chal rahe hain
+Sara: Zabardast
+Sara: Ali, survey update?
+Ali: Survey bhej diya hai, 52 responses aa chuke hain, summary kal share karunga
+Sara: Bohat acha, finally
+Hina: Responses mein sab se zyada request Urdu support ki hai
+Sara: Theek hai, Urdu support ko next sprint mein rakhte hain
+Bilal: Main launch day pe on call rahunga
+Sara: Perfect, launch Monday ko hai, sab ready rahein

@@ -9,14 +9,22 @@
 //   - A 120s timeout aborts the request so the UI never spins forever.
 // These tests lock those two behaviours in.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  cleanup,
+} from "@testing-library/react";
 import { toast } from "react-hot-toast";
 import UploadTranscriptModal from "./UploadTranscriptModal";
 
 // The component only uses these for UI wiring; mock them so no server-only
 // (Supabase/Clerk/Stream) code enters the jsdom runtime.
 vi.mock("@/components/ui/animated-modal", () => ({
-  ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  ModalBody: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   ModalContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -75,10 +83,9 @@ describe("UploadTranscriptModal (hang fix regression)", () => {
     const onClose = vi.fn();
     render(<UploadTranscriptModal onClose={onClose} />);
 
-    fireEvent.change(
-      screen.getByPlaceholderText("e.g. Q3 Planning Review"),
-      { target: { value: "Test Meeting" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("e.g. Q3 Planning Review"), {
+      target: { value: "Test Meeting" },
+    });
     fireEvent.change(
       screen.getByPlaceholderText("Paste your transcript here..."),
       { target: { value: "Alice: hello everyone" } },
@@ -110,10 +117,9 @@ describe("UploadTranscriptModal (hang fix regression)", () => {
     const onClose = vi.fn();
     render(<UploadTranscriptModal onClose={onClose} />);
 
-    fireEvent.change(
-      screen.getByPlaceholderText("e.g. Q3 Planning Review"),
-      { target: { value: "Test Meeting" } },
-    );
+    fireEvent.change(screen.getByPlaceholderText("e.g. Q3 Planning Review"), {
+      target: { value: "Test Meeting" },
+    });
     fireEvent.change(
       screen.getByPlaceholderText("Paste your transcript here..."),
       { target: { value: "Alice: hello everyone" } },
@@ -135,5 +141,129 @@ describe("UploadTranscriptModal (hang fix regression)", () => {
     );
     // A timeout is an abort, not a user click, so it must NOT close silently.
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+// Promise Ledger wiring (spec 0001): the meeting date field and the match step.
+const ok = (body: unknown) => ({
+  ok: true,
+  status: 200,
+  json: async () => body,
+});
+
+// Answers each route in turn, so a test can fail one step at a time.
+function routeFetch(match: () => unknown) {
+  const fn = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>(
+    async (url) => {
+      if (url === "/api/transcript/upload") return ok({ meetingId: "new-1" });
+      if (url === "/api/ai/process") return ok({ success: true });
+      if (url === "/api/ai/embed") return ok({ success: true });
+      if (url === "/api/ledger/match") return match();
+      throw new Error(`unexpected ${url}`);
+    },
+  );
+  globalThis.fetch = fn as unknown as typeof fetch;
+  return fn;
+}
+
+const urls = (fn: ReturnType<typeof routeFetch>) =>
+  fn.mock.calls.map(([u]) => u);
+const bodyOf = (fn: ReturnType<typeof routeFetch>, url: string) =>
+  JSON.parse(
+    String((fn.mock.calls.find(([u]) => u === url)?.[1] as RequestInit).body),
+  );
+
+async function fillAndUpload() {
+  fireEvent.change(screen.getByPlaceholderText("e.g. Q3 Planning Review"), {
+    target: { value: "Launch planning" },
+  });
+  fireEvent.change(
+    screen.getByPlaceholderText("Paste your transcript here..."),
+    {
+      target: { value: "Ali: main Friday tak survey bhej dunga" },
+    },
+  );
+  await act(async () => {
+    fireEvent.click(screen.getByText("Upload & Process"));
+  });
+}
+
+describe("UploadTranscriptModal meeting date (AC-5)", () => {
+  it("shows the date field for a new meeting, capped at today", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 30, 10, 0));
+    render(<UploadTranscriptModal onClose={vi.fn()} />);
+
+    const input = screen.getByLabelText(
+      "Meeting date (optional)",
+    ) as HTMLInputElement;
+    expect(input.type).toBe("date");
+    expect(input.max).toBe("2026-10-30");
+  });
+
+  it("hides the date field when attaching to an existing meeting", () => {
+    render(<UploadTranscriptModal onClose={vi.fn()} meetingId="m1" />);
+    expect(screen.queryByLabelText("Meeting date (optional)")).toBeNull();
+  });
+
+  it("sends the chosen date with a new meeting's upload", async () => {
+    const fn = routeFetch(() => ok({ matched: 0 }));
+    render(<UploadTranscriptModal onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Meeting date (optional)"), {
+      target: { value: "2026-10-01" },
+    });
+
+    await fillAndUpload();
+
+    expect(bodyOf(fn, "/api/transcript/upload").meetingDate).toBe("2026-10-01");
+  });
+
+  it("leaves the date out when none was chosen", async () => {
+    const fn = routeFetch(() => ok({ matched: 0 }));
+    render(<UploadTranscriptModal onClose={vi.fn()} />);
+
+    await fillAndUpload();
+
+    expect(bodyOf(fn, "/api/transcript/upload")).not.toHaveProperty(
+      "meetingDate",
+    );
+  });
+});
+
+describe("UploadTranscriptModal ledger match (AC-6, AC-14)", () => {
+  it("runs matching for the new meeting after embedding", async () => {
+    const fn = routeFetch(() => ok({ matched: 2 }));
+    render(<UploadTranscriptModal onClose={vi.fn()} />);
+
+    await fillAndUpload();
+
+    expect(urls(fn)).toEqual([
+      "/api/transcript/upload",
+      "/api/ai/process",
+      "/api/ai/embed",
+      "/api/ledger/match",
+    ]);
+    expect(bodyOf(fn, "/api/ledger/match")).toEqual({ meetingId: "new-1" });
+    expect(toast.success).toHaveBeenCalledWith(
+      "Transcript processed successfully!",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("still finishes the upload and toasts when matching fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    routeFetch(() => ({ ok: false, status: 502, json: async () => ({}) }));
+    const onClose = vi.fn();
+    render(<UploadTranscriptModal onClose={onClose} />);
+
+    await fillAndUpload();
+
+    expect(onClose).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith(
+      "Transcript processed successfully!",
+    );
+    const { LEDGER_MATCH_FAILED_MESSAGE } =
+      await import("@/lib/ledger-match-client");
+    expect(toast.error).toHaveBeenCalledWith(LEDGER_MATCH_FAILED_MESSAGE);
   });
 });

@@ -1,6 +1,6 @@
 # Scope: NeuraMeet
 
-NeuraMeet is an AI integrated meeting platform. Users create or join real time video meetings, upload or auto generate transcripts, and get AI summaries, action items, categories, and a meeting aware chat over every meeting. This scope restructures the plan. The already built Steps 0 to 9 become the Core NeuraMeet Pipeline. A new Advanced Pipeline Features phase adds three layers, then a Meeting Experience Polish phase (Steps D0–D3+) redesigns the live-call UI to Zoom/Meet quality, and Deploy moves to the very end, after the polish phase.
+NeuraMeet is an AI integrated meeting platform. Users create or join real time video meetings, upload or auto generate transcripts, and get AI summaries, action items, categories, and a meeting aware chat over every meeting. This scope restructures the plan. The already built Steps 0 to 9 become the Core NeuraMeet Pipeline. A new Advanced Pipeline Features phase adds three layers, then a Meeting Experience Polish phase (Steps D0–D3+) redesigns the live-call UI to Zoom/Meet quality, a Signature Feature phase adds the Promise Ledger (a feature none of the meeting apps we reviewed offer), and Deploy moves to the very end, after that.
 
 **Build approach:** Extend (add features to the working Core Pipeline without re architecting).
 **Workflow:** Beta (after develop: check verify, then test). Any feature can carry its own tag to do more or less.
@@ -72,6 +72,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | P11 | Meeting Intelligence tabs real-meeting audit: Attendance Report, Category, Action Items, Recording | Product Final Polishing | done |
 | P12 | Meeting pages updation: delete across meetings/recordings/follow-ups, fix stuck scroll, rework useless controls (Upcoming Start gated by time) | Product Final Polishing | done |
 | P13 | Responsive Polishing: audit + fix responsiveness across every screen at mobile/tablet/desktop | Product Final Polishing | done |
+| 17 | Promise Ledger: cross meeting memory of decisions and promises (kept, open, overdue, reversed) with quote evidence, Urdu English aware | Signature Feature | in-progress |
 | 11 | Deploy and harden | Deploy | planned |
 | 12 | General AI chat page | FYP Polish | done |
 | 13 | Change category write path | FYP Polish | done |
@@ -514,6 +515,26 @@ Audit every screen at mobile, tablet, and desktop, then fix responsiveness so th
 - [x] **Status: P13.9 done** (build + tests green; `/check verify` at true mobile width completed — panel non-obstructed at 375×667 and 768×1024)
 - [x] Build it: `P13.10` shared dropdown menu tokens (done; root-caused the inert tokens in `ui/dropdown-menu.tsx` to the six missing shadcn color keys (`popover`, `popover-foreground`, `accent`, `accent-foreground`, `muted`, `muted-foreground`) in `tailwind.config.ts` — Tailwind was not generating `bg-popover`/`bg-accent`/`bg-muted`/etc utilities at all, so dropdowns fell back to unstyled defaults; fixed by adding `hsl(var(--...))` color-key entries mapping to the existing `:root` variables in `globals.css` (which already hold the locked Stitch tokens `surface-container-lowest`/`surface-container`/`outline`/etc); verified via `npx tailwindcss` dump that all six utilities now generate, plus `:focus` and `data-[state=open]` variants; `tsc` clean (only pre-existing unrelated `AfterMeetingRecap.test.tsx` fixture); `npm run build` exit 0; vitest 27 files / 145 tests green with a new `src/tailwind-config.test.ts` regression guard.)
 
+## Signature Feature (before Deploy)
+
+The one feature meant to make NeuraMeet stand out to the FYP panel and in the market. Chosen from the October 2026 research in `reports/NeuraMeet unique FYP feature.md`, which found that summaries, action items, chat, search, prep, and engagement insights already ship in Zoom, Teams, Otter, Read.ai, and Fireflies. It runs after the meeting on transcripts NeuraMeet already has, so it stays inside the zero cost rule.
+
+### 17. Promise Ledger · in-progress · GA
+Pull every decision and every promise (who, what, by when) out of each meeting, in English, Urdu, or mixed Urdu English, and carry them forward. When a later meeting is processed, mark each one kept, still open, overdue, or reversed, always with the exact quote and timestamp as proof, and let the owner confirm or reject each match. Claim for the panel: no major meeting platform or mainstream notetaker in our review checks promise follow through across meetings, and none does it for Urdu English speech.
+**Done when:** after two or more related meetings, the ledger shows every extracted decision and promise with its status and a quote behind each verdict, a reversed decision raises a visible alert, the owner can confirm or reject a match, it works on a bilingual Urdu English meeting, and accuracy is measured on a small hand labelled set with Urdu English results reported separately.
+**Spec:** [0001](../specs/0001-promise-ledger/index.md)
+- [x] Design it (spec): `/architect promise ledger`
+- [x] Build it: `/develop promise ledger` (code in `src/agent/ledger.ts`, `src/app/api/ledger/`, `scripts/ledger-eval.ts`)
+  - [x] Data model, extraction in `/api/ai/process`, read route, and a basic owner only Ledger tab (AC-1, AC-2, AC-3, AC-4, AC-12, AC-13, AC-17)
+  - [x] Cross meeting matching route, pgvector candidate RPC, and judge, chained after embed (AC-6, AC-7, AC-8, AC-14)
+  - [x] Review (confirm, reject, undo), overdue on read, reversal card and tab badge (AC-9, AC-10, AC-11)
+  - [x] Meeting date on upload, plus the prep hook (AC-5, AC-15)
+  - [x] Evaluation script with per language metrics and kappa, plus the demo seed (AC-16)
+- [x] Verify it: `/check verify promise ledger`
+- [x] Test it: `/test promise ledger`
+- [x] Review it (fresh model): `/check review promise ledger`
+- [x] Document it: `/document promise ledger`
+
 ## Deploy
 
 ### 11. Deploy and harden · planned
@@ -525,6 +546,8 @@ Deploy to Vercel on the free tier, then verify and harden. Re-enable Clerk email
 
 Out of scope for the current build pass, kept so the plan stays honest.
 - Oxylabs topic or company enrichment (stretch, needs a paid API, forbidden by the zero cost rule) · needs a decision
+- Urdu English meeting intelligence (summaries and chat answers that keep code mixing, with English, Urdu script, or Roman Urdu output). Runner up from the October 2026 research; partly folded into the Promise Ledger · needs a decision
+- Anonymous AI devil's advocate (a participant privately submits a concern during a live call and the AI raises it as its own question). Runner up from the October 2026 research; touches live Stream code, so only after the Promise Ledger is done · needs a decision
 
 ## Step 9.5 FYP Polish Pass
 
