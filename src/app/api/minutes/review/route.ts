@@ -13,9 +13,9 @@ import {
 } from "@/lib/minutes-types";
 import {
   fail,
-  isRecordedParticipant,
   isUniqueViolation,
   loadMeeting,
+  minutesManagerDenial,
   loadReview,
   type MeetingRow,
 } from "@/lib/minutes-review";
@@ -24,7 +24,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Tasdeeq, Verified Minutes (spec 0003). Owner only: open a review (AC-5, AC-6,
+// Tasdeeq, Verified Minutes (spec 0003). Manager only (personal: the owner;
+// project: Owner or Admin): open a review (AC-5, AC-6,
 // AC-17) or cancel an open one (AC-7).
 
 interface Body {
@@ -320,11 +321,13 @@ export async function POST(request: Request) {
     const supabase = supabaseServer();
     const meeting = await loadMeeting(supabase, meetingId);
     if (!meeting) return fail(404, "Meeting not found");
-    if (meeting.user_id !== userId) {
-      return (await isRecordedParticipant(supabase, meetingId, userId))
-        ? fail(403, "Only the meeting owner can do this")
-        : fail(404, "Meeting not found");
-    }
+    const denied = await minutesManagerDenial(
+      supabase,
+      userId,
+      meeting,
+      "Only the meeting owner can do this",
+    );
+    if (denied) return denied;
 
     if (action === "cancel") return await cancelReview(supabase, meetingId);
 

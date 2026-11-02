@@ -58,7 +58,16 @@ function makeBuilder(table: string): Record<string, unknown> {
   return builder;
 }
 
-export const client = { from: (table: string) => makeBuilder(table) };
+export const client = {
+  from: (table: string) => makeBuilder(table),
+  // rpc results queue under "rpc:<name>"; the args are recorded like a chain call.
+  rpc: (name: string, args?: unknown) => {
+    calls.push({ table: `rpc:${name}`, method: "rpc", args: [args] });
+    return Promise.resolve(
+      queues[`rpc:${name}`]?.shift() ?? { data: null, error: null },
+    );
+  },
+};
 
 export const supabaseServerModule = { supabaseServer: () => client };
 

@@ -8,6 +8,7 @@ import type {
 } from "@/lib/minutes-types";
 import {
   fail,
+  isMinutesManager,
   isRecordedParticipant,
   loadMeeting,
   loadReview,
@@ -52,7 +53,9 @@ export async function GET(request: Request) {
         : fail(404, NOT_FOUND);
     }
 
-    if (meeting.user_id !== userId) {
+    // The draft is the manager's view: the creator of a personal meeting, an
+    // Owner or Admin of a project meeting.
+    if (!(await isMinutesManager(supabase, userId, meeting))) {
       // A stranger gets the same 404 as a missing meeting.
       if (!(await isRecordedParticipant(supabase, meetingId, userId))) {
         return fail(404, NOT_FOUND);

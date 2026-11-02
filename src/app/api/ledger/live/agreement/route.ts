@@ -3,7 +3,11 @@ import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase-server";
 import { embedTexts } from "@/agent/embed";
-import { findLiveMeeting, type LiveMeeting } from "@/lib/live-ledger-auth";
+import {
+  findLiveMeeting,
+  liveManagerDenial,
+  type LiveMeeting,
+} from "@/lib/live-ledger-auth";
 import {
   countCallParticipants,
   sendLiveLedgerEvent,
@@ -202,9 +206,9 @@ export async function POST(request: Request) {
   try {
     const supabase = supabaseServer();
     const meeting = await findLiveMeeting(supabase, body.callId);
-    if (!meeting || meeting.ownerId !== userId) {
-      return json({ error: "Meeting not found" }, 404);
-    }
+    if (!meeting) return json({ error: "Meeting not found" }, 404);
+    const denied = await liveManagerDenial(supabase, userId, meeting);
+    if (denied) return denied;
     return body.action === "open"
       ? await openAgreement(supabase, meeting, body.callId, body.statement)
       : await closeAgreement(supabase, meeting, body.callId, body.agreementId);

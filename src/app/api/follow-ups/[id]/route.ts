@@ -71,11 +71,13 @@ export async function GET(
   try {
     const supabase = supabaseServer();
 
-    // Scope to the user's own meetings (reliable ownership filter)
+    // Scope to the user's own personal meetings (reliable ownership filter).
+    // Project meetings have no follow ups of their own (Phase W tasks instead).
     const { data: meetings, error: meetingsError } = await supabase
       .from("meetings")
       .select("id")
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .is("project_id", null);
 
     if (meetingsError) {
       console.error("Failed to load meetings:", meetingsError);
@@ -122,7 +124,7 @@ export async function GET(
 interface FollowUpOwnedRow {
   id: string;
   meeting_id: string;
-  meetings: Embedded<{ user_id: string | null }>;
+  meetings: Embedded<{ user_id: string | null; project_id: string | null }>;
 }
 
 // Owner-only delete. Scoped to the caller's own meetings via the follow-up's
@@ -144,7 +146,7 @@ export async function DELETE(
 
     const { data, error: findError } = await supabase
       .from("follow_ups")
-      .select("id, meeting_id, meetings(user_id)")
+      .select("id, meeting_id, meetings(user_id, project_id)")
       .eq("id", id)
       .maybeSingle();
 
@@ -164,9 +166,17 @@ export async function DELETE(
     }
 
     const row = data as FollowUpOwnedRow;
-    const ownerId = first(row.meetings)?.user_id;
+    const meeting = first(row.meetings);
 
-    if (ownerId !== userId) {
+    // Follow ups belong to personal meetings only.
+    if (meeting?.project_id) {
+      return NextResponse.json(
+        { error: "Follow-up not found" },
+        { status: 404 },
+      );
+    }
+
+    if (meeting?.user_id !== userId) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 

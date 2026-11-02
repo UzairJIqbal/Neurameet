@@ -89,6 +89,7 @@ const { mockAuth, mockSupabase, mockSendCallEvent, mockFrom } = vi.hoisted(() =>
   return { mockAuth, mockSupabase, mockSendCallEvent, mockFrom, seedRows };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 vi.mock("@stream-io/node-sdk", () => ({

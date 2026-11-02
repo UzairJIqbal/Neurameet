@@ -7,6 +7,7 @@ const { mockAuth, mockSendReviewOpen, mockGetUser } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mockAuth,
   clerkClient: async () => ({ users: { getUser: mockGetUser } }),
@@ -211,6 +212,54 @@ describe("POST /api/minutes/review", () => {
     expect(sealed.status).toBe(409);
     expect(await sealed.json()).toEqual({
       error: "Sealed minutes can't be cancelled",
+    });
+  });
+
+  describe("project meeting (manage need)", () => {
+    const projectMeeting = ok({
+      id: "m1",
+      user_id: "creator",
+      project_id: "p1",
+      title: "Weekly",
+      started_at: "2026-11-02T09:00:00Z",
+      created_at: null,
+    });
+
+    const openAs = (userId: string) =>
+      post(userId, { meetingId: "m1", action: "cancel" });
+
+    it("returns 404 to a non member", async () => {
+      queue("meetings", projectMeeting);
+      queue("project_members", ok(null));
+      const res = await openAs("stranger");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Meeting not found" });
+    });
+
+    it("returns 403 to a Viewer and to a Developer", async () => {
+      queue("meetings", projectMeeting, projectMeeting);
+      queue(
+        "project_members",
+        ok({ role: "viewer" }),
+        ok({ role: "developer" }),
+      );
+      const viewer = await openAs("v1");
+      expect(viewer.status).toBe(403);
+      expect(await viewer.json()).toEqual({ error: "Not authorized" });
+      expect((await openAs("d1")).status).toBe(403);
+    });
+
+    it("lets an Admin who did not create the meeting cancel the review", async () => {
+      queue("meetings", projectMeeting);
+      queue("project_members", ok({ role: "admin" }));
+      queue(
+        "minutes_reviews",
+        ok({ id: "r1", status: "open" }),
+        ok([{ id: "r1" }]),
+      );
+      const res = await openAs("a1");
+      expect(res.status).toBe(200);
+      expect(callsOf("minutes_reviews", "delete")).toHaveLength(1);
     });
   });
 });

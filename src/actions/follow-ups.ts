@@ -33,11 +33,13 @@ export async function updateFollowUpStatus(
   try {
     const supabase = supabaseServer();
 
-    // Ownership check — the follow-up must belong to one of the user's meetings
+    // Ownership check: the follow-up must belong to one of the user's personal
+    // meetings. Project meetings never get follow-ups (they get proposals).
     const { data: meetings, error: meetingsError } = await supabase
       .from("meetings")
       .select("id")
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .is("project_id", null);
 
     if (meetingsError) {
       console.error("Failed to load meetings:", meetingsError);

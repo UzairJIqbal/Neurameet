@@ -39,7 +39,8 @@ export type SidebarPagesTypes =
   | "aiChat"
   | "settings"
   | "search"
-  | "prep";
+  | "prep"
+  | "projects";
 
 const Sidebar = ({
   open,

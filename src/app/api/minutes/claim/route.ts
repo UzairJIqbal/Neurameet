@@ -14,6 +14,8 @@ import {
   loadRawText,
   loadReviewRows,
   requireAttester,
+  requireReviewManager,
+  REVIEW_NOT_OPEN,
   stillOpen,
   toAttesterRef,
   toClaimRef,
@@ -26,7 +28,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Tasdeeq, Verified Minutes (spec 0003, AC-8, AC-12). Claim a speaker label,
-// or (owner) assign or clear one. One holder per label.
+// or (a manager) assign or clear one. One holder per label.
 
 interface Body {
   meetingId?: string;
@@ -35,7 +37,8 @@ interface Body {
   userId?: string;
 }
 
-const NOT_OPEN = "This review is not open";
+const NOT_OPEN = REVIEW_NOT_OPEN;
+const OWNER_ONLY = "Only the meeting owner can assign or clear a speaker name";
 
 /** The holder answered a line from this label, so the claim is locked. */
 function claimLocked(rows: ReviewRows, claim: ClaimRow): boolean {
@@ -97,16 +100,15 @@ export async function POST(request: Request) {
 
   try {
     const supabase = supabaseServer();
-    const access = await requireAttester(supabase, meetingId, userId);
+    // Claim: any frozen attester. Assign or clear: a manager (personal: the
+    // owner attester; project: an Owner or Admin).
+    const access =
+      action === "claim"
+        ? await requireAttester(supabase, meetingId, userId)
+        : await requireReviewManager(supabase, meetingId, userId, OWNER_ONLY);
     if (!access.ok) return access.response;
-    const { review, attester } = access;
+    const { review } = access;
     if (review.status !== "open") return fail(409, NOT_OPEN);
-    if (action !== "claim" && !attester.is_owner) {
-      return fail(
-        403,
-        "Only the meeting owner can assign or clear a speaker name",
-      );
-    }
 
     const key = labelKey(speakerLabel);
     const label = listSpeakerLabels(

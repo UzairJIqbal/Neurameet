@@ -43,6 +43,7 @@ const makeSupabase = (state: {
     deletedItemIds: [] as string[],
     embeddedIds: [] as string[],
     recomputed: [] as string[],
+    meetingFilters: [] as Array<[string, unknown]>,
   };
   const from = (table: string) => {
     const builder: Record<string, unknown> = {};
@@ -69,8 +70,12 @@ const makeSupabase = (state: {
       return { data: null, error: null };
     };
     builder.select = () => builder;
-    builder.is = () => builder;
+    builder.is = (col: string, val: unknown) => {
+      if (table === "meetings") writes.meetingFilters.push([col, val]);
+      return builder;
+    };
     builder.eq = (col: string, val: string) => {
+      if (table === "meetings") writes.meetingFilters.push([col, val]);
       if (col === "id") updateId = val;
       return builder;
     };
@@ -253,6 +258,35 @@ describe("runLedgerMatch", () => {
         item_id: "x1",
         state: "confirmed",
       });
+    });
+
+    it("scopes live marked items to personal meetings on a personal meeting", async () => {
+      mockJudge.mockResolvedValue([]);
+      const { client, writes } = makeSupabase({
+        candidates: [],
+        existingLinks: [],
+        liveMarks: [{ item_id: "x1", mark: "kept" }],
+        liveItems: [candidate("x1")],
+        ownedMeetingIds: ["m0"],
+      });
+      await runLedgerMatch(client, args);
+      expect(writes.meetingFilters).toEqual([
+        ["user_id", "u1"],
+        ["project_id", null],
+      ]);
+    });
+
+    it("scopes live marked items to the whole project on a project meeting", async () => {
+      mockJudge.mockResolvedValue([]);
+      const { client, writes } = makeSupabase({
+        candidates: [],
+        existingLinks: [],
+        liveMarks: [{ item_id: "x1", mark: "kept" }],
+        liveItems: [candidate("x1")],
+        ownedMeetingIds: ["m0"],
+      });
+      await runLedgerMatch(client, { ...args, projectId: "p1" });
+      expect(writes.meetingFilters).toEqual([["project_id", "p1"]]);
     });
 
     it("never touches a rejected link even when the live mark agrees", async () => {

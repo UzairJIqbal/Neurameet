@@ -1,3 +1,5 @@
+import type { ProjectRole } from "@/lib/project-types";
+
 export interface MeetingListItem {
   id: string;
   title: string;
@@ -8,6 +10,10 @@ export interface MeetingListItem {
   category: string | null;
   hasInsights: boolean;
   streamCallId: string;
+  /** Phase W: null for a personal meeting. */
+  projectId?: string | null;
+  /** Phase W: the caller's project role, null for a personal meeting. */
+  role?: ProjectRole | null;
 }
 
 export type GuestAdmissionMode = "open" | "approval";
@@ -44,6 +50,12 @@ export interface MeetingDetailResponse {
   insights: MeetingInsights | null;
   actionItems: ActionItem[];
   attendanceCount: number;
+  /** Phase W: null for a personal meeting. */
+  projectId?: string | null;
+  /** Phase W: the caller's project role, null for a personal meeting. */
+  role?: ProjectRole | null;
+  /** Host controls: the creator on a personal meeting, Owner or Admin on a project meeting. */
+  canManage?: boolean;
 }
 
 export type FollowUpStatus = "pending" | "needs_attention" | "completed";

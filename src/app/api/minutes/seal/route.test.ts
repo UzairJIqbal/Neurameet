@@ -194,4 +194,46 @@ describe("POST /api/minutes/seal", () => {
     ]);
     expect(mockSealedEmail).not.toHaveBeenCalled();
   });
+
+  describe("project meeting (manage need)", () => {
+    const projectMeeting = ok({
+      id: "m1",
+      user_id: "creator",
+      project_id: "p1",
+      title: "Weekly",
+      started_at: "2026-11-02T09:00:00Z",
+      created_at: null,
+    });
+
+    it("returns 404 to a non member", async () => {
+      queue("meetings", projectMeeting);
+      queue("project_members", ok(null));
+      const res = await post("stranger");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Meeting not found" });
+    });
+
+    it("returns 403 to a Viewer and to a Developer", async () => {
+      queue("meetings", projectMeeting, projectMeeting);
+      queue(
+        "project_members",
+        ok({ role: "viewer" }),
+        ok({ role: "developer" }),
+      );
+      const viewer = await post("v1");
+      expect(viewer.status).toBe(403);
+      expect(await viewer.json()).toEqual({ error: "Not authorized" });
+      expect((await post("d1")).status).toBe(403);
+      expect(reviewUpdates()).toHaveLength(0);
+    });
+
+    it("lets an Admin reach the seal checks", async () => {
+      queue("meetings", projectMeeting);
+      queue("project_members", ok({ role: "admin" }));
+      queue("minutes_reviews", review("sealed"));
+      expect(await (await post("a1")).json()).toEqual({
+        error: "These minutes are already sealed",
+      });
+    });
+  });
 });

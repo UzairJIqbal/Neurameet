@@ -6,10 +6,10 @@ import { sendMinutesSealedEmail, verifyUrlFor } from "@/lib/email";
 import { buildStatusText, sealBlocker } from "@/agent/minutes";
 import {
   fail,
-  isRecordedParticipant,
   loadMeeting,
   loadReview,
   loadReviewRows,
+  minutesManagerDenial,
   toAttesterRef,
   type AttesterRow,
   type MeetingRow,
@@ -27,7 +27,8 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Tasdeeq, Verified Minutes (spec 0003, AC-13 to AC-15, AC-17). Owner only.
+// Tasdeeq, Verified Minutes (spec 0003, AC-13 to AC-15, AC-17). Manager only
+// (personal: the owner; project: Owner or Admin).
 // The review moves open → sealing first (a conditional update), so nothing can
 // land while the bundle is built; any failure moves it back to open.
 
@@ -173,11 +174,13 @@ export async function POST(request: Request) {
   try {
     const meeting = await loadMeeting(supabase, meetingId);
     if (!meeting) return fail(404, "Meeting not found");
-    if (meeting.user_id !== userId) {
-      return (await isRecordedParticipant(supabase, meetingId, userId))
-        ? fail(403, "Only the meeting owner can seal the minutes")
-        : fail(404, "Meeting not found");
-    }
+    const denied = await minutesManagerDenial(
+      supabase,
+      userId,
+      meeting,
+      "Only the meeting owner can seal the minutes",
+    );
+    if (denied) return denied;
 
     const review = await loadReview(supabase, meetingId);
     if (!review) return fail(409, "No minutes review is open");

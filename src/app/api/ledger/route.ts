@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 import { deriveLedgerStatus } from "@/agent/ledger";
 import type {
   LedgerIncomingLink,
@@ -132,14 +133,20 @@ export async function GET(request: Request) {
 
     const { data: meeting, error: meetingErr } = await supabase
       .from("meetings")
-      .select("id")
+      .select("id, user_id, project_id")
       .eq("id", meetingId)
-      .eq("user_id", userId)
       .maybeSingle();
     if (meetingErr) throw meetingErr;
     if (!meeting) {
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
+    // Personal meeting: the creator only. Project meeting: any member.
+    const { projectId } = await checkMeetingAccess(
+      supabase,
+      userId,
+      meeting,
+      "read",
+    );
 
     // Items said in this meeting, plus the links later meetings suggested.
     const { data: itemRows, error: itemsErr } = await supabase
@@ -214,15 +221,18 @@ export async function GET(request: Request) {
         ((srcItemRows ?? []) as LedgerItemRow[]).map((r) => [r.id, toItem(r)]),
       );
 
-      // Scoped to the caller, so a link can never surface another user's meeting.
-      const { data: srcMeetingRows, error: srcMeetingsErr } = await supabase
+      // Scoped to the caller (or, on a project meeting, to the project), so a
+      // link can never surface another user's or another project's meeting.
+      const srcMeetingQuery = supabase
         .from("meetings")
         .select("id, title, started_at")
         .in(
           "id",
           [...srcItems.values()].map((i) => i.meetingId),
-        )
-        .eq("user_id", userId);
+        );
+      const { data: srcMeetingRows, error: srcMeetingsErr } = projectId
+        ? await srcMeetingQuery.eq("project_id", projectId)
+        : await srcMeetingQuery.eq("user_id", userId);
       if (srcMeetingsErr) throw srcMeetingsErr;
       const srcMeetings = new Map(
         ((srcMeetingRows ?? []) as SourceMeetingRow[]).map((m) => [m.id, m]),
@@ -281,6 +291,8 @@ export async function GET(request: Request) {
     };
     return NextResponse.json(body);
   } catch (err) {
+    const denied = accessErrorResponse(err);
+    if (denied) return denied;
     console.error("[ledger] read failed", { meetingId, err });
     return NextResponse.json(
       { error: "Failed to load the ledger" },

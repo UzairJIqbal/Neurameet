@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase-server";
-import { findLiveMeeting, type LiveMeeting } from "@/lib/live-ledger-auth";
+import {
+  findLiveMeeting,
+  liveManagerDenial,
+  type LiveMeeting,
+} from "@/lib/live-ledger-auth";
 import { sendLiveLedgerEvent } from "@/lib/live-ledger-events";
 import { buildCardEvent, type CardItemRow } from "@/lib/live-ledger-state";
 import {
@@ -54,7 +58,11 @@ function parseBody(raw: unknown): CardBody | null {
   };
 }
 
-/** The card payload for an item from one of the owner's other meetings. */
+/**
+ * The card payload for an item from another meeting of the same scope: the
+ * owner's own meetings for a personal call, the project's meetings for a
+ * project call.
+ */
 async function loadCard(
   supabase: SupabaseClient,
   meeting: LiveMeeting,
@@ -70,12 +78,15 @@ async function loadCard(
   const item = itemData as CardItemRow | null;
   if (!item || item.meeting_id === meeting.id) return null;
 
-  const { data: srcData, error: srcErr } = await supabase
+  const sourceQuery = supabase
     .from("meetings")
     .select("id, title")
-    .eq("id", item.meeting_id)
-    .eq("user_id", meeting.ownerId)
-    .maybeSingle();
+    .eq("id", item.meeting_id);
+  const { data: srcData, error: srcErr } = await (
+    meeting.projectId
+      ? sourceQuery.eq("project_id", meeting.projectId)
+      : sourceQuery.eq("user_id", meeting.ownerId)
+  ).maybeSingle();
   if (srcErr) throw srcErr;
   const source = srcData as { id: string; title: string | null } | null;
   if (!source) return null;
@@ -197,7 +208,7 @@ async function closeCard(
 }
 
 /**
- * Owner only: raise, mark, or close a Promise Check-in card (spec 0002 AC-4
+ * Manager only (personal: the creator; project: Owner or Admin): raise, mark, or close a Promise Check-in card (spec 0002 AC-4
  * to AC-8). The row is written first, then the server sends the event.
  */
 export async function POST(request: Request) {
@@ -219,11 +230,11 @@ export async function POST(request: Request) {
 
   try {
     const supabase = supabaseServer();
+    // Manage rights come from the stored meeting, never the client's call state.
     const meeting = await findLiveMeeting(supabase, body.callId);
-    // Ownership comes from the stored meeting, never the client's call state.
-    if (!meeting || meeting.ownerId !== userId) {
-      return json({ error: "Meeting not found" }, 404);
-    }
+    if (!meeting) return json({ error: "Meeting not found" }, 404);
+    const denied = await liveManagerDenial(supabase, userId, meeting);
+    if (denied) return denied;
     if (body.action === "raise") {
       return await raise(supabase, meeting, body, body.callId);
     }

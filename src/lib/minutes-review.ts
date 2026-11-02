@@ -10,6 +10,11 @@ import type {
   TranscriptSource,
 } from "@/lib/minutes-types";
 import type { AttesterRef, AttributableLine, ClaimRef } from "@/agent/minutes";
+import {
+  accessErrorResponse,
+  canManageMeeting,
+  checkMeetingAccess,
+} from "@/lib/project-auth";
 
 // Tasdeeq, Verified Minutes (spec 0003). Row loaders and access guards shared by
 // the minutes routes. Every caller passes the service role client.
@@ -17,6 +22,8 @@ import type { AttesterRef, AttributableLine, ClaimRef } from "@/agent/minutes";
 export interface MeetingRow {
   id: string;
   user_id: string;
+  /** Null (or absent in older fixtures) for a personal meeting. */
+  project_id?: string | null;
   title: string | null;
   started_at: string | null;
   created_at: string | null;
@@ -88,7 +95,8 @@ export interface ReviewRows {
   attestations: AttestationRow[];
 }
 
-export const MEETING_COLUMNS = "id, user_id, title, started_at, created_at";
+export const MEETING_COLUMNS =
+  "id, user_id, project_id, title, started_at, created_at";
 const REVIEW_COLUMNS =
   "id, meeting_id, status, deadline_days, deadline_at, opened_at, coverage, transcript_source, transcript_sha256";
 const LINE_COLUMNS =
@@ -96,6 +104,57 @@ const LINE_COLUMNS =
 
 export const fail = (status: number, error: string) =>
   NextResponse.json({ error }, { status });
+
+export const REVIEW_NOT_OPEN = "This review is not open";
+const MEETING_NOT_FOUND = "Meeting not found";
+
+const toAccessRow = (meeting: MeetingRow) => ({
+  id: meeting.id,
+  user_id: meeting.user_id,
+  project_id: meeting.project_id ?? null,
+});
+
+/**
+ * Boolean "manage" check (spec 0004 matrix): the creator of a personal
+ * meeting, or an Owner or Admin of a project meeting.
+ */
+export function isMinutesManager(
+  supabase: SupabaseClient,
+  userId: string,
+  meeting: MeetingRow,
+): Promise<boolean> {
+  return canManageMeeting(supabase, userId, toAccessRow(meeting));
+}
+
+/**
+ * The gate for every owner only minutes action. Returns the denial, or null
+ * when the caller may manage. Personal meeting, exactly as before W1: a
+ * recorded participant gets 403 `ownerOnlyMessage`, anyone else 404. Project
+ * meeting: a non member gets 404, a Developer or Viewer 403 "Not authorized".
+ */
+export async function minutesManagerDenial(
+  supabase: SupabaseClient,
+  userId: string,
+  meeting: MeetingRow,
+  ownerOnlyMessage: string,
+): Promise<NextResponse | null> {
+  if (!meeting.project_id) {
+    if (meeting.user_id === userId) return null;
+    return (await isRecordedParticipant(supabase, meeting.id, userId))
+      ? fail(403, ownerOnlyMessage)
+      : fail(404, MEETING_NOT_FOUND);
+  }
+  try {
+    await checkMeetingAccess(supabase, userId, toAccessRow(meeting), "manage", {
+      notFoundMessage: MEETING_NOT_FOUND,
+    });
+    return null;
+  } catch (err) {
+    const response = accessErrorResponse(err);
+    if (response) return response;
+    throw err;
+  }
+}
 
 export async function loadMeeting(
   supabase: SupabaseClient,
@@ -250,7 +309,7 @@ export type AttesterAccess =
 
 /**
  * The guard for every attester mutation: 404 for a missing meeting, 409 when
- * the owner has no review yet, 403 for anyone who is not a frozen attester.
+ * a manager has no review yet, 403 for anyone who is not a frozen attester.
  * The caller still checks `review.status`.
  */
 export async function requireAttester(
@@ -259,11 +318,19 @@ export async function requireAttester(
   userId: string,
 ): Promise<AttesterAccess> {
   const meeting = await loadMeeting(supabase, meetingId);
-  if (!meeting) return { ok: false, response: fail(404, "Meeting not found") };
+  if (!meeting) return { ok: false, response: fail(404, MEETING_NOT_FOUND) };
+  return attesterAccess(supabase, meeting, userId);
+}
 
-  const review = await loadReview(supabase, meetingId);
+/** `requireAttester` for a meeting already loaded. */
+async function attesterAccess(
+  supabase: SupabaseClient,
+  meeting: MeetingRow,
+  userId: string,
+): Promise<AttesterAccess> {
+  const review = await loadReview(supabase, meeting.id);
   if (!review) {
-    return meeting.user_id === userId
+    return (await isMinutesManager(supabase, userId, meeting))
       ? { ok: false, response: fail(409, "No minutes review is open") }
       : {
           ok: false,
@@ -285,6 +352,53 @@ export async function requireAttester(
     };
   }
   return { ok: true, meeting, review, attester: data as AttesterRow };
+}
+
+export type ManagerReviewAccess =
+  | { ok: true; meeting: MeetingRow; review: ReviewRow }
+  | { ok: false; response: NextResponse };
+
+/**
+ * The guard for manager only review edits (assign or clear a speaker name).
+ * Personal meeting, exactly as before W1: the attester guard, then 409 when
+ * the review is not open, then 403 `ownerOnlyMessage` for a non owner
+ * attester. Project meeting: the manage matrix (non member 404, Developer or
+ * Viewer 403), then 409 without a review; an Owner or Admin need not be an
+ * attester. The caller still checks `review.status`.
+ */
+export async function requireReviewManager(
+  supabase: SupabaseClient,
+  meetingId: string,
+  userId: string,
+  ownerOnlyMessage: string,
+): Promise<ManagerReviewAccess> {
+  const meeting = await loadMeeting(supabase, meetingId);
+  if (!meeting) return { ok: false, response: fail(404, MEETING_NOT_FOUND) };
+
+  if (!meeting.project_id) {
+    const access = await attesterAccess(supabase, meeting, userId);
+    if (!access.ok) return access;
+    if (access.review.status !== "open") {
+      return { ok: false, response: fail(409, REVIEW_NOT_OPEN) };
+    }
+    if (!access.attester.is_owner) {
+      return { ok: false, response: fail(403, ownerOnlyMessage) };
+    }
+    return { ok: true, meeting: access.meeting, review: access.review };
+  }
+
+  const denied = await minutesManagerDenial(
+    supabase,
+    userId,
+    meeting,
+    ownerOnlyMessage,
+  );
+  if (denied) return { ok: false, response: denied };
+  const review = await loadReview(supabase, meetingId);
+  if (!review) {
+    return { ok: false, response: fail(409, "No minutes review is open") };
+  }
+  return { ok: true, meeting, review };
 }
 
 /** Postgres unique violation. */

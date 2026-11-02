@@ -1,7 +1,14 @@
 /* eslint-disable prettier/prettier */
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase-server";
+import {
+  accessErrorResponse,
+  checkMeetingAccess,
+  NEED_ROLES,
+  type MeetingAccess,
+} from "@/lib/project-auth";
 import {
   ActionItem,
   GuestAdmissionMode,
@@ -25,6 +32,25 @@ interface ActionItemRow {
   due_date: string | null;
 }
 
+// Personal meeting fallback: a recorded participant (by Clerk user id, by the
+// guest's Stream identity, or by participant email) may read the meeting.
+async function isRecordedParticipant(
+  supabase: SupabaseClient,
+  meetingId: string,
+  userId: string,
+): Promise<boolean> {
+  for (const column of ["user_id", "stream_user_id", "participant_email"]) {
+    const { data } = await supabase
+      .from("attendance_events")
+      .select("user_id")
+      .eq("meeting_id", meetingId)
+      .eq(column, userId)
+      .limit(1);
+    if (data && data.length > 0) return true;
+  }
+  return false;
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -39,16 +65,17 @@ export async function GET(
   try {
     const supabase = supabaseServer();
 
-    // Scope check: the meeting must exist and the caller must be the owner OR
-    // a recorded participant. This mirrors the lenient ownership rule in
-    // /api/transcript/upload and /api/ai/embed — a participant may view a
-    // meeting they attended under a different Clerk account than the creator,
-    // so a strict owner-only check would wrongly 404 the detail fetch (and
-    // surface "Meeting not found" on the page) even though upload/embed
-    // already authorized the same caller.
+    // Scope check: the meeting must exist and the caller must be allowed to
+    // read it. Personal meeting: the owner OR a recorded participant. This
+    // mirrors the lenient ownership rule in /api/transcript/upload and
+    // /api/ai/embed — a participant may view a meeting they attended under a
+    // different Clerk account than the creator, so a strict owner-only check
+    // would wrongly 404 the detail fetch (and surface "Meeting not found" on the
+    // page) even though upload/embed already authorized the same caller.
+    // Project meeting: any active member (spec 0004, need "read").
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, guest_admission_mode")
+      .select("id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, guest_admission_mode, project_id")
       .eq("id", id)
       .single();
 
@@ -60,40 +87,26 @@ export async function GET(
       );
     }
 
-    if (meeting.user_id !== userId) {
-      const { data: part } = await supabase
-        .from("attendance_events")
-        .select("user_id")
-        .eq("meeting_id", meeting.id)
-        .eq("user_id", userId)
-        .limit(1);
-      if (!part || part.length === 0) {
-        // Guests may have a NULL user_id in attendance_events;
-        // match on stream_user_id (the guest's Stream identity).
-        const { data: guestPart } = await supabase
-          .from("attendance_events")
-          .select("user_id")
-          .eq("meeting_id", meeting.id)
-          .eq("stream_user_id", userId)
-          .limit(1);
-        if (!guestPart || guestPart.length === 0) {
-          // Finally, fallback to participant_email (for guests identified by email).
-          const { data: emailPart } = await supabase
-            .from("attendance_events")
-            .select("user_id")
-            .eq("meeting_id", meeting.id)
-            .eq("participant_email", userId)
-            .limit(1);
-          if (!emailPart || emailPart.length === 0) {
-            console.error("Meeting not authorized for user:", userId);
-            return NextResponse.json(
-              { error: "Meeting not found" },
-              { status: 404 },
-            );
-          }
-        }
-      }
+    let access: MeetingAccess;
+    try {
+      access = await checkMeetingAccess(supabase, userId, meeting, "read", {
+        personalFallback: () => isRecordedParticipant(supabase, meeting.id, userId),
+        personalDenied: { status: 404, message: "Meeting not found" },
+      });
+    } catch (err) {
+      const denied = accessErrorResponse(err);
+      if (!denied) throw err;
+      console.error("Meeting not authorized for user:", userId);
+      return denied;
     }
+
+    const canManage = access.projectId
+      ? access.role !== null && NEED_ROLES.manage.includes(access.role)
+      : access.isCreator;
+    // A Viewer on a project meeting sees only confirmed action items. The
+    // review_state column arrives in W4, which switches this on; until then a
+    // Viewer gets an empty list (review_state is not selected here).
+    const hideActionItems = access.role === "viewer";
 
     const [
       { data: insights },
@@ -105,10 +118,12 @@ export async function GET(
         .select("summary, key_points, decisions, category, detected_topics")
         .eq("meeting_id", id)
         .single(),
-      supabase
-        .from("action_items")
-        .select("id, title, assignee, due_date")
-        .eq("meeting_id", id),
+      hideActionItems
+        ? Promise.resolve({ data: [] as ActionItemRow[] })
+        : supabase
+          .from("action_items")
+          .select("id, title, assignee, due_date")
+          .eq("meeting_id", id),
       supabase
         .from("attendance_events")
         .select("*", { count: "exact", head: true })
@@ -154,6 +169,9 @@ export async function GET(
       insights: insightsData,
       actionItems: actionItemsData,
       attendanceCount: attendanceCount ?? 0,
+      projectId: access.projectId,
+      role: access.role,
+      canManage,
     };
 
     return NextResponse.json(response);
@@ -169,7 +187,8 @@ const SEALED = { error: "Sealed minutes can't be deleted" };
 // Owner-only delete. FK constraints on every child table use
 // `on delete cascade`, so removing the meetings row removes the transcript,
 // chunks, action items, follow-ups, categories, insights, and attendance in one
-// operation. Only the row owner (meetings.user_id) may delete.
+// operation. Only the row owner (meetings.user_id) may delete a personal
+// meeting; only the project Owner may delete a project meeting.
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -186,7 +205,7 @@ export async function DELETE(
 
     const { data: meeting, error: findError } = await supabase
       .from("meetings")
-      .select("id, user_id")
+      .select("id, user_id, project_id")
       .eq("id", id)
       .single();
 
@@ -197,8 +216,16 @@ export async function DELETE(
       );
     }
 
-    if (meeting.user_id !== userId) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    // Personal meeting: the creator only. Project meeting: the project Owner
+    // only (spec 0004, need "owner"); a non member gets 404.
+    try {
+      await checkMeetingAccess(supabase, userId, meeting, "owner", {
+        personalDenied: { status: 403, message: "Not authorized" },
+      });
+    } catch (err) {
+      const denied = accessErrorResponse(err);
+      if (denied) return denied;
+      throw err;
     }
 
     // Tasdeeq AC-7: sealed minutes are permanent. An open review is removed

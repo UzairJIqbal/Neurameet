@@ -10,7 +10,7 @@ const { queues, inserts, mockAuth, mockSupabase } = vi.hoisted(() => {
     const next = () =>
       Promise.resolve(queues[table]?.shift() ?? { data: null, error: null });
     const builder: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "limit", "upsert"])
+    for (const m of ["select", "eq", "limit", "upsert", "is"])
       builder[m] = () => builder;
     builder.insert = (payload: Record<string, unknown>) => {
       inserts.push({ table, payload });
@@ -32,6 +32,7 @@ const { queues, inserts, mockAuth, mockSupabase } = vi.hoisted(() => {
   };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 
@@ -94,5 +95,37 @@ describe("POST /api/transcript/upload meetingDate (Promise Ledger AC-5)", () => 
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/under review/);
     expect(inserts.find((i) => i.table === "transcripts")).toBeUndefined();
+  });
+
+  it.each([
+    ["a non member", null, 404],
+    ["a Viewer", "viewer", 403],
+    ["a Developer", "developer", 403],
+  ] as const)(
+    "on a project meeting %s gets %i (spec 0004, manage)",
+    async (_who, role, status) => {
+      queues.meetings = [
+        {
+          data: { id: "m-proj", user_id: "owner-1", project_id: "p1" },
+          error: null,
+        },
+      ];
+      queues.project_members = [{ data: role ? { role } : null, error: null }];
+      const res = await call({ meetingId: "m-proj" });
+      expect(res.status).toBe(status);
+    },
+  );
+
+  it("lets a project Admin attach and run processing", async () => {
+    queues.meetings = [
+      {
+        data: { id: "m-proj", user_id: "owner-1", project_id: "p1" },
+        error: null,
+      },
+    ];
+    queues.project_members = [{ data: { role: "admin" }, error: null }];
+    const res = await call({ meetingId: "m-proj" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ meetingId: "m-proj", canProcess: true });
   });
 });
