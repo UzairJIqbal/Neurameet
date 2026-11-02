@@ -3,6 +3,13 @@
 // show the exact 422 or 409 text it got back.
 
 import type {
+  AcceptInviteResponse,
+  CreateInvitationResponse,
+  InvitationListResponse,
+  InvitePreview,
+  InviteKind,
+  InviteRole,
+  JoinRequestListResponse,
   ProjectDetailResponse,
   ProjectListResponse,
   ProjectMembersResponse,
@@ -94,5 +101,59 @@ export function transferOwnership(id: string, userId: string) {
   return request<{ ok: true }>(`${base(id)}/transfer`, {
     method: "POST",
     body: JSON.stringify({ userId }),
+  });
+}
+
+// ---- W2. Invitations and join requests ----
+
+export function createInvitation(
+  id: string,
+  input: { kind: InviteKind; email?: string; role: InviteRole },
+) {
+  return request<CreateInvitationResponse>(`${base(id)}/invitations`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function listInvitations(id: string, signal?: AbortSignal) {
+  return request<InvitationListResponse>(`${base(id)}/invitations`, { signal });
+}
+
+export function revokeInvitation(id: string, invitationId: string) {
+  return request<{ ok: true }>(
+    `${base(id)}/invitations/${encodeURIComponent(invitationId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function listJoinRequests(id: string, signal?: AbortSignal) {
+  return request<JoinRequestListResponse>(`${base(id)}/join-requests`, {
+    signal,
+  });
+}
+
+export function decideJoinRequest(
+  id: string,
+  requestId: string,
+  decision: "approve" | "deny",
+) {
+  return request<{ request: { id: string; status: string } }>(
+    `${base(id)}/join-requests/${encodeURIComponent(requestId)}`,
+    { method: "POST", body: JSON.stringify({ decision }) },
+  );
+}
+
+export function previewInvitation(token: string, signal?: AbortSignal) {
+  return request<InvitePreview>(
+    `/api/invitations/preview?token=${encodeURIComponent(token)}`,
+    { signal },
+  );
+}
+
+export function acceptInvitation(token: string) {
+  return request<AcceptInviteResponse>("/api/invitations/accept", {
+    method: "POST",
+    body: JSON.stringify({ token }),
   });
 }

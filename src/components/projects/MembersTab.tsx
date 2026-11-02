@@ -8,6 +8,7 @@ import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import InvitesPanel from "@/components/projects/InvitesPanel";
 import {
   changeMemberRole,
   deleteProject,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/project-client";
 import {
   assignableRoles,
+  canManageInvites,
   canRemoveMember,
   ROLE_LABELS,
   type ProjectDetail,
@@ -221,6 +223,10 @@ const MembersTab = ({ project, onProjectChanged }: Props) => {
           })}
         </ul>
       </div>
+
+      {canManageInvites(myRole) && (
+        <InvitesPanel projectId={project.id} myRole={myRole} onMembersChanged={refresh} />
+      )}
 
       {myRole !== "owner" && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-5">

@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
     // as the real type/correctness gate. Do not chase the tooling bug.
     ignoreDuringBuilds: true,
   },
+  // Invite links carry a secret token in the path; never leak it to other
+  // sites through the Referer header (W2, AC-22a).
+  async headers() {
+    return [
+      {
+        source: "/invite/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

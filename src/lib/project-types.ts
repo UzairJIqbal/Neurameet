@@ -88,3 +88,76 @@ export function canRemoveMember(
     (targetRole === "developer" || targetRole === "viewer")
   );
 }
+
+// ---- W2. Invitations and join requests (spec 0004-invitations) ----
+
+export type InviteKind = "email" | "link";
+export type InviteRole = Exclude<ProjectRole, "owner">;
+export type InviteStatus = "valid" | "member" | "pending";
+
+export interface InvitationSummary {
+  id: string;
+  kind: InviteKind;
+  email: string | null;
+  role: InviteRole;
+  expiresAt: string;
+  createdAt: string;
+  createdByName: string;
+}
+
+export interface InvitationListResponse {
+  invitations: InvitationSummary[];
+}
+
+export interface CreateInvitationResponse {
+  invitation: {
+    id: string;
+    kind: InviteKind;
+    email: string | null;
+    role: InviteRole;
+    expiresAt: string;
+  };
+  link: string;
+  emailSent: boolean;
+}
+
+export interface InvitePreview {
+  projectName: string;
+  role: InviteRole;
+  kind: InviteKind;
+  status: InviteStatus;
+  /** Only when status is "member", so the page can link to the project. */
+  projectId?: string;
+}
+
+export interface AcceptInviteResponse {
+  status: "joined" | "pending";
+  projectId: string;
+}
+
+export interface JoinRequestSummary {
+  id: string;
+  displayName: string;
+  email: string | null;
+  role: InviteRole;
+  createdAt: string;
+}
+
+export interface JoinRequestListResponse {
+  requests: JoinRequestSummary[];
+}
+
+/** Roles a caller may put on a new invite (the server checks again, AC-14). */
+export function inviteRoleOptions(
+  myRole: ProjectRole,
+  kind: InviteKind,
+): InviteRole[] {
+  if (myRole === "owner" && kind === "email") {
+    return ["admin", "developer", "viewer"];
+  }
+  if (myRole === "owner" || myRole === "admin") return ["developer", "viewer"];
+  return [];
+}
+
+export const canManageInvites = (role: ProjectRole): boolean =>
+  role === "owner" || role === "admin";

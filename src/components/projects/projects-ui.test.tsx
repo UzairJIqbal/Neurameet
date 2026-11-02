@@ -26,6 +26,8 @@ const client = vi.hoisted(() => ({
   removeMember: vi.fn(),
   transferOwnership: vi.fn(),
   deleteProject: vi.fn(),
+  listInvitations: vi.fn(),
+  listJoinRequests: vi.fn(),
 }));
 vi.mock("@/lib/project-client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/project-client")>(
@@ -79,7 +81,11 @@ function membersAs(myRole: "owner" | "developer"): ProjectMembersResponse {
   };
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  client.listInvitations.mockResolvedValue({ invitations: [] });
+  client.listJoinRequests.mockResolvedValue({ requests: [] });
+});
 afterEach(cleanup);
 
 describe("CreateProjectDialog", () => {

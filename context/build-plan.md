@@ -699,7 +699,7 @@ Spec in `docs/specs/0004-conversations-to-code/` (index, rationale, 8 child spec
 ### Step W1 — Projects, members, shared role check ✅ (done 2026-11-03, SQL applied)
 Tables plus a shared server helper (`requireProjectRole`) that replaces the ~29 per route `meetings.user_id` owner checks; owner only routes map to Owner/Admin. `meetings.project_id` nullable so personal meetings keep working. Exit: a non member gets 403/404 on every project route (test per route).
 
-### Step W2 — Invitations ⬜
+### Step W2 — Invitations ✅ (built 2026-11-03, SQL applied as migration `w2_invitations`; live two account test pending)
 Hashed 256 bit single use tokens, expiry, email binding, owner approval on by default, public `/invite/[token]` route, Resend email with a copy link fallback (Resend free sends only to the account owner until a domain is verified), audit rows. Exit: forged, expired, and replayed tokens rejected.
 
 ### Step W3 — Project meetings + consent notice ⬜

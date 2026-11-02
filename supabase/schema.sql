@@ -783,3 +783,207 @@ GRANT EXECUTE ON FUNCTION create_project(text, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION transfer_project_ownership(uuid, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION remove_project_member(uuid, text, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION match_ledger_candidates(uuid, text, int) TO service_role;
+
+-- ===== W2. Invitations (spec 0004, child 0004-invitations) =====
+create table if not exists project_invitations (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references projects(id) on delete cascade not null,
+  kind text not null check (kind in ('email', 'link')),
+  email text check (email = lower(email)),         -- lowercased, email kind only
+  role text not null check (role in ('admin', 'developer', 'viewer')),
+  token_hash text not null unique,                  -- SHA-256 hex of the raw token
+  created_by text not null,
+  expires_at timestamptz not null,                  -- created_at + 7 days
+  revoked_at timestamptz,
+  used_at timestamptz,                              -- email kind only (single use)
+  used_by text,
+  created_at timestamptz not null default now(),
+  check ((kind = 'email') = (email is not null)),
+  check (kind = 'email' or role <> 'admin')         -- links never grant Admin
+);
+
+create table if not exists project_join_requests (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references projects(id) on delete cascade not null,
+  invitation_id uuid references project_invitations(id) on delete set null,
+  user_id text not null,
+  display_name text not null,
+  email text,
+  role text not null check (role in ('developer', 'viewer')),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'denied')),
+  decided_by text,
+  decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists project_join_requests_one_pending
+  on project_join_requests (project_id, user_id) where status = 'pending';
+create unique index if not exists project_invitations_one_live_email
+  on project_invitations (project_id, email) where kind = 'email' and revoked_at is null and used_at is null;
+create index if not exists project_join_requests_invitation
+  on project_join_requests (invitation_id) where status = 'pending';
+create index if not exists audit_log_actor_action
+  on audit_log (actor_id, action, created_at desc);   -- AC-22 failed accept count
+
+-- Joins or restores a member; never changes an active member's role.
+-- Returns 'joined', 'restored', or 'member' (already active).
+create or replace function upsert_project_member(p_project uuid, p_user text, p_role text,
+  p_added_by text, p_via text, p_ref uuid)
+returns text language plpgsql set search_path = public as $$
+declare existing project_members; was_member boolean;
+begin
+  select * into existing from project_members
+    where project_id = p_project and user_id = p_user for update;
+  was_member := found;
+  if was_member and existing.removed_at is null then return 'member'; end if;
+  if was_member then
+    update project_members set role = p_role, removed_at = null, removed_by = null,
+      added_by = p_added_by, joined_at = now()
+      where project_id = p_project and user_id = p_user;
+  else
+    insert into project_members (project_id, user_id, role, added_by)
+      values (p_project, p_user, p_role, p_added_by)
+      on conflict (project_id, user_id) do nothing;
+    if not found then return 'member'; end if;   -- a parallel join won the race
+  end if;
+  insert into audit_log (project_id, actor_id, action, target_type, target_id, detail)
+    values (p_project, p_user, case when was_member then 'member.restored' else 'member.joined' end,
+      'member', p_user, jsonb_build_object('role', p_role, 'via', p_via, 'ref', p_ref));
+  return case when was_member then 'restored' else 'joined' end;
+end $$;
+
+-- AC-13, AC-13a: one per project lock, re-invite revokes the live email invite,
+-- then the active cap, then the insert. The token is never passed in, only its hash.
+create or replace function create_project_invitation(p_project uuid, p_kind text, p_email text,
+  p_role text, p_token_hash text, p_created_by text, p_expires_at timestamptz, p_max_active int)
+returns project_invitations language plpgsql set search_path = public as $$
+declare inv project_invitations; replaced uuid; active int;
+begin
+  perform pg_advisory_xact_lock(hashtext('invite:' || p_project::text));
+  if p_kind = 'email' then
+    update project_invitations set revoked_at = now()
+      where project_id = p_project and kind = 'email' and email = p_email
+        and revoked_at is null and used_at is null
+      returning id into replaced;
+  end if;
+  select count(*) into active from project_invitations
+    where project_id = p_project and revoked_at is null and used_at is null and expires_at > now();
+  if active >= p_max_active then raise exception 'cap_reached'; end if;
+  insert into project_invitations (project_id, kind, email, role, token_hash, created_by, expires_at)
+    values (p_project, p_kind, p_email, p_role, p_token_hash, p_created_by, p_expires_at)
+    returning * into inv;
+  if replaced is not null then
+    insert into audit_log (project_id, actor_id, action, target_type, target_id, detail)
+      values (p_project, p_created_by, 'invite.revoked', 'invitation', replaced::text,
+        jsonb_build_object('replacedBy', inv.id));
+  end if;
+  insert into audit_log (project_id, actor_id, action, target_type, target_id, detail)
+    values (p_project, p_created_by, 'invite.created', 'invitation', inv.id::text,
+      jsonb_build_object('kind', p_kind, 'role', p_role));
+  return inv;
+end $$;
+
+-- AC-17, AC-20: single use, only one of two racing accepts gets the row.
+create or replace function accept_email_invitation(p_invitation uuid, p_user text)
+returns text language plpgsql set search_path = public as $$
+declare inv project_invitations;
+begin
+  update project_invitations set used_at = now(), used_by = p_user
+    where id = p_invitation and kind = 'email' and used_at is null and revoked_at is null
+      and expires_at > now()
+    returning * into inv;
+  if not found then raise exception 'gone'; end if;
+  return upsert_project_member(inv.project_id, p_user, inv.role, inv.created_by,
+    'email_invite', inv.id);
+end $$;
+
+-- AC-18: one pending request per user per project. The invite row is locked so a
+-- revoke cannot slip in between the check and the insert (AC-21 invariant).
+create or replace function request_project_join(p_invitation uuid, p_user text, p_name text,
+  p_email text)
+returns project_join_requests language plpgsql set search_path = public as $$
+declare inv project_invitations; req project_join_requests;
+begin
+  select * into inv from project_invitations where id = p_invitation and kind = 'link' for update;
+  if not found or inv.revoked_at is not null or inv.expires_at <= now() then
+    raise exception 'gone';
+  end if;
+  insert into project_join_requests (project_id, invitation_id, user_id, display_name, email, role)
+    values (inv.project_id, inv.id, p_user, p_name, p_email, inv.role)
+    on conflict (project_id, user_id) where status = 'pending' do nothing
+    returning * into req;
+  if found then
+    insert into audit_log (project_id, actor_id, action, target_type, target_id, detail)
+      values (inv.project_id, p_user, 'join_request.created', 'join_request', req.id::text,
+        jsonb_build_object('invitationId', inv.id, 'role', inv.role));
+    return req;
+  end if;
+  select * into req from project_join_requests
+    where project_id = inv.project_id and user_id = p_user and status = 'pending';
+  return req;
+end $$;
+
+-- AC-21a: revoke is idempotent; a link revoke denies its pending requests.
+create or replace function revoke_project_invitation(p_invitation uuid, p_project uuid, p_actor text)
+returns void language plpgsql set search_path = public as $$
+declare inv project_invitations; denied record;
+begin
+  select * into inv from project_invitations
+    where id = p_invitation and project_id = p_project for update;
+  if not found then raise exception 'not_found'; end if;
+  if inv.revoked_at is not null then return; end if;
+  update project_invitations set revoked_at = now() where id = p_invitation;
+  insert into audit_log (project_id, actor_id, action, target_type, target_id, detail)
+    values (p_project, p_actor, 'invite.revoked', 'invitation', p_invitation::text,
+      jsonb_build_object('kind', inv.kind));
+  for denied in
+    update project_join_requests set status = 'denied', decided_by = p_actor, decided_at = now()
+      where invitation_id = p_invitation and status = 'pending'
+      returning id
+  loop
+    insert into audit_log (project_id, actor_id, action, target_type, target_id, detail)
+      values (p_project, p_actor, 'join_request.denied', 'join_request', denied.id::text,
+        jsonb_build_object('reason', 'invite_revoked'));
+  end loop;
+end $$;
+
+-- AC-21: decide once; approve joins or restores with the request's role.
+create or replace function decide_join_request(p_request uuid, p_project uuid, p_actor text,
+  p_decision text)
+returns project_join_requests language plpgsql set search_path = public as $$
+declare req project_join_requests;
+begin
+  select * into req from project_join_requests
+    where id = p_request and project_id = p_project for update;
+  if not found then raise exception 'not_found'; end if;
+  if req.status <> 'pending' then raise exception 'already_decided'; end if;
+  update project_join_requests
+    set status = case when p_decision = 'approve' then 'approved' else 'denied' end,
+        decided_by = p_actor, decided_at = now()
+    where id = p_request returning * into req;
+  insert into audit_log (project_id, actor_id, action, target_type, target_id, detail)
+    values (p_project, p_actor, 'join_request.' || req.status, 'join_request', req.id::text,
+      jsonb_build_object('role', req.role));
+  if p_decision = 'approve' then
+    perform upsert_project_member(p_project, req.user_id, req.role, p_actor,
+      'join_request', req.id);
+  end if;
+  return req;
+end $$;
+
+alter table project_invitations enable row level security;
+alter table project_join_requests enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON project_invitations, project_join_requests TO service_role;
+
+revoke execute on function upsert_project_member(uuid, text, text, text, text, uuid) from public, anon, authenticated;
+revoke execute on function create_project_invitation(uuid, text, text, text, text, text, timestamptz, int) from public, anon, authenticated;
+revoke execute on function accept_email_invitation(uuid, text) from public, anon, authenticated;
+revoke execute on function request_project_join(uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function revoke_project_invitation(uuid, uuid, text) from public, anon, authenticated;
+revoke execute on function decide_join_request(uuid, uuid, text, text) from public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION upsert_project_member(uuid, text, text, text, text, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION create_project_invitation(uuid, text, text, text, text, text, timestamptz, int) TO service_role;
+GRANT EXECUTE ON FUNCTION accept_email_invitation(uuid, text) TO service_role;
+GRANT EXECUTE ON FUNCTION request_project_join(uuid, text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION revoke_project_invitation(uuid, uuid, text) TO service_role;
+GRANT EXECUTE ON FUNCTION decide_join_request(uuid, uuid, text, text) TO service_role;

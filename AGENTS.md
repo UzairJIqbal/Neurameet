@@ -168,6 +168,7 @@ POST /api/projects/[id]/transfer   → owner only: { userId } of an active admin
 POST /api/projects/[id]/invitations        → owner or admin: { kind: "email" | "link", email?, role }, returns the link once
 GET  /api/projects/[id]/invitations        → owner or admin: active invitations, never the token
 DELETE /api/projects/[id]/invitations/[invitationId] → owner or admin: revoke
+GET  /api/invitations/preview      → signed in: ?token=, project name, role, kind, status for the invite page (+ projectId when already a member); consumes nothing
 POST /api/invitations/accept       → signed in: { token }; email kind joins, link kind creates a pending join request
 GET  /api/projects/[id]/join-requests      → owner or admin: pending join requests
 POST /api/projects/[id]/join-requests/[requestId] → owner or admin: { decision: "approve" | "deny" }

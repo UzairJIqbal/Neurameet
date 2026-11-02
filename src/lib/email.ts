@@ -198,3 +198,66 @@ export function sendMinutesSealedEmail(
 /** The public verify page link for the emails and the PDF. */
 export const verifyUrlFor = (sealId: string): string =>
   appLink(`/minutes/verify/${sealId}`);
+
+// ---------------------------------------------------------------------------
+// W2 project invites (spec 0004-invitations, AC-15). Sent only from a verified
+// workspace sender; there is no fallback to the Resend test sender, which can
+// only reach the account owner. The link is the secret: it is never logged.
+
+export type ProjectInviteEmailInput = {
+  to: string;
+  projectName: string;
+  inviterName: string;
+  roleLabel: string;
+  link: string;
+};
+
+export const workspaceEmailConfigured = (): boolean =>
+  Boolean(process.env.RESEND_API_KEY && process.env.RESEND_WORKSPACE_FROM);
+
+/** Invite email with the join link. Never throws; false when not sent. */
+export async function sendProjectInviteEmail(
+  input: ProjectInviteEmailInput,
+): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_WORKSPACE_FROM;
+  if (!apiKey || !from) return false;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #1a1a1a;">You're invited to ${escapeHtml(input.projectName)}</h2>
+      <p style="color: #444;">
+        ${escapeHtml(input.inviterName)} invited you to join
+        <strong>${escapeHtml(input.projectName)}</strong> on NeuraMeet as
+        <strong>${escapeHtml(input.roleLabel)}</strong>.
+      </p>
+      <p style="color: #444;">The invite works for 7 days, only for this email address.</p>
+      ${button(input.link, "Join the project")}
+    </div>`;
+  try {
+    const res = await fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: input.to,
+        subject: `Invite to ${input.projectName} on NeuraMeet`,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      console.error(`[invitations] invite email failed (${res.status})`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(
+      "[invitations] invite email failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  }
+}

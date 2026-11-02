@@ -12,6 +12,7 @@ const isProtectedRoute = createRouteMatcher([
 	"/meeting-intelligence(.*)",
 	"/follow-ups(.*)",
 	"/projects(.*)",
+	"/invite(.*)",
 	"/ai-chat",
 	"/settings",
 ]);

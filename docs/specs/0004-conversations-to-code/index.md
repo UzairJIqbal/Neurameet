@@ -227,7 +227,7 @@ create table if not exists project_invitations (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references projects(id) on delete cascade not null,
   kind text not null check (kind in ('email', 'link')),
-  email text,                                       -- lowercased, email kind only
+  email text check (email = lower(email)),         -- lowercased, email kind only
   role text not null check (role in ('admin', 'developer', 'viewer')),
   token_hash text not null unique,                  -- SHA-256 hex of the raw token
   created_by text not null,
@@ -255,6 +255,12 @@ create table if not exists project_join_requests (
 );
 create unique index if not exists project_join_requests_one_pending
   on project_join_requests (project_id, user_id) where status = 'pending';
+create unique index if not exists project_invitations_one_live_email
+  on project_invitations (project_id, email) where kind = 'email' and revoked_at is null and used_at is null;
+create index if not exists project_join_requests_invitation
+  on project_join_requests (invitation_id) where status = 'pending';
+create index if not exists audit_log_actor_action
+  on audit_log (actor_id, action, created_at desc);   -- AC-22 failed accept count
 
 -- ===== W3. Project meetings and consent =====
 create table if not exists meeting_participants (
@@ -600,6 +606,7 @@ GitHub moves (rules in [0004-github.md](0004-github.md)): a linked draft PR move
 | /api/projects/[id]/invitations | POST | kind, email?, role | invitation, link (once) | owner, admin | 403 admin role by non owner, 422 |
 | /api/projects/[id]/invitations | GET | | active invitations (no token) | owner, admin | |
 | /api/projects/[id]/invitations/[invitationId] | DELETE | | ok | owner, admin | 404 |
+| /api/invitations/preview | GET | token | projectName, role, kind, status | signed in | 410 gone, 429 |
 | /api/invitations/accept | POST | token | status joined or pending, projectId | signed in | 410 used or expired, 403 email mismatch, 429 |
 | /api/projects/[id]/join-requests | GET | | pending requests | owner, admin | |
 | /api/projects/[id]/join-requests/[requestId] | POST | decision | request | owner, admin | 409 decided |
@@ -649,6 +656,7 @@ POST /api/projects/[id]/transfer   → owner only: { userId } of an active admin
 POST /api/projects/[id]/invitations        → owner or admin: { kind: "email" | "link", email?, role }, returns the link once
 GET  /api/projects/[id]/invitations        → owner or admin: active invitations, never the token
 DELETE /api/projects/[id]/invitations/[invitationId] → owner or admin: revoke
+GET  /api/invitations/preview      → signed in: ?token=, project name, role, kind, status for the invite page; consumes nothing
 POST /api/invitations/accept       → signed in: { token }; email kind joins, link kind creates a pending join request
 GET  /api/projects/[id]/join-requests      → owner or admin: pending join requests
 POST /api/projects/[id]/join-requests/[requestId] → owner or admin: { decision: "approve" | "deny" }
@@ -764,7 +772,7 @@ Each child lists its own. The cross cutting ones:
 Each W step is one shippable end to end slice: its migration block, its routes, its UI, and its tests ship together, then `/check verify`. Order follows the dependency chain.
 
 1. **W1, Projects and roles** ([0004-projects-roles.md](0004-projects-roles.md)): W1 SQL block, `project-auth.ts`, project and member routes, the route migration onto `requireMeetingAccess`, offboarding, a minimal Projects page and Members tab, satisfies **AC-1** to **AC-12**.
-2. **W2, Invitations** ([0004-invitations.md](0004-invitations.md)): W2 SQL block, invite and join request routes, `/invite/[token]` page, copy link UI, optional Resend email, satisfies **AC-13** to **AC-22**.
+2. **W2, Invitations** ([0004-invitations.md](0004-invitations.md)): W2 SQL block, invite and join request routes, `/invite/[token]` page, copy link UI, optional Resend email, satisfies **AC-13** to **AC-22** (plus AC-13a and AC-21a, added at the W2 `/architect`).
 3. **W3, Project meetings and consent** ([0004-project-meetings.md](0004-project-meetings.md)): W3 SQL block, project picker on New and Schedule Meeting, move in route, consent notice before join, guest consent, satisfies **AC-23** to **AC-29**.
 4. **W4, Review gate and tasks** ([0004-review-gate-tasks.md](0004-review-gate-tasks.md)): W4 SQL block, proposals from `/api/ai/process`, review route, task routes, Kanban with `@hello-pangea/dnd`, satisfies **AC-30** to **AC-42**.
 5. **W5, GitHub** ([0004-github.md](0004-github.md)): W5 SQL block plus the `ledger_links` change, App JWT and installation tokens with Node `crypto` (no Octokit), setup, account link, webhook, linking rules, revert, Sync, satisfies **AC-43** to **AC-56**.

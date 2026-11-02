@@ -588,7 +588,7 @@ Projects with Owner, Admin, Developer, and Viewer roles kept in our own Supabase
 Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
 - [ ] Build it: `/develop project workspaces`
   - [x] W1 Projects, members, shared role check, route migration (AC-1 to AC-12) (`src/lib/project-auth.ts`, `src/app/api/projects/`)
-  - [ ] W2 Invitations and join requests (AC-13 to AC-22)
+  - [x] W2 Invitations, invite preview, and join requests (built 2026-11-03, SQL applied; live test pending) (AC-13 to AC-22c, spec [0004-invitations](../specs/0004-conversations-to-code/0004-invitations.md))
 
 ### 21. Project meetings with a consent notice · planned · GA
 Schedule a meeting inside a project with a participant picker; project members see project meetings; everyone, guests included, sees a recording consent notice before joining.
