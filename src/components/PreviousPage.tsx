@@ -161,6 +161,7 @@ const PreviousPage = () => {
 														: "Only the host can delete this meeting"
 												}
 												confirmLabel="Delete"
+												warning="If a minutes review is open, it and its answers are deleted too."
 												disabled={!isOwner}
 												onConfirm={() => handleDeleteCall(call.id)}
 											/>

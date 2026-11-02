@@ -499,3 +499,159 @@ as $$
 $$;
 
 GRANT EXECUTE ON FUNCTION match_ledger_prep_items(vector, text, int) TO service_role;
+
+-- ---------------------------------------------------------------------------
+-- Live Ledger (spec docs/specs/0002-live-ledger): live marks raised during a
+-- call, Agreement Checks, and their votes. Same posture as the ledger tables:
+-- RLS on with no policies, so only the service_role client can touch rows.
+-- ---------------------------------------------------------------------------
+create table if not exists ledger_live_marks (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid references meetings(id) on delete cascade not null, -- the live meeting
+  item_id uuid references ledger_items(id) on delete cascade not null, -- an item from an earlier meeting
+  mark text check (mark in ('kept', 'open', 'reversed')),             -- null while raised, not marked
+  raised_at timestamptz not null default now(),
+  marked_at timestamptz,
+  closed_at timestamptz,
+  unique (meeting_id, item_id)
+);
+create index if not exists ledger_live_marks_meeting_idx
+  on ledger_live_marks (meeting_id, raised_at desc);
+
+create table if not exists ledger_agreements (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid references meetings(id) on delete cascade not null,
+  statement text not null check (char_length(statement) between 1 and 280),
+  status text not null default 'open' check (status in ('open', 'closed')),
+  agreed_count integer,
+  total_count integer,
+  ledger_item_id uuid references ledger_items(id) on delete set null,
+  opened_at timestamptz not null default now(),
+  closed_at timestamptz
+);
+create unique index if not exists ledger_agreements_one_open
+  on ledger_agreements (meeting_id) where status = 'open';
+
+create table if not exists ledger_agreement_votes (
+  agreement_id uuid references ledger_agreements(id) on delete cascade not null,
+  voter_id text not null, -- Clerk id or verified Stream guest id
+  vote text not null check (vote in ('agree', 'not_yet')),
+  voted_at timestamptz not null default now(),
+  primary key (agreement_id, voter_id)
+);
+
+alter table ledger_items
+  add column if not exists source text not null default 'transcript'
+    check (source in ('transcript', 'live_agreement')),
+  add column if not exists agreed_count integer,
+  add column if not exists total_count integer;
+
+alter table ledger_live_marks enable row level security;
+alter table ledger_agreements enable row level security;
+alter table ledger_agreement_votes enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON ledger_live_marks, ledger_agreements, ledger_agreement_votes TO service_role;
+
+-- Tasdeeq, Verified Minutes (spec docs/specs/0003-tasdeeq-verified-minutes):
+-- attendees confirm, correct, or record a view on the AI minutes, then the
+-- owner seals them with a signed, chained SHA-256 fingerprint.
+alter table meeting_insights
+  add column if not exists minutes_draft jsonb; -- null for meetings processed before Tasdeeq
+
+create table if not exists minutes_reviews (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid unique references meetings(id) on delete cascade not null,
+  status text not null default 'open' check (status in ('open', 'sealing', 'sealed')), -- cancel deletes the row
+  deadline_days integer not null check (deadline_days in (3, 7)),
+  deadline_at timestamptz not null,
+  opened_at timestamptz not null default now(),
+  coverage jsonb not null,                -- { lastLine, totalLines, text }
+  transcript_source text not null check (transcript_source in ('upload', 'recording')),
+  transcript_sha256 text not null
+);
+
+create table if not exists minutes_lines (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  position integer not null,
+  section text not null check (section in ('summary', 'key_point', 'decision', 'action_item')),
+  text text not null,
+  evidence jsonb not null default '[]',   -- [{ quote, lineNumber, speaker }], at most 2
+  supported boolean not null,
+  speaker_labels text[] not null default '{}',
+  action_item_id uuid references action_items(id) on delete set null,
+  assignee text,
+  unique (review_id, position)
+);
+
+create table if not exists minutes_attesters (
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  user_id text not null,                  -- Clerk id
+  display_name text not null,
+  email text,
+  is_owner boolean not null default false,
+  done_at timestamptz,
+  primary key (review_id, user_id)
+);
+
+create table if not exists minutes_speaker_claims (
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  speaker_label text not null,           -- the label key (lowercase, trimmed, spaces collapsed)
+  display_label text not null,           -- first seen spelling
+  user_id text not null,
+  claimed_by text not null check (claimed_by in ('self', 'owner')),
+  claimed_at timestamptz not null default now(),
+  primary key (review_id, speaker_label),
+  foreign key (review_id, user_id) references minutes_attesters(review_id, user_id) on delete cascade
+);
+
+create table if not exists minutes_attestations (
+  line_id uuid references minutes_lines(id) on delete cascade not null,
+  user_id text not null,
+  action text not null check (action in ('confirm', 'correct', 'view')),
+  note text check (note is null or char_length(note) between 1 and 500),
+  late boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (line_id, user_id),
+  check (action = 'confirm' or note is not null)
+);
+
+create table if not exists minutes_dissent_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  speaker_label text not null,
+  topic text not null,
+  position text not null,
+  quote text not null,
+  line_number integer not null,
+  related_line_id uuid references minutes_lines(id) on delete set null,
+  status text not null default 'suggested' check (status in ('suggested', 'adopted', 'dismissed'))
+);
+
+create table if not exists minutes_seals (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid unique references minutes_reviews(id) on delete restrict not null,
+  meeting_id uuid references meetings(id) on delete restrict not null,
+  owner_id text not null,
+  content_sha256 text not null,
+  prev_seal_sha256 text,
+  signature text not null,                -- base64 Ed25519
+  key_id text not null,
+  bundle jsonb not null,
+  status_text text not null,
+  sealed_at timestamptz not null default now()
+);
+create index if not exists minutes_seals_owner_idx on minutes_seals (owner_id, sealed_at desc);
+
+alter table minutes_reviews enable row level security;
+alter table minutes_lines enable row level security;
+alter table minutes_attesters enable row level security;
+alter table minutes_speaker_claims enable row level security;
+alter table minutes_attestations enable row level security;
+alter table minutes_dissent_suggestions enable row level security;
+alter table minutes_seals enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON minutes_reviews, minutes_lines, minutes_attesters, minutes_speaker_claims,
+     minutes_attestations, minutes_dissent_suggestions, minutes_seals TO service_role;

@@ -7,6 +7,7 @@ const { store, mockAuth, mockGenerate } = vi.hoisted(() => ({
   store: {
     meeting: null as Record<string, unknown> | null,
     attendance: [] as Array<Record<string, unknown>>,
+    review: null as Record<string, unknown> | null,
   },
   mockAuth: vi.fn(),
   mockGenerate: vi.fn(),
@@ -30,7 +31,9 @@ vi.mock("@/lib/supabase-server", () => ({
             : []
           : table === "attendance_events"
             ? store.attendance
-            : [];
+            : table === "minutes_reviews" && store.review
+              ? [store.review]
+              : [];
       const builder = {
         select: () => builder,
         eq: (col: string, val: unknown) => {
@@ -71,6 +74,7 @@ describe("POST /api/transcript/download authorization", () => {
     });
     store.meeting = { id: "m1", user_id: "owner", stream_call_id: "call-1" };
     store.attendance = [];
+    store.review = null;
   });
 
   it("rejects a streamCallId that is not the meeting's", async () => {
@@ -101,5 +105,13 @@ describe("POST /api/transcript/download authorization", () => {
     mockAuth.mockResolvedValue({ userId: "owner" });
     const res = await post({ meetingId: "m1", streamCallId: "call-1" });
     expect(res.status).toBe(200);
+  });
+
+  it("returns 409 and generates nothing under a minutes review (spec 0003 AC-7)", async () => {
+    store.attendance = [{ id: "a1", meeting_id: "m1", user_id: "user_a" }];
+    store.review = { meeting_id: "m1", status: "open" };
+    const res = await post({ meetingId: "m1", streamCallId: "call-1" });
+    expect(res.status).toBe(409);
+    expect(mockGenerate).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,7 @@ import {
   LedgerIncomingLink,
   LedgerItemView,
   LedgerLinkState,
+  LedgerLiveOnlyMark,
   LedgerResponse,
   LedgerReviewDecision,
 } from "@/lib/meeting-types";
@@ -35,6 +36,16 @@ const STATUS_BADGE: Record<LedgerDerivedStatus, { label: string; className: stri
 const badgeBase =
   "rounded-full px-3 py-1 text-label-caps font-medium uppercase tracking-wider";
 
+// Live Ledger (spec 0002 AC-15): marks made during a call.
+const LIVE_BADGE = `${badgeBase} border border-primary-container text-primary-container`;
+
+const LiveBadge = () => <span className={LIVE_BADGE}>Marked live</span>;
+
+const itemMeta = (item: LedgerItemView): string =>
+  item.source === "live_agreement"
+    ? `Agreed live by ${item.agreedCount ?? 0} of ${item.totalCount ?? 0}`
+    : `${item.speaker ? `${item.speaker} · ` : ""}line ${item.lineNumber}`;
+
 const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
   const status = STATUS_BADGE[item.derivedStatus];
   const isPromise = item.kind === "promise";
@@ -52,6 +63,7 @@ const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
           {isPromise ? "Promise" : "Decision"}
         </span>
         <span className={`${badgeBase} ${status.className}`}>{status.label}</span>
+        {item.liveMark && <LiveBadge />}
       </div>
 
       <p className="font-body-md font-medium text-on-surface">{item.statement}</p>
@@ -62,9 +74,7 @@ const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
           <span dir="auto" className="italic text-on-surface">
             {item.quote}
           </span>
-          <span>
-            {item.speaker ? `${item.speaker} · ` : ""}line {item.lineNumber}
-          </span>
+          <span>{itemMeta(item)}</span>
         </span>
       </blockquote>
 
@@ -175,6 +185,7 @@ const MatchCard = ({
         <span className={`${badgeBase} bg-surface-container-high text-on-surface-variant`}>
           {LINK_STATE_LABEL[link.state]}
         </span>
+        {link.liveMark && <LiveBadge />}
         <span className="text-body-md text-on-surface-variant">
           {Math.round(link.confidence * 100)}% confident
         </span>
@@ -218,6 +229,23 @@ const MatchCard = ({
     </div>
   );
 };
+
+const LiveOnlyCard = ({ entry }: { entry: LedgerLiveOnlyMark }) => (
+  <div className="flex flex-col gap-3 px-6 py-4">
+    <div className="flex flex-wrap items-center gap-2">
+      <LiveBadge />
+    </div>
+    <p className="font-body-md font-medium text-on-surface">{entry.item.statement}</p>
+    <p className="text-body-md text-on-surface-variant">
+      Marked live as {entry.mark === "open" ? "still open" : entry.mark}, no transcript evidence found
+    </p>
+    <QuoteBlock
+      label={`Earlier · ${entry.sourceMeeting.title} · ${new Date(entry.sourceMeeting.startedAt).toLocaleDateString()}`}
+      quote={entry.item.quote}
+      meta={quoteMeta(entry.item.speaker, entry.item.lineNumber)}
+    />
+  </div>
+);
 
 const ReversalCard = ({ links }: { links: LedgerIncomingLink[] }) => (
   <div className="flex flex-col gap-4 rounded-xl bg-error-container px-6 py-4 text-error">
@@ -330,6 +358,8 @@ const LedgerTab = ({
     return <LoadError message="We couldn't load the ledger." onRetry={retry} />;
   }
 
+  // Older cached responses may predate the Live Ledger fields.
+  const liveOnly = data.liveOnly ?? [];
   const reversed = data.incoming.filter(
     (link) => link.relation === "reversed" && link.state !== "rejected",
   );
@@ -357,7 +387,7 @@ const LedgerTab = ({
         <h2 className="text-headline-sm font-semibold text-on-surface">
           Matches found in this meeting
         </h2>
-        {data.incoming.length === 0 ? (
+        {data.incoming.length === 0 && liveOnly.length === 0 ? (
           <TabEmptyState message="No earlier promises were mentioned here yet." />
         ) : (
           <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
@@ -369,6 +399,9 @@ const LedgerTab = ({
                   saving={saving?.linkId === link.id ? saving.decision : null}
                   onReview={review}
                 />
+              ))}
+              {liveOnly.map((entry) => (
+                <LiveOnlyCard key={`live-${entry.item.id}`} entry={entry} />
               ))}
             </div>
           </div>

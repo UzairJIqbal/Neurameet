@@ -3,6 +3,7 @@ import {
   deriveLedgerStatus,
   filterVerdicts,
   findQuoteLine,
+  findQuoteLines,
   numberTranscriptLines,
   LEDGER_MAX_ITEMS,
   prepareLedgerRows,
@@ -72,6 +73,29 @@ describe("findQuoteLine", () => {
 
   it("rejects a near empty quote", () => {
     expect(findQuoteLine(transcript, "a")).toBeNull();
+  });
+});
+
+describe("findQuoteLines", () => {
+  const repeated =
+    "Ali: we agree on Vercel\nSara: ok then\nSara: we agree on Vercel";
+
+  it("returns every matching line in order with its speaker", () => {
+    expect(findQuoteLines(repeated, "We agree on   VERCEL")).toEqual([
+      { lineNumber: 1, speaker: "Ali" },
+      { lineNumber: 3, speaker: "Sara" },
+    ]);
+  });
+
+  it("strips a speaker prefix from the quote", () => {
+    expect(findQuoteLines(repeated, "Sara: ok then")).toEqual([
+      { lineNumber: 2, speaker: "Sara" },
+    ]);
+  });
+
+  it("returns an empty list for a too short or missing quote", () => {
+    expect(findQuoteLines(repeated, "a")).toEqual([]);
+    expect(findQuoteLines(repeated, "we pick AWS")).toEqual([]);
   });
 });
 

@@ -12,13 +12,22 @@ const makeSupabase = (state: {
   const calls = {
     deleted: [] as string[],
     inserted: [] as Array<Record<string, unknown>>,
+    itemFilters: [] as Array<[string, unknown]>,
   };
   const client = {
     from: (table: string) => ({
       select: () => {
         if (table === "ledger_items") {
           return {
-            eq: () => Promise.resolve({ data: state.items, error: null }),
+            eq: (col: string, val: unknown) => {
+              calls.itemFilters.push([col, val]);
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  calls.itemFilters.push([col2, val2]);
+                  return Promise.resolve({ data: state.items, error: null });
+                },
+              };
+            },
           };
         }
         return {
@@ -112,5 +121,19 @@ describe("writeLedgerItems (reprocess keep rule, AC-13)", () => {
       }),
     ).resolves.toBe(0);
     expect(console.error).toHaveBeenCalled();
+  });
+
+  it("only reads transcript items, so live agreement items survive reprocessing (0002 AC-16)", async () => {
+    const { client, calls } = makeSupabase({ items: [], reviewedItemIds: [] });
+    await writeLedgerItems(client, {
+      meetingId: "m1",
+      rawText,
+      items,
+      actionItemIds: [],
+    });
+    expect(calls.itemFilters).toEqual([
+      ["meeting_id", "m1"],
+      ["source", "transcript"],
+    ]);
   });
 });

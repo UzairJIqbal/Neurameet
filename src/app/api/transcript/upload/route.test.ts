@@ -17,6 +17,7 @@ const { queues, inserts, mockAuth, mockSupabase } = vi.hoisted(() => {
       return builder;
     };
     builder.single = next;
+    builder.maybeSingle = next;
     builder.then = (
       res: (v: unknown) => unknown,
       rej: (e: unknown) => unknown,
@@ -81,5 +82,17 @@ describe("POST /api/transcript/upload meetingDate (Promise Ledger AC-5)", () => 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ meetingId: "m-old", canProcess: true });
     expect(inserts.find((i) => i.table === "meetings")).toBeUndefined();
+  });
+
+  it("returns 409 when the existing meeting has a minutes review (Tasdeeq AC-7)", async () => {
+    queues.meetings = [
+      { data: { id: "m-old", user_id: "user-1" }, error: null },
+    ];
+    queues.minutes_reviews = [{ data: { status: "open" }, error: null }];
+    const res = await call({ meetingId: "m-old" });
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/under review/);
+    expect(inserts.find((i) => i.table === "transcripts")).toBeUndefined();
   });
 });

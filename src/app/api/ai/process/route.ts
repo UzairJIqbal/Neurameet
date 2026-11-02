@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -8,6 +9,16 @@ import { generateStructuredWithFallback } from "@/agent/models";
 import { extractionResultSchema } from "@/agent/types";
 import { LEDGER_MAX_ITEMS, writeLedgerItems } from "@/agent/ledger";
 import { setTranscriptState } from "@/lib/transcript-state";
+import { assertMinutesUnlocked } from "@/lib/minutes-lock";
+import { buildMinutesDraft, cutMinutes } from "@/agent/minutes";
+import {
+  DISSENT_SUGGESTIONS_MAX,
+  MINUTES_MAX_DECISIONS,
+  MINUTES_MAX_KEY_POINTS,
+  MINUTES_MAX_QUOTES,
+  MINUTES_MAX_SUMMARY_POINTS,
+  type MinutesDraft,
+} from "@/lib/minutes-types";
 
 // Normalize the model's free-text category to a valid MEETING_CATEGORIES
 // member. The AI SDK returns an unconstrained string; mapping it (case-
@@ -73,6 +84,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
 
+    // Tasdeeq AC-7: a meeting with a minutes review keeps its insights frozen.
+    const locked = await assertMinutesUnlocked(supabase, meetingId);
+    if (locked) return locked;
+
     // Fetch the transcript for this meeting
     const { data: transcript, error: transcriptError } = await supabase
       .from("transcripts")
@@ -98,7 +113,7 @@ export async function POST(request: Request) {
     const truncatedText =
       rawText.length > MAX_TRANSCRIPT_CHARS
         ? rawText.slice(0, MAX_TRANSCRIPT_CHARS) +
-        "\n[transcript truncated for processing]"
+          "\n[transcript truncated for processing]"
         : rawText;
 
     // Run AI extraction via Gemini (with Groq fallback). Both paths use the
@@ -118,25 +133,32 @@ Respond with a SINGLE JSON object only (no markdown, no prose), with exactly thi
 {
   "insights": {
     "summary": "A comprehensive summary of the meeting",
-    "keyPoints": ["Key point discussed", "Another key point"],
-    "decisions": ["Decision that was made"],
     "category": "Product | Sales | Design | Operations | Engineering | General",
     "detectedTopics": ["Specific topic", "Another topic"]
   },
+  "minutes": {
+    "summaryPoints": [{ "text": "One summary point", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }],
+    "keyPoints": [{ "text": "Key point discussed", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }],
+    "decisions": [{ "text": "Decision that was made", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }]
+  },
   "actionItems": [
-    { "title": "A clear, actionable task", "assignee": "Person responsible or null", "dueDate": "ISO date YYYY-MM-DD or null" }
+    { "title": "A clear, actionable task", "assignee": "Person responsible or null", "dueDate": "ISO date YYYY-MM-DD or null", "quotes": ["Exact words from one transcript line"] }
   ],
   "ledgerItems": [
     { "kind": "decision | promise", "statement": "Plain English restatement", "quote": "Exact words from one transcript line", "quoteLanguage": "en | ur | mixed", "speaker": "Who said it or null", "assignee": "Who promised (promises only) or null", "dueDate": "ISO date YYYY-MM-DD or null", "actionItemIndex": 0 }
+  ],
+  "dissentSuggestions": [
+    { "speakerLabel": "Speaker name exactly as in the transcript", "topic": "What they objected to", "position": "Their view in one sentence", "quote": "Exact words from one transcript line", "relatedDecisionIndex": 0 }
   ]
 }
 Extraction rules:
-- Summary: a comprehensive summary of the meeting.
-- Key points: the main points discussed.
-- Decisions: explicit decisions that were made.
+- Summary: a comprehensive summary of the meeting, as one paragraph.
+- Minutes: summaryPoints (at most ${MINUTES_MAX_SUMMARY_POINTS}) restate the summary as short points; keyPoints (at most ${MINUTES_MAX_KEY_POINTS}) are the main points discussed; decisions (at most ${MINUTES_MAX_DECISIONS}) are explicit decisions that were made.
+  - speakers: who said the point, using the speaker names exactly as they appear in the transcript, or null.
+  - quotes: at most ${MINUTES_MAX_QUOTES} per point, each copied WORD FOR WORD from ONE transcript line, without the "Speaker:" label. Return no quote (null or an empty array) rather than invent or paraphrase one.
 - Category: choose the SINGLE most representative category from the list. Do NOT default to any one; pick the category that best matches what the meeting was actually about.
 - Detected topics: specific topics discussed.
-- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, and a due date (ISO YYYY-MM-DD) if stated.
+- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, a due date (ISO YYYY-MM-DD) if stated, and at most ${MINUTES_MAX_QUOTES} quotes copied word for word from one transcript line each (no "Speaker:" label; null when there is none).
 - Dates: resolve every relative date ("Friday", "Friday tak", "next week", "kal") against the meeting date above, never against today.
 - Ledger items: every decision that was made and every promise someone made (who will do what, by when). The transcript may be English, Urdu, or mixed Urdu English.
   - quote: copy the words EXACTLY as they appear in the transcript, in the original language and script, from ONE transcript line at most. Do not translate, paraphrase, or include the "Speaker:" label.
@@ -144,8 +166,36 @@ Extraction rules:
   - quoteLanguage: "en" for English, "ur" for Urdu (any script), "mixed" for code mixed Urdu English.
   - assignee and dueDate apply to promises only; use null for decisions.
   - actionItemIndex: the zero based index into the actionItems array you return when this promise is the same commitment, otherwise null.
-  - At most ${LEDGER_MAX_ITEMS} items, the most important first. Return an empty array when there are none.`,
+  - At most ${LEDGER_MAX_ITEMS} items, the most important first. Return an empty array when there are none.
+- Dissent suggestions: at most ${DISSENT_SUGGESTIONS_MAX}, only where a person clearly objected to or disagreed with something. speakerLabel is their name exactly as in the transcript, quote is their own words copied word for word from one line they said (no "Speaker:" label), relatedDecisionIndex is the zero based index into minutes.decisions the objection is about, or null. Return null or an empty array when nobody objected.`,
     });
+
+    // Tasdeeq (spec 0003): action item ids are generated up front so the
+    // minutes draft, written with the insights, can name each action line's row.
+    const actionItemIds = result.actionItems.map(() => randomUUID());
+    const minutes = cutMinutes(result.minutes);
+    let minutesDraft: MinutesDraft | null = null;
+    try {
+      const built = buildMinutesDraft({
+        result,
+        rawText,
+        actionItemIds,
+        maxChars: MAX_TRANSCRIPT_CHARS,
+      });
+      minutesDraft = built.draft;
+      if (built.droppedSuggestions > 0) {
+        console.warn(
+          `[tasdeeq] dropped ${built.droppedSuggestions} dissent suggestions`,
+        );
+      }
+    } catch (draftErr) {
+      console.error("[tasdeeq] minutes draft failed:", draftErr);
+    }
+
+    // The AI call above is long, so a review may have opened meanwhile. Check
+    // again before anything is deleted (AC-7).
+    const lockedNow = await assertMinutesUnlocked(supabase, meetingId);
+    if (lockedNow) return lockedNow;
 
     // Idempotent retry: clear any prior insights, action items, and their
     // follow-ups for this meeting before writing the new ones. This runs only
@@ -166,7 +216,10 @@ Extraction rules:
         .eq("meeting_id", meetingId);
       if (priorItems && priorItems.length > 0) {
         const priorIds = priorItems.map((i) => i.id);
-        await supabase.from("follow_ups").delete().in("action_item_id", priorIds);
+        await supabase
+          .from("follow_ups")
+          .delete()
+          .in("action_item_id", priorIds);
         await supabase.from("action_items").delete().in("id", priorIds);
       }
     }
@@ -177,11 +230,12 @@ Extraction rules:
       .insert({
         meeting_id: meetingId,
         summary: result.insights.summary,
-        key_points: result.insights.keyPoints,
-        decisions: result.insights.decisions,
+        key_points: minutes.keyPoints.map((p) => p.text),
+        decisions: minutes.decisions.map((p) => p.text),
         category: normalizeCategory(result.insights.category),
         detected_topics: result.insights.detectedTopics,
         processed_at: new Date().toISOString(),
+        minutes_draft: minutesDraft,
       });
 
     if (insightsError) {
@@ -193,15 +247,13 @@ Extraction rules:
     }
 
     // Write action items (ids kept in insert order for ledger linking)
-    let actionItemIds: string[] = [];
+    let insertedActionItemIds: string[] = [];
     if (result.actionItems.length > 0) {
-      const {
-        data: insertedItems,
-        error: actionItemsError,
-      } = await supabase
+      const { data: insertedItems, error: actionItemsError } = await supabase
         .from("action_items")
         .insert(
-          result.actionItems.map((item) => ({
+          result.actionItems.map((item, i) => ({
+            id: actionItemIds[i],
             meeting_id: meetingId,
             title: item.title,
             assignee: item.assignee ?? null,
@@ -214,7 +266,7 @@ Extraction rules:
         console.error("Failed to write action items:", actionItemsError);
         // Non-fatal — insights are saved, action items can be retried
       } else if (insertedItems && insertedItems.length > 0) {
-        actionItemIds = insertedItems.map((ai) => ai.id as string);
+        insertedActionItemIds = insertedItems.map((ai) => ai.id as string);
         // Auto-generate a follow-up per action item (Step 7)
         const { error: followUpError } = await supabase
           .from("follow_ups")
@@ -230,10 +282,7 @@ Extraction rules:
           );
 
         if (followUpError) {
-          console.error(
-            "Failed to auto-generate follow-ups:",
-            followUpError,
-          );
+          console.error("Failed to auto-generate follow-ups:", followUpError);
           // Non-fatal — insights + action items are already saved
         }
       }
@@ -246,7 +295,7 @@ Extraction rules:
       meetingId,
       rawText,
       items: result.ledgerItems ?? [],
-      actionItemIds,
+      actionItemIds: insertedActionItemIds,
     });
 
     // Notify the owner by email when the "Email notifications" preference is ON.
@@ -262,9 +311,9 @@ Extraction rules:
         if (!clerkEmail) {
           // Fetch participant email from attendance_events for this meeting and caller.
           const { data: att } = await supabase
-            .from('attendance_events')
-            .select('participant_email')
-            .eq('meeting_id', meetingId)
+            .from("attendance_events")
+            .select("participant_email")
+            .eq("meeting_id", meetingId)
             .or(`user_id.eq.${userId},stream_user_id.eq.${userId}`)
             .limit(1);
           participantEmail = att && att[0] ? att[0].participant_email : null;

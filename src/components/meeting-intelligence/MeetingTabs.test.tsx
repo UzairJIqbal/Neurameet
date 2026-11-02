@@ -110,4 +110,12 @@ describe("Ledger tab is owner only (spec 0001 AC-12)", () => {
     render(<MeetingTabs {...baseProps} />);
     expect(await screen.findByText("Ledger")).toBeTruthy();
   });
+
+  it("shows the Minutes tab to a participant but not Ledger or Recording (spec 0003)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    render(<MeetingTabs {...baseProps} isOwner={false} />);
+    expect(await screen.findByRole("button", { name: "Minutes" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Ledger/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Recording" })).toBeNull();
+  });
 });

@@ -9,6 +9,7 @@ const {
   mockSupabase,
   mockGenerate,
   mockWriteLedger,
+  mockBuildDraft,
 } = vi.hoisted(() => {
   const queues: Record<string, Array<{ data: unknown; error: unknown }>> = {};
   const inserts: Record<string, unknown[]> = {};
@@ -37,6 +38,7 @@ const {
     mockSupabase: vi.fn(() => ({ from: (t: string) => makeBuilder(t) })),
     mockGenerate: vi.fn(),
     mockWriteLedger: vi.fn(),
+    mockBuildDraft: vi.fn(),
   };
 });
 
@@ -50,10 +52,16 @@ vi.mock("@/lib/transcript-state", () => ({ setTranscriptState: vi.fn() }));
 vi.mock("@/agent/models", () => ({
   generateStructuredWithFallback: mockGenerate,
 }));
-vi.mock("@/agent/ledger", () => ({
-  LEDGER_MAX_ITEMS: 15,
+vi.mock("@/agent/ledger", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/agent/ledger")>()),
   writeLedgerItems: mockWriteLedger,
 }));
+// The real draft builder by default; one test makes it throw.
+vi.mock("@/agent/minutes", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/agent/minutes")>();
+  mockBuildDraft.mockImplementation(real.buildMinutesDraft);
+  return { ...real, buildMinutesDraft: mockBuildDraft };
+});
 
 import { POST } from "./route";
 
@@ -83,17 +91,32 @@ const ledgerItem = {
 const extraction = {
   insights: {
     summary: "s",
-    keyPoints: [],
-    decisions: [],
     category: "engineering",
     detectedTopics: [],
   },
+  minutes: {
+    summaryPoints: [],
+    keyPoints: [{ text: "Hosting", speakers: null, quotes: null }],
+    decisions: [
+      { text: "Use Vercel", speakers: ["Sara"], quotes: ["We go with Vercel"] },
+    ],
+  },
   actionItems: [
-    { title: "Move to Vercel", assignee: null, dueDate: null },
-    { title: "Send the survey", assignee: "Ali", dueDate: "2026-10-02" },
+    { title: "Move to Vercel", assignee: null, dueDate: null, quotes: null },
+    {
+      title: "Send the survey",
+      assignee: "Ali",
+      dueDate: "2026-10-02",
+      quotes: ["survey bhej dunga"],
+    },
   ],
   ledgerItems: [ledgerItem],
+  dissentSuggestions: null,
 };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const savedInsights = () =>
+  inserts.meeting_insights[0] as Record<string, unknown>;
 
 // An owned meeting dated 2026-10-01 with a transcript and no prior rows.
 const ownedMeeting = () => {
@@ -212,6 +235,54 @@ describe("POST /api/ai/process (Promise Ledger extraction)", () => {
     });
   });
 
+  it("fills key points and decisions from minutes and stores the draft (spec 0003 AC-1, AC-2)", async () => {
+    ownedMeeting();
+    mockGenerate.mockResolvedValue({ object: extraction });
+
+    expect((await call("u1")).status).toBe(200);
+
+    const sentItems = inserts.action_items[0] as Array<{ id: string }>;
+    expect(sentItems).toHaveLength(2);
+    for (const item of sentItems) expect(item.id).toMatch(UUID);
+
+    const saved = savedInsights();
+    expect(saved.key_points).toEqual(["Hosting"]);
+    expect(saved.decisions).toEqual(["Use Vercel"]);
+    expect(saved.minutes_draft).toMatchObject({
+      version: 1,
+      coverage: { lastLine: 2, totalLines: 2 },
+      dissentSuggestions: [],
+      lines: [
+        { section: "key_point", supported: false, evidence: [] },
+        {
+          section: "decision",
+          supported: true,
+          evidence: [{ lineNumber: 1, speaker: "Sara" }],
+        },
+        { section: "action_item", actionItemId: sentItems[0].id },
+        {
+          section: "action_item",
+          actionItemId: sentItems[1].id,
+          assignee: "Ali",
+          evidence: [{ lineNumber: 2, speaker: "Ali" }],
+        },
+      ],
+    });
+    expect(promptSent()).toContain("WORD FOR WORD");
+  });
+
+  it("still saves the insights when the draft builder throws (spec 0003)", async () => {
+    ownedMeeting();
+    mockGenerate.mockResolvedValue({ object: extraction });
+    mockBuildDraft.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+
+    expect((await call("u1")).status).toBe(200);
+    expect(savedInsights().minutes_draft).toBeNull();
+    expect(savedInsights().decisions).toEqual(["Use Vercel"]);
+  });
+
   it("returns 500 and writes nothing when extraction fails (AC-14)", async () => {
     ownedMeeting();
     mockGenerate.mockRejectedValue(new Error("both providers failed"));
@@ -229,5 +300,28 @@ describe("POST /api/ai/process (Promise Ledger extraction)", () => {
 
     expect((await call("u1")).status).toBe(404);
     expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 and runs no AI while a minutes review exists (spec 0003 AC-7)", async () => {
+    ownedMeeting();
+    queues.minutes_reviews = [{ data: { status: "sealed" }, error: null }];
+    const res = await call("u1");
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe(
+      "These minutes are sealed and can't change.",
+    );
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when a review opened while the AI ran, before anything is deleted", async () => {
+    ownedMeeting();
+    mockGenerate.mockResolvedValue({ object: extraction });
+    queues.minutes_reviews = [
+      { data: null, error: null },
+      { data: { status: "open" }, error: null },
+    ];
+    expect((await call("u1")).status).toBe(409);
+    expect(mockWriteLedger).not.toHaveBeenCalled();
+    expect(inserts.meeting_insights).toBeUndefined();
   });
 });

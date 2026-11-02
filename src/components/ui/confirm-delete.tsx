@@ -14,6 +14,8 @@ interface ConfirmDeleteProps {
   /** Text on the cancel button. */
   cancelLabel?: string;
   disabled?: boolean;
+  /** Optional line shown beside Confirm/Cancel while armed. */
+  warning?: string;
   className?: string;
   size?: "sm" | "md";
 }
@@ -27,6 +29,7 @@ export const ConfirmDelete = ({
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
   disabled,
+  warning,
   className,
   size = "md",
 }: ConfirmDeleteProps) => {
@@ -47,7 +50,10 @@ export const ConfirmDelete = ({
 
   if (confirming) {
     return (
-      <div className={cn("inline-flex items-center gap-2", className)}>
+      <div className={cn("inline-flex flex-wrap items-center gap-2", className)}>
+        {warning && (
+          <span className="w-full text-body-md text-on-surface-variant">{warning}</span>
+        )}
         <button
           type="button"
           onClick={handleConfirm}

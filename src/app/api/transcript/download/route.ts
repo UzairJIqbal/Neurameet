@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { generateTranscriptForMeeting } from "@/agent/transcript-generation";
 import { setTranscriptState } from "@/lib/transcript-state";
 
@@ -93,6 +94,10 @@ export async function POST(request: Request) {
         cached: true,
       });
     }
+
+    // Tasdeeq AC-7: generation would rewrite a transcript under a minutes review.
+    const locked = await assertMinutesUnlocked(supabase, meetingId);
+    if (locked) return locked;
 
     // No ready cache: mark in-flight so a concurrent click (or a later poll)
     // sees `pending` instead of starting a second transcription.

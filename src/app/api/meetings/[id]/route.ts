@@ -164,6 +164,8 @@ export async function GET(
   }
 }
 
+const SEALED = { error: "Sealed minutes can't be deleted" };
+
 // Owner-only delete. FK constraints on every child table use
 // `on delete cascade`, so removing the meetings row removes the transcript,
 // chunks, action items, follow-ups, categories, insights, and attendance in one
@@ -199,11 +201,27 @@ export async function DELETE(
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
+    // Tasdeeq AC-7: sealed minutes are permanent. An open review is removed
+    // with the meeting (cascade); minutes_seals is `on delete restrict`.
+    const { data: seal, error: sealError } = await supabase
+      .from("minutes_seals")
+      .select("id")
+      .eq("meeting_id", id)
+      .limit(1);
+    if (sealError) throw sealError;
+    if (seal && seal.length > 0) {
+      return NextResponse.json(SEALED, { status: 409 });
+    }
+
     const { error: deleteError } = await supabase
       .from("meetings")
       .delete()
       .eq("id", id);
 
+    // A seal that landed after the pre check trips the foreign key restrict.
+    if (deleteError?.code === "23503") {
+      return NextResponse.json(SEALED, { status: 409 });
+    }
     if (deleteError) {
       console.error("Failed to delete meeting:", deleteError);
       return NextResponse.json(

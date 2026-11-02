@@ -125,6 +125,9 @@ export type LedgerDerivedStatus = LedgerItemStatus | "overdue";
 export type LedgerRelation = "kept" | "reversed";
 export type LedgerLinkState = "suggested" | "confirmed" | "rejected";
 export type LedgerReviewDecision = "confirm" | "reject" | "reset";
+// Live Ledger (spec 0002): where an item came from, and the owner's live mark.
+export type LedgerItemSource = "transcript" | "live_agreement";
+export type LedgerLiveMark = "kept" | "open" | "reversed";
 
 export interface LedgerItem {
   id: string;
@@ -140,6 +143,10 @@ export interface LedgerItem {
   lineNumber: number;
   status: LedgerItemStatus;
   createdAt: string;
+  source: LedgerItemSource;
+  /** Live Agreement items only: "agreed by N of M". */
+  agreedCount: number | null;
+  totalCount: number | null;
 }
 
 export interface LedgerLink {
@@ -159,9 +166,20 @@ export interface LedgerLink {
 export interface LedgerItemView extends LedgerItem {
   derivedStatus: LedgerDerivedStatus;
   links: LedgerLink[];
+  /** The latest live mark on this item from a later call, if any. */
+  liveMark: LedgerLiveMark | null;
 }
 
 export interface LedgerIncomingLink extends LedgerLink {
+  item: LedgerItem;
+  sourceMeeting: { id: string; title: string; startedAt: string };
+  /** The owner's live mark on this item during this meeting, if any. */
+  liveMark: LedgerLiveMark | null;
+}
+
+/** A live mark made in this meeting that no transcript link backs (AC-15). */
+export interface LedgerLiveOnlyMark {
+  mark: LedgerLiveMark;
   item: LedgerItem;
   sourceMeeting: { id: string; title: string; startedAt: string };
 }
@@ -169,6 +187,7 @@ export interface LedgerIncomingLink extends LedgerLink {
 export interface LedgerResponse {
   items: LedgerItemView[];
   incoming: LedgerIncomingLink[];
+  liveOnly: LedgerLiveOnlyMark[];
   reversalCount: number;
 }
 

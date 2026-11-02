@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { parseMeetingDate } from "@/lib/meeting-date";
 
 export async function POST(request: Request) {
@@ -85,6 +86,9 @@ export async function POST(request: Request) {
           }
         }
       }
+      // Tasdeeq AC-7: never rewrite a transcript under a minutes review.
+      const locked = await assertMinutesUnlocked(supabase, existing.id);
+      if (locked) return locked;
       meetingIdResolved = existing.id;
       canProcess = existing.user_id === userId;
     } else {

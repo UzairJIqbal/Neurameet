@@ -25,6 +25,7 @@ import {
 import { useState, useEffect, useCallback, useRef } from "react";
 import { LoaderOne } from "./ui/loader";
 import {
+  BookCheck,
   LayoutList,
   ListVideo,
   RefreshCw,
@@ -45,6 +46,10 @@ import { useClerk } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 import { useAttendanceTracking } from "@/hooks/useAttendanceTracking";
 import EndCallButton from "@/components/EndCallButton";
+import { LiveLedgerPanel } from "@/components/live-ledger/LiveLedgerPanel";
+import { LiveLedgerCard } from "@/components/live-ledger/LiveLedgerCard";
+import { AgreementPrompt } from "@/components/live-ledger/AgreementPrompt";
+import { useLiveLedger } from "@/hooks/useLiveLedger";
 
 type callTypesLayout = "grid" | "speaker-left" | "speaker-right";
 
@@ -174,6 +179,9 @@ const MeetingRoom = ({
   const [layout, setLayout] = useState<callTypesLayout>("speaker-right");
   const [showParticipants, setShowParticipants] = useState(false);
   const [showRecordings, setShowRecordings] = useState(false);
+  // Live Ledger (spec 0002): owner only check-in panel, a sibling of the
+  // layout so it never touches the participant tile tree.
+  const [showLedger, setShowLedger] = useState(false);
   const [recordings, setRecordings] = useState<CallRecording[]>([]);
   // Start in the loading state so the panel never flashes the misleading
   // "No recordings available" empty message on first open (recordings is
@@ -211,6 +219,8 @@ const MeetingRoom = ({
   // D3.4: the owner is the call creator. The Record control is owner-only
   // (UI gating) and the recording consent toast is broadcast to everyone.
   const isOwner = !!call && call.state.createdBy?.id === user?.id;
+  // Live Ledger (spec 0002): card and agreement state for everyone in the call.
+  const liveLedger = useLiveLedger(call, guestStreamToken ?? null);
   const [isRecording, setIsRecording] = useState(false);
 
   // Mic / camera toggles via the device managers (stable across renders).
@@ -880,13 +890,14 @@ const MeetingRoom = ({
             gives a phone user an obvious escape. It sits below the control bar
             (z-50) and the panel (z-40) so those stay interactive; only the
             video area (z-0) is dimmed and clickable to close. */}
-        {(showParticipants || showRecordings) && (
+        {(showParticipants || showRecordings || showLedger) && (
           <div
             data-testid="panel-backdrop"
             aria-hidden="true"
             onClick={() => {
               setShowParticipants(false);
               setShowRecordings(false);
+              setShowLedger(false);
             }}
             className="fixed inset-0 z-30 bg-inverse-surface/50"
           />
@@ -921,6 +932,28 @@ const MeetingRoom = ({
             LoadingCallRecordingList={RecordingsPanelLoading}
           />
         </div>
+        {isOwner && showLedger && call && (
+          <div
+            data-testid="live-ledger-panel"
+            className="fixed top-16 bottom-32 right-2 z-40 w-[calc(100vw-1rem)] max-w-[350px] overflow-y-auto rounded-lg border border-outline-variant/20 bg-inverse-surface sm:static sm:ml-2 sm:h-[calc(100vh-10rem)]"
+          >
+            <LiveLedgerPanel
+              callId={call.id}
+              onClose={() => setShowLedger(false)}
+              live={liveLedger.state}
+              actions={liveLedger.actions}
+            />
+          </div>
+        )}
+        {/* Live Ledger overlays for everyone: plain props, outside the tiles. */}
+        <LiveLedgerCard
+          live={liveLedger.state.card}
+          cardSeq={liveLedger.state.cardSeq}
+        />
+        <AgreementPrompt
+          agreement={liveLedger.state.agreement}
+          onVote={liveLedger.actions.vote}
+        />
       </main>
 
       {/* Control bar: pill with icon + label controls */}
@@ -994,6 +1027,7 @@ const MeetingRoom = ({
             onClick={() => {
               setShowParticipants((prev) => !prev);
               setShowRecordings(false);
+              setShowLedger(false);
             }}
             className="flex cursor-pointer items-center gap-2 rounded-xl bg-inverse-surface px-3 py-2 text-inverse-on-surface hover:bg-inverse-on-surface/10 sm:px-4"
           >
@@ -1009,6 +1043,7 @@ const MeetingRoom = ({
               onClick={() => {
                 setShowRecordings((prev) => !prev);
                 setShowParticipants(false);
+                setShowLedger(false);
               }}
               aria-expanded={showRecordings}
               className={cn(
@@ -1025,6 +1060,34 @@ const MeetingRoom = ({
                 Recordings
               </span>
             </Button>
+          )}
+
+          {/* Live Ledger (spec 0002): owner only. A plain button, not the
+              stateful-loader Button, so nothing morphs on click. */}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowLedger((prev) => !prev);
+                setShowParticipants(false);
+                setShowRecordings(false);
+              }}
+              aria-expanded={showLedger}
+              aria-label="Open Live Ledger"
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-xl bg-inverse-surface px-3 py-2 text-inverse-on-surface hover:bg-inverse-on-surface/10 sm:px-4",
+                showLedger && "bg-inverse-on-surface/10",
+              )}
+            >
+              <BookCheck
+                size={20}
+                className="text-inverse-on-surface"
+                aria-hidden
+              />
+              <span className="hidden text-body-md text-inverse-on-surface sm:inline">
+                Ledger
+              </span>
+            </button>
           )}
 
           {/* Reactions: tokened control opening an emoji picker that sends via

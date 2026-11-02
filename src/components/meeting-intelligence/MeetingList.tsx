@@ -152,6 +152,7 @@ const MeetingList = () => {
                   <ConfirmDelete
                     label="Delete meeting"
                     confirmLabel="Delete"
+                    warning="If a minutes review is open, it and its answers are deleted too."
                     onConfirm={() => handleDeleteMeeting(m.id)}
                   />
                 </div>

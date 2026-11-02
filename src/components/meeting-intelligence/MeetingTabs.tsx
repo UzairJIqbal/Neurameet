@@ -15,6 +15,7 @@ import CategoryTab from "./CategoryTab";
 import AiChatTab from "./AiChatTab";
 import EngagementTab from "./EngagementTab";
 import LedgerTab from "./LedgerTab";
+import MinutesTab from "./MinutesTab";
 import { fetchLedger } from "@/lib/ledger-client";
 
 const TABS = [
@@ -26,6 +27,7 @@ const TABS = [
   "AI Chat",
   "Engagement",
   "Ledger",
+  "Minutes",
 ] as const;
 
 type TabKey = (typeof TABS)[number];
@@ -125,6 +127,7 @@ const MeetingTabs = ({
         {active === "AI Chat" && <AiChatTab meetingId={meetingId} />}
         {active === "Engagement" && <EngagementTab meetingId={meetingId} />}
         {isOwner && active === "Ledger" && <LedgerTab meetingId={meetingId} refreshKey={ledgerVersion} onReversalCount={setReversalCount} />}
+        {active === "Minutes" && <MinutesTab meetingId={meetingId} />}
       </div>
     </div>
   );
