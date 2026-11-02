@@ -1,56 +1,49 @@
-# Memory — Promise Ledger: commit + `/check verify promise ledger` (in progress)
+# Memory — Phase W, Step W1 project workspaces (done, on main)
 
-Last updated: 2026-10-30 (evening, about 16:40 UTC)
+Last updated: 2026-11-03
 
 ## What was built
 
-- Slices 1 to 5 committed on branch `feat/promise-ledger`, commit `8f419a0` (not pushed, no PR). `reports/` and `research_notes/` left untracked on purpose.
-- Installed the `anthropics/skills@webapp-testing` skill for browser verification (Claude in Chrome cannot reach localhost).
-- Temporary verify harness (gitignored, delete when done): `.claude/verify-tmp/`
-  - `pw.config.ts`: reuses `playwright.config`, baseURL `http://localhost:3100`, no webServer, `setup` project = `tests/auth.setup.ts` (Clerk e2e user, saves `tests/.clerk/e2e-auth.json`), `verify` project matches `*.verify.ts`. Absolute paths are required (relative storageState gave ENOENT).
-  - `upload.verify.ts` (UI upload via dashboard modal, API fallback), `finish.verify.ts` (embed + match + Ledger tab capture; env MID, TAG, FILE, TITLE, DATE), `review.verify.ts` (guards, confirm/undo, check again, prep), `cleanup.verify.ts` (DEL_IDS), `peek.verify.ts`.
-  - Run: `OUT_DIR=<ev dir> npx playwright test -c .claude/verify-tmp/pw.config.ts --project=verify <name>.verify`
-- Evidence dir (session scratchpad, may be gone next session): `/private/tmp/claude-502/-Users-UzairIqbal-Projects-neurameet/3fa3f89e-e798-43f7-a570-6a619bb75984/scratchpad/ev/` (meetings.jsonl, review.log, run*.log, screenshots and page text).
+- W0 `/architect conversations to code` done; spec `docs/specs/0004-conversations-to-code/index.md`. AGENTS.md API contracts and Security lines synced from it.
+- W-pre partly done: Live Ledger + Tasdeeq merged to `main` (PR #13).
+- W1 built from `prompts/step-W1-project-workspaces.md` (approved):
+  - SQL in `supabase/schema.sql` (W1 block): `projects`, `project_members`, `audit_log`, nullable `meetings.project_id`, rpc `create_project`, `transfer_project_ownership`, `remove_project_member`, and `match_ledger_candidates` scoped by project (same signature).
+  - Shared role check `src/lib/project-auth.ts` (needs read/content/manage/owner; non member 404, wrong role 403). Every meeting scoped route migrated to it.
+  - Project routes under `src/app/api/projects/` (list/create, `[id]`, members, `members/[userId]`, transfer).
+  - UI: `src/app/(root)/(home)/projects/` and `src/components/projects/` (ProjectList, CreateProjectDialog, ProjectDetailView, MembersTab), sidebar link, `/projects(.*)` protected in middleware.
+  - Helpers: `src/lib/project-client.ts`, `project-types.ts`, `projects.ts`.
+  - Ledger match scoped per project (`src/agent/ledger-match.ts`, `loadLiveCandidates(projectId)`).
+  - Follow ups exclude project meetings (`src/actions/follow-ups.ts` adds `.is("project_id", null)`).
+- Commit `3c44df6` (102 files) merged to `main` via PR #14 into #13; `main` head `7e75913` holds Live Ledger, Tasdeeq, specs, and W1.
+- Docs updated: progress-tracker (W1 DONE, SQL applied), build-plan (W1 ✅), scope (W1 ticked), ui-registry (Project Workspace section).
 
-## Demo meetings in Supabase (owner: e2e user `user_3HuHMuZsWgk0kXD0Aog93H5GgzT`)
+## Decisions made
 
-- M1 "Launch planning" 2026-10-01: `434407e2-292e-4414-a3c5-f3682cf683e0`. 4 items (Sara Vercel decision line 5; Ali survey due 2026-10-02 line 8; Hina copy due 2026-10-05 line 10; Bilal line 11). Three promises linked to action items. Ali and Hina show Overdue.
-- M2 "Infra review" 2026-10-08: `fd15c050-5a3e-488f-ac36-d691d1007d09`. 3 items. Links: Vercel decision reversed (0.95), Hina kept (line 11), Bilal monitoring kept (line 13). Ali correctly not matched. Tab label showed "Ledger1" (reversal badge).
-- M3 "Launch check" 2026-10-15: `a0b2d445-5c6b-4d2d-bbb7-bb3a62d04270`. 4 links: M1 Vercel reversed again (line 2), M2 AWS decision kept, Ali survey kept from both M1 and M2 (line 5). Bilal's M2 migration plan promise not matched (judge miss, note for eval).
-- Foreign meeting for owner checks: `6a4124fa-93d6-426f-a8c1-2731e8005403` (another user). Do not modify it.
-- Ask the user before deleting M1 to M3; they may want them for the demo.
+- Projects, members, roles, invites live in our own Supabase tables, not Clerk Organizations.
+- Personal meetings = `project_id` null and behave exactly as before.
+- On a project meeting: project Owner or Admin passes every owner only meeting route; meeting delete stays Owner only. by-call DELETE is now Owner only on project meetings; by-call gained a GET returning `{ meetingId }` (user was asked to confirm both; no answer yet).
+- Stream call role: `admin` for project Owner/Admin, `call_member` otherwise. MeetingRoom host controls follow `canManage`.
+- rpc functions: execute revoked from public/anon/authenticated, granted to service_role only.
 
-## Evidence so far (per AC)
+## Problems solved
 
-- Static: tsc clean, vitest 47 files / 311 tests pass. Live schema: all ledger tables, RPCs, trigger, RLS present.
-- AC-1, AC-2, AC-3, AC-4: pass on M1 and M2 (verified quotes with line numbers, language tags, action_item_id, due dates from meeting date).
-- AC-5: started_at = 2026-10-01 12:00 UTC; future date 2099-01-01 returns 400 "Meeting date cannot be in the future".
-- AC-6, AC-7: pass (links on M2 and M3, confidence >= 0.9, quotes and lines verified).
-- AC-10: M1 Ledger tab shows Overdue for Ali and Hina; API returns derivedStatus overdue.
-- AC-11: M2 tab label "Ledger1" seen.
-- AC-12: signed out 401 on all three routes; foreign meeting GET and match 404, zero-uuid review 404, bad `today` 400, foreign page has no Ledger tab.
-- Pending at save time: the rest of review.verify (M2 confirm/undo, Check again idempotence AC-8, M3 confirm, M1 final Kept/Reversed AC-9, prep AC-15), reprocess AC-13, failure isolation AC-14 (manual, needs bad keys), AC-16 eval, AC-17 static (grep found no hex, raw colors or sonner in LedgerTab/MeetingTabs).
-
-## Findings (for the report; `/check verify` does not edit app code)
-
-1. Gemini hang: `generateStructuredWithFallback` in `src/agent/models.ts:103` has no timeout on the Gemini call. Gemini stalled until the 300 s undici headers timeout, then Groq answered. Processing and match each took 5+ min. The upload modal's shared 120 s AbortController (upload + process + embed) aborts first, so the UI never redirects and match never runs from the UI; the server still finishes. Next dev logs "200 in ~119 s" for the aborted client, which is misleading. Suggested fix: about 30 s abort on the primary call.
-2. Empty body `{}` on match and review returns 400 before the auth check (401 with a valid body). Minor.
-3. In review.verify, "Undo" was not visible right after the first Confirm on M2 (count 0). Not yet explained: check m2-after-first-confirm.txt; it may be the reversal card or a re-render timing issue.
+- eslint chokes on paths with brackets: lint `src` and `constants` with JSON output, then filter to changed files.
+- Remaining lint errors (guest admit/deny tests `any`, prettier in engagement, guest routes, `Sidebar.tsx`) existed on HEAD before W1; not ours.
+- Live Supabase project for this app is "NeuraMeet" id `lsjiwxohfpzdvenbxpeu` (not "Kunji").
 
 ## Current state
 
-- `/check verify promise ledger` finished 2026-10-30: pass with findings. Build passes. Scope box `Verify it` ticked; 41 verified steps ticked in docs/scope/verify.md. Temp harness `.claude/verify-tmp/` and `test-results/` deleted.
-- Finding 3 (Undo after Confirm) explained: a review takes about 3 s and the test only waited 2.5 s. Not an app bug.
-- AC-8, AC-9, AC-11, AC-13, AC-15 all passed live. Not run: AC-14 bad keys step, full AC-16 eval, offline toast, Check again twice, 409 route case.
+- W1 SQL applied to live Supabase as migration `w1_projects_and_members` and verified: tables, column, 4 indexes, RLS on, anon cannot execute the functions, all 202 existing meetings have null `project_id`.
+- Tests 759/759, tsc clean, `npm run build` passes (last run before commit).
+- Known gaps carried to later steps: a Viewer sees an empty action item list until W4 adds `review_state`; guests on project calls not handled until W3; freezeAttesters, seal `owner_id`, and live events still use the creator id.
+- LL5 and Tasdeeq live runs still owed (W-pre).
 
 ## Next session starts with
 
-1. Decide on finding 1 (add about a 30 s timeout on the Gemini call in `src/agent/models.ts`).
-2. Decide whether to keep or delete demo meetings M1 to M3.
-3. Label review plus full `npm run eval:ledger`, then `/test`, `/check review`, `/document`.
+1. Step W2 invitations: write `prompts/step-W2-...md` from the 0004 spec (hashed single use tokens, expiry, owner approval, Resend email + copy link fallback), get approval, build.
 
 ## Open questions
 
-- Fix the Gemini timeout now (separate small task) or note it only?
-- Who is the second labeller for `label_b`?
-- Keep or delete demo meetings M1 to M3 after verification?
+- Confirm by-call DELETE Owner only on project meetings and the new by-call GET.
+- When to do the LL5 and Tasdeeq live runs.
+- Rules that hold: work on `main` and push there, no branches or PRs; ask before commit/push; SQL to live Supabase only with explicit OK per block; never read `.env`; plain words, no dashes; end reports with a 2 line summary.
