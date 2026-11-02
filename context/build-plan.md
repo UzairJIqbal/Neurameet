@@ -2,7 +2,7 @@
 
 Order matters — each step depends on the one before it being real, not assumed. Each step gets its own `/architect` pass (where noted), its own approved prompt in `prompts/`, and its own verification before moving on.
 
-The plan is in these phases: Core NeuraMeet Pipeline (Steps 0 to 9, built), FYP Polish Pass (Step 9.5, built), Advanced Pipeline Features (Steps A0 to C3, built), **Meeting Experience Polish (Steps D0 to D3+, built, before Deploy)**, **Transcript Generation (Steps F0 to F8, built, before Deploy)**, **Guest Join with Owner Approval (Steps G0 to G1.5, G2 to G4, G8 integration audit, G9 manual walkthrough, new, before Deploy)**, Product Final Polishing (Steps P0 to P13), **Signature Feature: Promise Ledger (Steps S0+, new, before Deploy)**, then Deploy (Step 11). Every third party tool in every phase must be zero cost.
+The plan is in these phases: Core NeuraMeet Pipeline (Steps 0 to 9, built), FYP Polish Pass (Step 9.5, built), Advanced Pipeline Features (Steps A0 to C3, built), **Meeting Experience Polish (Steps D0 to D3+, built, before Deploy)**, **Transcript Generation (Steps F0 to F8, built, before Deploy)**, **Guest Join with Owner Approval (Steps G0 to G1.5, G2 to G4, G8 integration audit, G9 manual walkthrough, new, before Deploy)**, Product Final Polishing (Steps P0 to P13), **Signature Feature: Promise Ledger (Steps S0+, built, before Deploy)**, **Signature Feature: Live Ledger (Steps LL0+, new, before Deploy)**, **Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5, new, before Deploy)**, **Project Workspace: Conversations to Code (Steps W-pre, W0 to W9, new, before Deploy)**, then Deploy (Step 11). Every third party tool in every phase must be zero cost.
 
 ---
 
@@ -631,6 +631,100 @@ The one feature meant to make NeuraMeet stand out to the FYP panel. Research and
 - **Zero cost:** about 2 to 3 Gemini calls per meeting (Groq fallback) plus one embedding batch; no extra Whisper calls; no new provider
 
 ---
+
+## Signature Feature: Live Ledger (Steps LL0+, new, before Deploy)
+
+Takes the Promise Ledger into the live call: Promise Check-in (raise an open promise as a quote card for everyone, owner marks it live) and Agreement Check (one tap Agree or Not yet, saved to the ledger as "agreed by N of M"). Research and reasoning: `reports/NeuraMeet second signature feature.md`. Scope row: `docs/scope/scope.md` #18 (workflow tier GA).
+
+### Step LL0 — Live Ledger architect ✅
+- Run `/architect live ledger` before any code. Decide: the new API routes (check-in list, raise, live mark, agreement start and vote), to be added to the AGENTS.md contract list; where live marks and agreement votes are stored (for example a `ledger_live_marks` table) and how they reconcile into `ledger_items` / `ledger_links` after the call; the custom event shape (under Stream's 5 KB cap) sent server side so nobody can fake a card; owner only rules; throttling (about one event per second)
+- Verify every Stream API (custom events, `sendCallEvent`, the `custom` listener, participant state) against the official `stream-react` skill and the installed SDK types before coding, per the permanent Stream rule
+- Keep the panel outside the participant tile tree so it cannot trigger the camera re render loop seen in earlier steps
+- Output: a spec with a build plan; the LL1+ steps below are filled from it
+
+- Done 2026-11-02: spec `docs/specs/0002-live-ledger/index.md` (+ `rationale.md`)
+
+### Step LL1 — Schema plus owner check-in panel ✅
+- Three new tables + `ledger_items.source` columns, `writeLedgerItems` keeps live agreement items, `GET /api/ledger/live/checkin` (deterministic, no AI), owner "Ledger" control with `LiveLedgerPanel` and a private card preview. Spec AC-1, AC-2, AC-3, AC-16, AC-17
+
+### Step LL2 — Raise, mark, close, late join ✅
+- `POST /api/ledger/live/card`, `GET /api/ledger/live`, server sent `ledger.card*` events (owner id, under 4.5 KB), `useLiveLedger` hook, `LiveLedgerCard` overlay, 1.5 s raise throttle. AC-4 to AC-8, AC-12, AC-13
+
+### Step LL3 — Agreement Check ✅
+- `POST /api/ledger/live/agreement`, `POST /api/ledger/live/vote` (guests via verified Stream token), `AgreementPrompt`, close writes a `live_agreement` decision item "agreed by N of M" (M from Stream `queryCallParticipants`) with an embedding. AC-9 to AC-11
+
+### Step LL4 — Reconcile plus Ledger tab ✅
+- Live marks join `runLedgerMatch` candidates; a verdict matching the mark is stored confirmed; Ledger tab "Marked live" and "Agreed live by N of M" badges. AC-14, AC-15
+
+### Step LL5 — Live verify ⬜
+- Your two person call (one signed in, one guest): raise, mark, agree, end, generate transcript, run match, check the Ledger tab badges. AC-17, AC-18
+- Stretch only (LL6, not planned): a speech trigger (blocked today by missing transcript timestamps and the English only cleanup pass)
+- **Verification:** a live two person call where the owner raises a promise, both see the card, the live mark and an agreement land in the ledger after the call; `npx tsc --noEmit` clean, `npm run build` exit 0, vitest green
+- **Zero cost:** about one embedding and zero to a few LLM calls per meeting; Stream free tier custom events only; no paid captions, no extra Whisper calls, no new provider
+
+---
+
+## Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5, new, before Deploy)
+
+Spec `docs/specs/0003-tasdeeq-verified-minutes/index.md`, scope row #19, workflow tier GA.
+
+### Step T1 — Schema plus minutes draft with evidence ✅
+- 7 `minutes_*` tables plus `meeting_insights.minutes_draft`; one extraction call returns minutes with quotes, the server locates every quote (`findQuoteLines`), stores the draft with coverage and validated dissent suggestions; `GET /api/minutes`; `MinutesTab` owner draft view. AC-1 to AC-4, AC-19, AC-20
+
+### Step T2 — Open, cancel, freeze, speaker claims ✅
+- `POST /api/minutes/review`, `POST /api/minutes/claim`, the lock on reprocess, upload, transcript generation, and delete, review open email. AC-5 to AC-8, AC-17
+
+### Step T3 — Attest, suggestions, Finish my review ✅
+- `POST /api/minutes/attest`, `POST /api/minutes/suggestion`, the tab action buttons and progress. AC-9 to AC-12
+
+### Step T4 — Seal and verify ✅
+- `POST /api/minutes/seal`, `GET /api/minutes/verify`, the verify page, sealed email, signing key env var (server only). AC-13 to AC-17
+
+### Step T5 — PDF plus evaluation and end to end check ✅
+- `GET /api/minutes/pdf`, the seed script and evaluation template, a three person run. AC-18, AC-19, AC-21, AC-22
+- **Zero cost:** no new provider; the minutes ride inside the existing single extraction call
+
+---
+
+## Project Workspace: Conversations to Code (Steps W-pre, W0 to W9, new, before Deploy)
+
+Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview`; research in `reports/Conversations to code workspace.md`; scope rows #20 to #27. Extend, do not rewrite: the meeting, transcript, AI, ledger, and minutes engine is reused as is. Decisions locked: projects and roles in our own Supabase tables (not Clerk Organizations); PDF for layout only, Stitch tokens stay; live captions out of the core; all three signature features stay. Every step: prompt file in `prompts/`, approval, then build. Workflow tier GA.
+
+### Step W-pre — Close in flight work ⬜
+Commit Live Ledger and Tasdeeq (both untracked today) on their own branches; run LL5 (two person live verify) and the Tasdeeq three person live run. Exit: clean `git status`, both runs recorded in the progress tracker.
+
+### Step W0 — Architect: `/architect conversations to code` ✅ (spec accepted 2026-11-03, status Proposed)
+Spec in `docs/specs/0004-conversations-to-code/` (index, rationale, 8 child specs, AC-1 to AC-84). Outcomes: Viewers see the chain without quotes, transcript lines, or private repo details; removal is a timestamp and unassigns open tasks; recordings kept until an Owner or Admin deletes them; one repo belongs to one project; a qualifying merge completes the task directly and only suggests the kept promise (Owner or Admin confirms); Resend sender gated on `RESEND_WORKSPACE_FROM`; one GitHub install callback `/api/github/callback`; reprocessing locked once a proposal is reviewed. Originally scoped as: Decides: role matrix (what a Viewer sees), offboarding and recording retention, GitHub linking and completion rules (merge completes directly vs "done pending owner confirm"), one repo per project vs shared, Resend sending domain, data model (`projects`, `project_members`, `project_invitations`, `tasks`, `task_events`, `github_installations`, `github_repos`, `github_deliveries`, `task_links`, `notifications`, `meeting_participants`, `meetings.project_id`, `action_items.review_state`), new API routes added to the AGENTS.md contract list and new secrets (GitHub App private key, webhook secret) added to Security before code. Verify Stream calls with the `stream-react` skill and Next.js `after()` in `node_modules/next/dist/docs/`.
+
+### Step W1 — Projects, members, shared role check ⬜
+Tables plus a shared server helper (`requireProjectRole`) that replaces the ~29 per route `meetings.user_id` owner checks; owner only routes map to Owner/Admin. `meetings.project_id` nullable so personal meetings keep working. Exit: a non member gets 403/404 on every project route (test per route).
+
+### Step W2 — Invitations ⬜
+Hashed 256 bit single use tokens, expiry, email binding, owner approval on by default, public `/invite/[token]` route, Resend email with a copy link fallback (Resend free sends only to the account owner until a domain is verified), audit rows. Exit: forged, expired, and replayed tokens rejected.
+
+### Step W3 — Project meetings + consent notice ⬜
+Project and participant picker in the schedule dialog, `meeting_participants`, project meeting lists, pre join recording consent notice for members and guests. Exit: a project member sees project meetings; an outsider does not.
+
+### Step W4 — Review gate + tasks + Kanban ⬜
+`action_items.review_state`; stop auto created follow ups; quote validation through the ledger validator; assignee suggested only from that person's own audio track (or a Tasdeeq speaker claim); pgvector duplicate check; keyed `tasks` (To Do, In Progress, In Review, Completed, Blocked); follow ups migrated; Kanban with a free drag and drop library chosen at W0 (`@hello-pangea/dnd` recommended); manual completion with evidence. Exit: a planted hallucinated item is dropped, a duplicate is flagged.
+
+### Step W5 — GitHub App ⬜
+Install callback stores installation and repo ids; webhook route verifies `X-Hub-Signature-256` over the raw body (`await req.text()`, `timingSafeEqual`), dedupes on `X-GitHub-Delivery`, replies within 10 s and processes in `after()`; completion only on closing reference + `merged == true` + base is the default branch + all linked PRs done; drafts stay In Progress; closed unmerged does nothing; revert reopens; "Sync GitHub" reconciles missed deliveries (GitHub does not retry); optional issue creation; members mapped by OAuth linked numeric GitHub id. Exit: forged webhook rejected; partial, draft, unmerged, non default, and revert PRs each behave correctly.
+
+### Step W6 — Proof Chain surfaces ⬜
+Project Decisions and Promises tab on `ledger_items` (project scoped; Owner/Admin review), code evidence on promises (owner confirms), meeting Outcome card, Activity timeline as a SQL view, Live Ledger check in scoped to the project. Exit: one demo promise traced in the UI from quote to merge.
+
+### Step W7 — Project AI assistant ⬜
+`match_project_chunks` RPC filtering by project inside SQL; retrieval over meetings, ledger items, and task titles; citations built in code from record ids; transcripts, PR text, and commits wrapped as untrusted data; read only; "not found in this project's records" fallback. Extend `/api/ai/chat` and `/api/search` with `projectId` rather than adding routes. Exit: a cross project question returns nothing from other projects; injected PR text does not change answers.
+
+### Step W8 — Workspace shell, personal views, notifications, Ctrl K ⬜
+New sidebar from the PDF layout, My Dashboard, My Tasks with Overdue (Asia/Karachi day rule), notifications table and bell, one daily digest via the once a day Vercel Hobby cron, Ctrl K palette (`cmdk` recommended), success and warning tokens added to the Stitch set, an empty state in every project tab. Recordings fold into meeting detail, Prep into project overview, Search into Ctrl K. Exit: every tab renders a useful empty state in a fresh project.
+
+### Step W9 — Verify + security suite ⬜
+Security tests (non member, forged webhook, invite replay, role escalation), planted PR scenarios, a real bilingual project meeting through the full chain, demo script. Exit: all green, then Step 11.
+
+### Stretch after W9 — Live captions experiment (deferred) ⬜
+Browser Web Speech captions for each speaker's own mic over Stream custom events (5 KB cap), labelled experimental (Chrome and Edge only, audio processed by Google). The post call transcript stays the record. Not Stream captions (paid add-on, no Urdu).
 
 ## Step 11 — Deploy, then polish and harden
 - Deploy to Vercel (free tier)

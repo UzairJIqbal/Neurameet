@@ -2,6 +2,8 @@
 
 **Locked from final Stitch redesign** (`context/designs/*.png` + `*.html`, 16 screens, approved). This supersedes the earlier draft based on `tailwind.config.ts` guesses — Stitch's actual output is the source of truth. Update `tailwind.config.ts` to match these values exactly. Never hardcode hex values or use raw Tailwind color classes in components — use these tokens.
 
+> **Phase W decision (2026-11-02):** the PDF `NeuraMeet UI Overview` (light indigo and blue look) is used for layout and information architecture only. These Stitch tokens stay locked. Step W8 adds **success** and **warning** status tokens (needed for Completed, In Review, Overdue, Blocked); their exact values are chosen at W8 to sit with this palette, recorded here first, then added to `tailwind.config.ts`.
+
 ---
 
 ## How to Use

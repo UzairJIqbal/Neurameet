@@ -66,9 +66,27 @@ Signature Feature: Promise Ledger (new — Steps S0+, after Product Final Polish
   Steps S1+, Build: filled from the S0 spec.
   ZERO-COST RULE applies: Gemini + Groq + pgvector only. Claim wording stays narrow ("none of the major platforms or notetakers we reviewed").
 
+Signature Feature: Live Ledger (new — Steps LL0+, after the Promise Ledger, before Deploy):
+  Takes the Promise Ledger into the live call (chosen 2026-11-02 from `reports/NeuraMeet second signature feature.md`). Promise Check-in: the owner raises an open or overdue promise and every participant sees it as a quote card; the owner marks it Kept, Still open, or Reversed live. Agreement Check: the host types a decision, participants tap Agree or Not yet, saved to the ledger as "agreed by N of M".
+  Step LL0, Architect: `/architect live ledger` decides the routes (add them to the API Contracts list before coding), live marks storage and post call reconcile into `ledger_items` / `ledger_links`, the server side custom event shape (Stream 5 KB cap), owner only rules, and throttling. Verify every Stream API via the `stream-react` skill first. Workflow tier GA.
+  Steps LL1+, Build: filled from the LL0 spec. A speech trigger is a stretch step only.
+  ZERO-COST RULE applies: Stream free tier custom events + existing Gemini/Groq/pgvector only. No paid captions, no extra Whisper calls, no new provider.
+
+Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5, built in code, live run pending, before Deploy):
+  Every attendee confirms, corrects, or records a dissent ("Record my view") on the AI minutes lines attributed to them; each line links to its supporting transcript lines; minutes seal on quorum or deadline (SHA-256 chain + Ed25519 signature, server only key) so any later change is detectable. Spec `docs/specs/0003-tasdeeq-verified-minutes/index.md`, scope #19, GA. Say "tamper evident", never "legally binding".
+
+Phase W, Project Workspace: Conversations to Code (new — Steps W-pre, W0 to W9, after the Signature Features, before Deploy):
+  Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview` and `reports/Conversations to code workspace.md`. NeuraMeet becomes a project workspace that connects conversations with code. Centre of gravity is the Proof Chain: a spoken promise (code verified quote, speaker, timestamp) → human reviewed task → PR merged into the default branch → promise marked kept, visible from the meeting and the Promise Ledger. Claim stays narrow ("none of the products we reviewed"); Huly, Linear, Jira + Loom/Rovo already ship the individual screens.
+  Step W-pre: commit in flight Live Ledger + Tasdeeq work; run LL5 and the Tasdeeq live run.
+  Step W0, Architect: `/architect conversations to code` decides the role matrix (Owner, Admin, Developer, Viewer), offboarding and retention, GitHub linking rules, whether a merge completes a task directly or pending owner confirm, repo sharing, the Resend sending domain, and every new API route (add to the API Contracts list before coding) and new secret (add to Security). Workflow tier GA.
+  Steps W1 to W9 (scope #20 to #27): W1 projects, members, shared server role check (replaces per route `meetings.user_id` owner checks; `meetings.project_id` nullable so personal meetings keep working); W2 invitations (hashed single use tokens, expiry, owner approval, Resend email + copy link fallback); W3 project meetings + consent notice; W4 review gate (no auto created follow ups; quote verified, own track assignee rule, pgvector duplicate check) + keyed tasks + Kanban; W5 GitHub App (raw body HMAC `X-Hub-Signature-256`, `X-GitHub-Delivery` dedupe, `after()` processing, strict completion rules, revert reopens, Sync reconcile); W6 Proof Chain surfaces (Decisions and Promises tab on `ledger_items`, code evidence, Outcome card, Activity timeline); W7 project assistant (extend `/api/ai/chat` + `/api/search` with project scope, filter by project inside SQL, code built citations, untrusted data wrapping); W8 workspace shell + personal views + notifications + Ctrl K; W9 security suite + bilingual end to end run.
+  Decisions locked 2026-11-02: projects, members, roles, and invites live in our own Supabase tables (not Clerk Organizations); the PDF is used for layout and information architecture only and the locked Stitch tokens in `context/ui-tokens.md` stay (add success and warning tokens at W8); live captions leave the core (paid on Stream, no Urdu) and are an optional post W9 Web Speech experiment; Promise Ledger, Live Ledger, and Tasdeeq stay (Decisions and Promises tab, live meeting panel, optional Verify minutes step before task confirmation).
+  Cut: the PDF's development simulator, Contributors tab and per developer contribution views, a global assistant outside projects, sprints, raw commit ingestion beyond PR linked commits.
+  ZERO-COST RULE applies: free GitHub App + webhooks, Supabase, Vercel Hobby (`after()`, once a day cron), Gemini/Groq/pgvector, Stream free tier, Clerk free, Resend free. No paid captions, no Clerk paid roles, no new AI provider.
+
 Phase 4, Deploy: deploy to Vercel free tier and harden (re-enable Clerk email verification before production, verify every path, confirm no secret leaks, confirm free tier limits). Deploy sits after the Meeting Experience Polish phase, not before.
 
-Out of scope (do not build unless explicitly asked): auto-transcription vendor lock-in beyond one provider, multi-tenant/org accounts, payments/billing, mobile app, calendar integrations, live collaborative transcript editing, custom LLM fine-tuning. Do not overbuild.
+Out of scope (do not build unless explicitly asked): auto-transcription vendor lock-in beyond one provider, multi-tenant/org accounts beyond the Phase W project workspaces (no organizations, no Clerk Organizations, no cross workspace admin), payments/billing, mobile app, calendar integrations, live collaborative transcript editing, custom LLM fine-tuning. Do not overbuild.
 
 ## Architecture
 - UI (Next.js pages/components) displays data only — no business logic, no direct DB or AI SDK calls in components.
@@ -119,11 +137,30 @@ POST /api/ledger/match             → owner only: match this meeting's transcri
 GET  /api/ledger                   → owner only: ?meetingId=&today=YYYY-MM-DD, this meeting's items + links, incoming links, reversal count
 POST /api/ledger/links/[id]/review → owner only: { decision: "confirm" | "reject" | "reset" }
 POST /api/prep                     → (extended) adds a deterministic ledgerItems list (top 5 open or overdue)
+GET  /api/ledger/live/checkin      → owner only: ?callId=&today=YYYY-MM-DD, up to 20 open/overdue items from the owner's other meetings (deterministic, no AI)
+GET  /api/ledger/live              → participant: ?callId=&today=YYYY-MM-DD (+ guestStreamToken for guests), open card + open agreement with tallies and the caller's vote
+POST /api/ledger/live/card         → owner only: { callId, itemId, action: "raise" | "mark" | "close", mark?, today? (YYYY-MM-DD, raise) }, stores the live mark, sends a ledger.card* event
+POST /api/ledger/live/agreement    → owner only: { callId, action: "open" | "close", statement?, agreementId? }, close writes a decision ledger item "agreed by N of M"
+POST /api/ledger/live/vote         → participant: { callId, agreementId, vote: "agree" | "not_yet", guestStreamToken? }, one vote per voter, sends a tally event (best effort: the vote is stored even if the event fails)
+GET  /api/ledger                   → (extended) items carry source, agreedCount, totalCount, liveMark
+POST /api/ledger/match             → (extended) live marks join the candidates; a verdict matching the live mark is stored as confirmed
+GET  /api/minutes                 → owner or recorded participant: ?meetingId=, draft (owner, before open) or review state, lines, evidence, claims, my answers, all answers, my suggestions, progress, seal
+POST /api/minutes/review          → owner only: { meetingId, action: "open" | "cancel", deadlineDays?: 3 | 7 }, open freezes lines and attesters and sends "Review open" emails
+POST /api/minutes/claim           → attester: { meetingId, action: "claim" | "assign" | "clear", speakerLabel, userId? (assign) }, assign and clear are owner only
+POST /api/minutes/attest          → attester: { meetingId, action: "confirm" | "correct" | "view" | "finish", lineId?, note?, suggestionId? }, latest answer wins, late flagged
+POST /api/minutes/suggestion      → holder of the label: { meetingId, suggestionId, action: "dismiss" }
+POST /api/minutes/seal            → owner only: { meetingId }, signed chained SHA-256 seal, sends "Minutes sealed" emails
+GET  /api/minutes/verify          → public: ?sealId= (&hash=), intact or altered, hash, title, date, status text, never the minutes text
+GET  /api/minutes/pdf             → attester, after seal: ?meetingId=, application/pdf with Content-Disposition attachment
+POST /api/ai/process              → (extended) also writes minutes_draft; 409 while a minutes review exists
+POST /api/transcript/upload       → (extended) 409 when meetingId has a minutes review
+POST /api/transcript/download     → (extended) 409 when generation would rewrite a transcript under a minutes review
+DELETE /api/meetings/[id]         → (extended) 409 "Sealed minutes can't be deleted" when sealed
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 
 ## Security
-Never expose to the browser: `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `STREAM_SECRET_KEY`, `CLERK_SECRET_KEY`.
+Never expose to the browser: `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `STREAM_SECRET_KEY`, `CLERK_SECRET_KEY`, `MINUTES_SIGNING_PRIVATE_KEY`.
 Never run from the browser: embedding generation, RAG retrieval, LLM calls, Supabase service-role writes. All of the above go through API routes only, using the Supabase server client and AI SDK server-side.
 
 ## Code Standards

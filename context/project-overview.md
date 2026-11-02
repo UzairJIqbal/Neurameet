@@ -4,6 +4,8 @@
 
 NeuraMeet is an AI-integrated meeting platform. Users create or join real-time video meetings (Stream Video SDK), and every meeting becomes searchable, summarized intelligence: AI-generated summary, extracted action items, an auto-assigned category, and a meeting-aware chat that answers questions grounded in that specific meeting's content (RAG). Transcripts can be uploaded directly or generated from a meeting recording. Action items convert into trackable Follow-ups.
 
+**Direction from Phase W (adopted 2026-11-02, from the PDF `NeuraMeet UI Overview`):** NeuraMeet grows into "the development workspace that connects conversations with code" for software houses, dev teams, and university FYP teams. Projects hold members with roles, meetings, reviewed tasks on a Kanban board, a linked GitHub repo, a Decisions and Promises log, an activity timeline, and a project AI assistant. The differentiator is the **Proof Chain**: a promise spoken in a meeting (English, Urdu, or both) is traced to a reviewed task, then to a PR merged into the default branch, and shown as kept back on the meeting. Research: `reports/Conversations to code workspace.md`.
+
 ---
 
 ## The Problem It Solves
@@ -136,10 +138,40 @@ All Advanced features reuse the existing Gemini primary + Groq fallback and pgve
 - Evaluation for the thesis: accuracy on a small hand labelled set (Urdu English results reported separately) plus a 6 to 10 person task study
 - All zero cost, existing free tiers only
 
+### Signature Feature: Live Ledger (new, Steps LL0+, after the Promise Ledger, before Deploy)
+- Takes the Promise Ledger into the live call. Chosen from the November 2026 research (`reports/NeuraMeet second signature feature.md`), which found most live AI features (captions, live summaries, polls, reactions) already standard, but no product pushes a past promise with its exact quote into a live call
+- Promise Check-in: the owner sees a ranked panel of open and overdue promises, raises one so every participant sees it as a quote card, and marks it Kept, Still open, or Reversed during the call
+- Agreement Check: the host types a decision, each participant taps Agree or Not yet, and it is saved to the ledger as "agreed by N of M", so a quiet "we agreed" becomes an explicit, logged agreement
+- After the call, live marks and agreements are reconciled into the ledger (owner stays the final reviewer)
+- Reuses the server side Stream `sendCallEvent` path (already used by guest join), the in room `custom` event listener, and the existing ledger RPCs. Stream custom events are capped at 5 KB, so cards carry ids and a short quote, not transcripts
+- Cost per meeting: about one embedding and zero to a few LLM calls; no Stream paid captions, no extra Whisper calls, no new provider
+- Not in the first build: an automatic speech trigger that raises a promise when someone mentions it (stretch step only; stored transcripts have no timestamps and the cleanup pass outputs English)
+- Step LL0 is `/architect live ledger`; it decides the routes (to be added to the AGENTS.md contract list), the live marks storage, the event shape, and checks every Stream API against the official `stream-react` skill. Workflow tier GA
+- All zero cost, existing free tiers only
+
+### Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5, built in code, live run pending)
+- Every attendee confirms, corrects, or records a dissent on the AI minutes lines attributed to them; each line links to its supporting transcript lines and unsupported lines are flagged
+- Minutes seal on quorum or deadline (SHA-256 chain plus Ed25519 signature); a public verify page detects any later change. Say "tamper evident", never "legally binding"
+- Spec `docs/specs/0003-tasdeeq-verified-minutes/index.md`; in Phase W it becomes the optional Verify minutes step before AI proposed tasks are confirmed
+
+### Phase W, Project Workspace: Conversations to Code (new, Steps W-pre, W0 to W9, before Deploy)
+- **Personal space:** My Dashboard, My Tasks (with Overdue), My Meetings, My Projects, Notifications, Ctrl K search. Personal meetings with no project keep working
+- **Projects:** Owner, Admin, Developer, Viewer roles kept in our own Supabase tables; invitations by email or copyable link with single use hashed tokens, expiry, and owner approval
+- **Project tabs:** Overview, Meetings, Tasks (Kanban: To Do, In Progress, In Review, Completed, Blocked), Decisions and Promises (the Promise Ledger), GitHub, Activity, AI Assistant, Members, Settings
+- **Review gate:** AI proposes tasks and decisions with a code verified quote, speaker, and timestamp; a duplicate check runs against open tasks; nothing becomes a task until the owner or an admin confirms; optional "also create GitHub issue"
+- **GitHub:** a free GitHub App per project repo. A task moves to In Review when a linked non draft PR opens and completes only when a PR with a closing reference merges into the default branch and all linked PRs are done; a revert reopens it; signed webhooks only. Tasks without GitHub complete manually with evidence
+- **Proof Chain:** a qualifying merge adds code evidence to the linked promise, the meeting shows an Outcome card, and the Activity timeline joins meetings, decisions, tasks, and PRs
+- **Project assistant:** answers only from the project's own meetings, promises, and tasks, with citations built by code and "not found in this project's records" when nothing matches
+- **Live meeting:** Live Ledger panel and a recording consent notice. Live captions are deferred (Stream captions are paid with no Urdu); the post call Whisper transcript stays the record
+- **Design:** the PDF sets layout and information architecture; colours stay the locked Stitch tokens, plus success and warning tokens
+- **Cut:** development simulator, Contributors tab and per developer contribution views, a global assistant outside projects, sprints
+- Step W0 is `/architect conversations to code`. Zero cost: free GitHub App, Vercel Hobby, Supabase, Gemini/Groq/pgvector, Stream, Clerk, Resend free tiers only
+
 ## Features Out of Scope
 
 - Auto-transcription vendor lock-in beyond one provider (Stream's own transcription or a single chosen provider — decide once, do not add a second)
-- Multi-tenant/organization accounts
+- Organization accounts beyond Phase W project workspaces (no Clerk Organizations, no cross workspace admin, no billing)
+- Live captions in the core (deferred; optional Web Speech experiment after W9)
 - Payments or subscriptions
 - Mobile app
 - Calendar integrations (Google Calendar sync etc.)
@@ -151,7 +183,7 @@ All Advanced features reuse the existing Gemini primary + Groq fallback and pgve
 
 ## Target User
 
-Small teams and solo professionals who run recurring meetings, want automatic summaries and action-item tracking, and want to ask questions about past meetings without re-watching recordings — without paying for a hosted SaaS.
+Software houses, dev teams, and university FYP teams (Pakistan first, English and Urdu meetings) who need meeting promises to turn into tracked, provable code work; plus small teams and solo professionals who run recurring meetings, want automatic summaries and action-item tracking, and want to ask questions about past meetings without re-watching recordings — without paying for a hosted SaaS.
 
 ---
 
@@ -163,4 +195,6 @@ Small teams and solo professionals who run recurring meetings, want automatic su
 - Follow-ups correctly reflect extracted action items and update status reliably
 - No secret keys or service-role credentials ever reach client bundles
 - Promise Ledger flags a reversed decision and tracks a promise across two or more meetings with a quote behind every verdict, including on a bilingual Urdu English meeting
+- Live Ledger shows a raised promise to every participant during a call and saves the owner's live mark and any Agreement Check result to the ledger
+- Proof Chain: one promise from a real Urdu English project meeting is traced in the UI from quote to reviewed task to merged PR to kept, and a forged webhook, a partial PR, and a non member request are all refused
 - Entire stack runs on free-tier services only (Supabase free tier, Gemini/Groq free tier, Stream free tier, Clerk free tier)
