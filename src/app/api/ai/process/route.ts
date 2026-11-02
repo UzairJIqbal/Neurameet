@@ -10,6 +10,7 @@ import { extractionResultSchema } from "@/agent/types";
 import { LEDGER_MAX_ITEMS, writeLedgerItems } from "@/agent/ledger";
 import { setTranscriptState } from "@/lib/transcript-state";
 import { assertMinutesUnlocked } from "@/lib/minutes-lock";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 import { buildMinutesDraft, cutMinutes } from "@/agent/minutes";
 import {
   DISSENT_SUGGESTIONS_MAX,
@@ -72,16 +73,24 @@ export async function POST(request: Request) {
 
     const supabase = supabaseServer();
 
-    // Ownership check: only the meeting's owner may run extraction on it.
+    // Access check: the creator of a personal meeting, or an Owner or Admin of
+    // a project meeting ("manage" need), may run extraction on it.
     const { data: owned, error: ownErr } = await supabase
       .from("meetings")
-      .select("id, started_at, created_at")
+      .select("id, user_id, project_id, started_at, created_at")
       .eq("id", meetingId)
-      .eq("user_id", userId)
       .maybeSingle();
 
     if (ownErr || !owned) {
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
+    }
+
+    try {
+      await checkMeetingAccess(supabase, userId, owned, "manage");
+    } catch (accessErr) {
+      const denied = accessErrorResponse(accessErr);
+      if (denied) return denied;
+      throw accessErr;
     }
 
     // Tasdeeq AC-7: a meeting with a minutes review keeps its insights frozen.

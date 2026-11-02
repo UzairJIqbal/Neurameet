@@ -587,7 +587,7 @@ Projects with Owner, Admin, Developer, and Viewer roles kept in our own Supabase
 **Done when:** a non member gets 403 or 404 on every project route; forged, expired, and replayed invite tokens are rejected; an invited member joins with the right role after owner approval.
 Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
 - [ ] Build it: `/develop project workspaces`
-  - [ ] W1 Projects, members, shared role check, route migration (AC-1 to AC-12)
+  - [x] W1 Projects, members, shared role check, route migration (AC-1 to AC-12) (`src/lib/project-auth.ts`, `src/app/api/projects/`)
   - [ ] W2 Invitations and join requests (AC-13 to AC-22)
 
 ### 21. Project meetings with a consent notice · planned · GA

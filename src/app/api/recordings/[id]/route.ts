@@ -4,7 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { deleteUserRecording } from "@/lib/recordings";
 
 // Owner-only delete of a single recording. Ownership is enforced inside
-// deleteUserRecording (it only matches recordings from the caller's own calls).
+// deleteUserRecording (it only matches recordings from the caller's own calls;
+// a project meeting's recording needs the project Owner or Admin role).
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -19,7 +20,8 @@ export async function DELETE(
   const result = await deleteUserRecording(userId, id);
 
   if (!result.ok) {
-    const status = result.error === "Recording not found" ? 404 : 500;
+    const status =
+      result.status ?? (result.error === "Recording not found" ? 404 : 500);
     return NextResponse.json({ error: result.error }, { status });
   }
 

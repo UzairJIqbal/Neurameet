@@ -63,11 +63,13 @@ export async function GET() {
   try {
     const supabase = supabaseServer();
 
-    // Scope to the user's own meetings (reliable ownership filter)
+    // Scope to the user's own personal meetings (reliable ownership filter).
+    // Project meetings have no follow ups of their own (Phase W tasks instead).
     const { data: meetings, error: meetingsError } = await supabase
       .from("meetings")
       .select("id")
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .is("project_id", null);
 
     if (meetingsError) {
       console.error("Failed to load meetings:", meetingsError);

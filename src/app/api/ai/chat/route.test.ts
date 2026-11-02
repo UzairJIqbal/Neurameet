@@ -16,6 +16,7 @@ const {
   const store = {
     meetings: { data: null as unknown, error: null as unknown },
     attendance: { data: null as unknown, error: null as unknown },
+    members: { data: null as unknown, error: null as unknown },
   };
   const makeClient = () => ({
     from: (table: string) => {
@@ -24,12 +25,16 @@ const {
           ? store.meetings
           : table === "attendance_events"
             ? store.attendance
-            : { data: null, error: null };
+            : table === "project_members"
+              ? store.members
+              : { data: null, error: null };
       // Chainable builder: every .eq returns itself so .eq().eq().single()
       // (meetings) and .eq().eq().limit() (attendance) both resolve.
       const builder = {
         eq: () => builder,
+        is: () => builder,
         single: () => Promise.resolve(result),
+        maybeSingle: () => Promise.resolve(result),
         limit: () => Promise.resolve(result),
         order: () => builder,
         then: (
@@ -107,6 +112,7 @@ describe("POST /api/ai/chat authorization", () => {
     vi.clearAllMocks();
     store.meetings = { data: null, error: null };
     store.attendance = { data: null, error: null };
+    store.members = { data: null, error: null };
     // Keep the hoisted defaults intact.
     mockRetrieveContext.mockImplementation(async () => []);
     mockBuildSystemPrompt.mockImplementation(() => "system-prompt");
@@ -153,6 +159,46 @@ describe("POST /api/ai/chat authorization", () => {
 
     expect(res.status).toBe(404);
     expect(mockStreamText).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a non member on a project meeting", async () => {
+    store.meetings = {
+      data: { id: "m1", user_id: "owner", project_id: "p1" },
+      error: null,
+    };
+    store.members = { data: null, error: null };
+
+    const res = await call("stranger", body("m1"));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Meeting not found" });
+    expect(mockStreamText).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for a viewer on a project meeting", async () => {
+    store.meetings = {
+      data: { id: "m1", user_id: "owner", project_id: "p1" },
+      error: null,
+    };
+    store.members = { data: { role: "viewer" }, error: null };
+
+    const res = await call("viewer", body("m1"));
+
+    expect(res.status).toBe(403);
+    expect(mockStreamText).not.toHaveBeenCalled();
+  });
+
+  it("streams for a developer on a project meeting", async () => {
+    store.meetings = {
+      data: { id: "m1", user_id: "owner", project_id: "p1" },
+      error: null,
+    };
+    store.members = { data: { role: "developer" }, error: null };
+
+    const res = await call("dev", body("m1"));
+
+    expect(res.status).toBe(200);
+    expect(mockStreamText).toHaveBeenCalledTimes(1);
   });
 
   it("returns 404 when the meeting does not exist (PGRST116)", async () => {

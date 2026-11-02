@@ -1,6 +1,6 @@
 # 0004. Conversations to Code, Project Workspace
 
-**Status**: Proposed
+**Status**: In Progress
 **Date**: 2026-11-03
 **Mode**: FEATURE
 **Scope feature**: [docs/scope/scope.md, rows 20 to 27. Project Workspace](../../scope/scope.md)

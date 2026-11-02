@@ -7,12 +7,14 @@ const { store, mockAuth, mockGenerate } = vi.hoisted(() => ({
   store: {
     meeting: null as Record<string, unknown> | null,
     attendance: [] as Array<Record<string, unknown>>,
+    member: null as Record<string, unknown> | null,
     review: null as Record<string, unknown> | null,
   },
   mockAuth: vi.fn(),
   mockGenerate: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/agent/transcript-generation", () => ({
   generateTranscriptForMeeting: mockGenerate,
@@ -33,13 +35,16 @@ vi.mock("@/lib/supabase-server", () => ({
             ? store.attendance
             : table === "minutes_reviews" && store.review
               ? [store.review]
-              : [];
+              : table === "project_members" && store.member
+                ? [store.member]
+                : [];
       const builder = {
         select: () => builder,
         eq: (col: string, val: unknown) => {
           filters.push([col, val]);
           return builder;
         },
+        is: () => builder,
         limit: () => builder,
         maybeSingle: async () => ({
           data:
@@ -75,6 +80,7 @@ describe("POST /api/transcript/download authorization", () => {
     store.meeting = { id: "m1", user_id: "owner", stream_call_id: "call-1" };
     store.attendance = [];
     store.review = null;
+    store.member = null;
   });
 
   it("rejects a streamCallId that is not the meeting's", async () => {
@@ -113,5 +119,47 @@ describe("POST /api/transcript/download authorization", () => {
     const res = await post({ meetingId: "m1", streamCallId: "call-1" });
     expect(res.status).toBe(409);
     expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  describe("on a project meeting (spec 0004)", () => {
+    beforeEach(() => {
+      store.meeting = {
+        id: "m1",
+        user_id: "owner",
+        project_id: "p1",
+        stream_call_id: "call-1",
+      };
+    });
+    const member = (role: string) => {
+      store.member = { project_id: "p1", user_id: "user_a", role };
+    };
+
+    it("returns 404 to a non member, even one who attended", async () => {
+      store.attendance = [{ id: "a1", meeting_id: "m1", user_id: "user_a" }];
+      const res = await post({ meetingId: "m1", streamCallId: "call-1" });
+      expect(res.status).toBe(404);
+      expect(mockGenerate).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 to a Viewer", async () => {
+      member("viewer");
+      const res = await post({ meetingId: "m1", streamCallId: "call-1" });
+      expect(res.status).toBe(403);
+      expect(mockGenerate).not.toHaveBeenCalled();
+    });
+
+    it("lets a Developer download but not generate", async () => {
+      member("developer");
+      const res = await post({ meetingId: "m1", streamCallId: "call-1" });
+      expect(res.status).toBe(403);
+      expect(mockGenerate).not.toHaveBeenCalled();
+    });
+
+    it("lets an Admin generate", async () => {
+      member("admin");
+      const res = await post({ meetingId: "m1", streamCallId: "call-1" });
+      expect(res.status).toBe(200);
+      expect(mockGenerate).toHaveBeenCalledOnce();
+    });
   });
 });

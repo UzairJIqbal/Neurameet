@@ -3,6 +3,7 @@ import { callsOf, ok, queue, resetQueues } from "@/test/supabase-queue-mock";
 
 const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock(
   "@/lib/supabase-server",
@@ -267,5 +268,83 @@ describe("POST /api/minutes/claim", () => {
     const update = callsOf("minutes_attesters", "update");
     expect(update).toHaveLength(1);
     expect(update[0].args[0]).toEqual({ done_at: null });
+  });
+
+  describe("project meeting: assign and clear need manage", () => {
+    const projectMeeting = ok({
+      id: "m1",
+      user_id: "creator",
+      project_id: "p1",
+      title: "Weekly",
+      started_at: "2026-11-02T09:00:00Z",
+      created_at: null,
+    });
+
+    const assignAs = (userId: string) =>
+      post(userId, {
+        meetingId: "m1",
+        action: "assign",
+        speakerLabel: "Ali",
+        userId: "p1",
+      });
+
+    it("returns 404 to a non member", async () => {
+      queue("meetings", projectMeeting);
+      queue("project_members", ok(null));
+      const res = await assignAs("stranger");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Meeting not found" });
+    });
+
+    it("returns 403 to a Viewer and to a Developer, even an attester", async () => {
+      queue("meetings", projectMeeting, projectMeeting);
+      queue(
+        "project_members",
+        ok({ role: "viewer" }),
+        ok({ role: "developer" }),
+      );
+      const viewer = await assignAs("v1");
+      expect(viewer.status).toBe(403);
+      expect(await viewer.json()).toEqual({ error: "Not authorized" });
+      expect((await assignAs("p1")).status).toBe(403);
+      expect(callsOf("minutes_speaker_claims", "insert")).toHaveLength(0);
+    });
+
+    it("lets an Admin who is not an attester assign a label", async () => {
+      queue("meetings", projectMeeting);
+      queue("project_members", ok({ role: "admin" }));
+      queue("minutes_reviews", openReview, ok({ status: "open" }));
+      queue("minutes_attesters", ok([owner, ali]));
+      queue("transcripts", raw);
+      queue("minutes_lines", ok([line]));
+      queue("minutes_speaker_claims", ok([]));
+      queue("minutes_attestations", ok([]));
+      const res = await assignAs("a1");
+      expect(res.status).toBe(200);
+      expect(
+        callsOf("minutes_speaker_claims", "insert")[0].args[0],
+      ).toMatchObject({
+        speaker_label: "ali",
+        user_id: "p1",
+        claimed_by: "owner",
+      });
+    });
+
+    it("keeps claim open to any frozen attester on a project meeting", async () => {
+      queue("meetings", projectMeeting);
+      queue("minutes_reviews", openReview, ok({ status: "open" }));
+      queue("minutes_attesters", ok(ali), ok([owner, ali]));
+      queue("transcripts", raw);
+      queue("minutes_lines", ok([line]));
+      queue("minutes_speaker_claims", ok([]));
+      queue("minutes_attestations", ok([]));
+      const res = await post("p1", {
+        meetingId: "m1",
+        action: "claim",
+        speakerLabel: "Ali",
+      });
+      expect(res.status).toBe(200);
+      expect(callsOf("project_members", "select")).toHaveLength(0);
+    });
   });
 });

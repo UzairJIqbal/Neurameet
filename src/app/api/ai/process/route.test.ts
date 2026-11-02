@@ -17,7 +17,7 @@ const {
     const next = () =>
       Promise.resolve(queues[table]?.shift() ?? { data: null, error: null });
     const builder: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "in", "delete"])
+    for (const m of ["select", "eq", "in", "is", "delete"])
       builder[m] = () => builder;
     builder.insert = (rows: unknown) => {
       (inserts[table] ??= []).push(rows);
@@ -42,6 +42,7 @@ const {
   };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mockAuth,
   currentUser: vi.fn(),
@@ -124,6 +125,8 @@ const ownedMeeting = () => {
     {
       data: {
         id: "m1",
+        user_id: "u1",
+        project_id: null,
         started_at: "2026-10-01T12:00:00.000Z",
         created_at: "2026-10-29T09:00:00.000Z",
       },
@@ -176,6 +179,41 @@ describe("POST /api/ai/process (Promise Ledger extraction)", () => {
     expect(mockWriteLedger).not.toHaveBeenCalled();
   });
 
+  it("returns 404 for a non member on a project meeting", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "owner", project_id: "p1" }, error: null },
+    ];
+    queues.project_members = [{ data: null, error: null }];
+
+    const res = await call("stranger");
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Meeting not found" });
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it.each(["viewer", "developer"])(
+    "returns 403 for a %s on a project meeting",
+    async (role) => {
+      queues.meetings = [
+        { data: { id: "m1", user_id: "owner", project_id: "p1" }, error: null },
+      ];
+      queues.project_members = [{ data: { role }, error: null }];
+
+      expect((await call("member")).status).toBe(403);
+      expect(mockGenerate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns 404 for a non creator on a personal meeting", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "owner", project_id: null }, error: null },
+    ];
+
+    expect((await call("intruder")).status).toBe(404);
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
   it("resolves dates against the meeting's start date, not today (AC-4)", async () => {
     ownedMeeting();
     mockGenerate.mockResolvedValue({ object: extraction });
@@ -192,6 +230,7 @@ describe("POST /api/ai/process (Promise Ledger extraction)", () => {
       {
         data: {
           id: "m1",
+          user_id: "u1",
           started_at: null,
           created_at: "2026-09-15T08:00:00.000Z",
         },

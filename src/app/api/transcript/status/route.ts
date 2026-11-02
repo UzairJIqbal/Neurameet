@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getTranscriptState } from "@/lib/transcript-state";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Fast, read-only status probe used by client polling + the global owner
 // poller. Returns only booleans/enum, never the raw transcript text, so it is
@@ -22,6 +26,36 @@ export async function GET(request: Request) {
   }
 
   const supabase = supabaseServer();
+
+  // Project meeting: any member may read the status (spec 0004, read); a non
+  // member gets 404. Personal meetings stay open to any signed-in caller, as
+  // before (the probe never returns transcript text).
+  if (UUID_RE.test(meetingId)) {
+    const { data: meeting, error: meetingErr } = await supabase
+      .from("meetings")
+      .select("id, user_id, project_id")
+      .eq("id", meetingId)
+      .maybeSingle();
+    if (meetingErr) {
+      console.error("[transcript/status] meeting lookup failed:", meetingErr);
+      return NextResponse.json(
+        { error: "Failed to load transcript status" },
+        { status: 500 },
+      );
+    }
+    if (meeting) {
+      try {
+        await checkMeetingAccess(supabase, userId, meeting, "read", {
+          personalFallback: async () => true,
+        });
+      } catch (err) {
+        const denied = accessErrorResponse(err);
+        if (denied) return denied;
+        throw err;
+      }
+    }
+  }
+
   const { state, rawText, hasInsights } = await getTranscriptState(
     supabase,
     meetingId,

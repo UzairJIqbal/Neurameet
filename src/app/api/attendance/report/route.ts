@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { AttendanceRow, MeetingDetailData } from "@/lib/meeting-types";
 import { generateAttendancePdf } from "@/lib/attendance-pdf";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,14 +49,25 @@ export async function GET(request: Request) {
 
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id, title, status, started_at, ended_at, created_at, user_id")
+      .select(
+        "id, title, status, started_at, ended_at, created_at, user_id, project_id",
+      )
       .eq("id", meetingId)
-      .eq("user_id", userId)
       .single();
 
     if (meetingError || !meeting) {
       console.error("Attendance report: meeting not found:", meetingError);
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
+    }
+
+    // The creator of a personal meeting, or an Owner or Admin of a project
+    // meeting ("manage" need).
+    try {
+      await checkMeetingAccess(supabase, userId, meeting, "manage");
+    } catch (accessErr) {
+      const denied = accessErrorResponse(accessErr);
+      if (denied) return denied;
+      throw accessErr;
     }
 
     const { data: rows, error: rowsError } = await supabase

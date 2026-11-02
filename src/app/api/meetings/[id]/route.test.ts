@@ -7,6 +7,8 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
     attendanceRows: [] as Array<Record<string, unknown>>,
     insights: { data: null as unknown, error: null as unknown },
     actionItems: { data: null as unknown, error: null as unknown },
+    // Phase W: active project memberships (removed_at null).
+    members: [] as Array<Record<string, unknown>>,
   };
   const makeClient = () => ({
     from: (table: string) => {
@@ -27,16 +29,31 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
         ),
         error: null,
       });
+      const member = () => ({
+        data:
+          store.members.find((r) =>
+            filters.every(([col, val]) => (r[col] ?? null) === val),
+          ) ?? null,
+        error: null,
+      });
       const builder = {
         eq: (col: string, val: unknown) => {
           filters.push([col, val]);
           return builder;
         },
+        is: (col: string, val: unknown) => {
+          filters.push([col, val]);
+          return builder;
+        },
         single: () => Promise.resolve(result),
+        maybeSingle: () =>
+          Promise.resolve(table === "project_members" ? member() : result),
         limit: () =>
           Promise.resolve(
             table === "attendance_events" ? attendance() : result,
           ),
+        // Awaiting the chain directly (action items list) yields the result.
+        then: (resolve: (v: unknown) => unknown) => resolve(result),
       };
       return { select: () => builder };
     },
@@ -48,14 +65,16 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
   };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 
 import { GET } from "./route";
 
-const meetingRow = (user_id: string) => ({
+const meetingRow = (user_id: string, project_id: string | null = null) => ({
   id: "m1",
   user_id,
+  project_id,
   title: "Test Meeting",
   status: "ended",
   stream_call_id: "call_1",
@@ -87,6 +106,7 @@ describe("GET /api/meetings/[id] authorization", () => {
       error: null,
     };
     store.actionItems = { data: [], error: null };
+    store.members = [];
   });
 
   it("rejects when not authenticated", async () => {
@@ -136,5 +156,95 @@ describe("GET /api/meetings/[id] authorization", () => {
 
     const res = await call("u1", "nope");
     expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/meetings/[id] on a project meeting", () => {
+  const items = [
+    { id: "a1", title: "Ship it", assignee: null, due_date: null },
+  ];
+  const asMember = (role: string) => {
+    store.members = [
+      { project_id: "p1", user_id: "u2", role, removed_at: null },
+    ];
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    store.meetings = { data: meetingRow("owner", "p1"), error: null };
+    store.attendanceRows = [];
+    store.insights = { data: null, error: null };
+    store.actionItems = { data: items, error: null };
+    store.members = [];
+  });
+
+  it("returns 404 to a non member, even one who attended", async () => {
+    store.attendanceRows = [{ meeting_id: "m1", user_id: "u2" }];
+    const res = await call("u2", "m1");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 to a removed member", async () => {
+    store.members = [
+      {
+        project_id: "p1",
+        user_id: "u2",
+        role: "admin",
+        removed_at: "2026-11-01",
+      },
+    ];
+    expect((await call("u2", "m1")).status).toBe(404);
+  });
+
+  it("gives a Viewer read access, canManage false, and no action items", async () => {
+    asMember("viewer");
+    const res = await call("u2", "m1");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      projectId: "p1",
+      role: "viewer",
+      canManage: false,
+    });
+    expect(body.actionItems).toEqual([]);
+  });
+
+  it("gives a Developer the action items but canManage false", async () => {
+    asMember("developer");
+    const body = await (await call("u2", "m1")).json();
+    expect(body.canManage).toBe(false);
+    expect(body.actionItems).toHaveLength(1);
+  });
+
+  it("gives an Admin canManage true", async () => {
+    asMember("admin");
+    const body = await (await call("u2", "m1")).json();
+    expect(body).toMatchObject({ role: "admin", canManage: true });
+    expect(body.actionItems).toHaveLength(1);
+  });
+
+  it("does not let the creator manage once they are only a Developer", async () => {
+    store.meetings = { data: meetingRow("u2", "p1"), error: null };
+    asMember("developer");
+    const body = await (await call("u2", "m1")).json();
+    expect(body.canManage).toBe(false);
+  });
+
+  it("keeps personal meetings: projectId null, role null, canManage for the creator", async () => {
+    store.meetings = { data: meetingRow("u1"), error: null };
+    const body = await (await call("u1", "m1")).json();
+    expect(body).toMatchObject({
+      projectId: null,
+      role: null,
+      canManage: true,
+    });
+  });
+
+  it("gives a personal meeting participant canManage false", async () => {
+    store.meetings = { data: meetingRow("owner"), error: null };
+    store.attendanceRows = [{ meeting_id: "m1", user_id: "participant" }];
+    const body = await (await call("participant", "m1")).json();
+    expect(body.canManage).toBe(false);
   });
 });

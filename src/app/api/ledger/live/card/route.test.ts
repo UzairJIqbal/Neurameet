@@ -52,7 +52,9 @@ const {
 vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
-vi.mock("@/lib/live-ledger-auth", () => ({
+vi.mock("@/lib/live-ledger-auth", async (importOriginal) => ({
+  // The real manager gate (liveManagerDenial) runs against the mocked meeting.
+  ...(await importOriginal<typeof import("@/lib/live-ledger-auth")>()),
   findLiveMeeting: mockFind,
   resolveLiveCaller: mockResolve,
 }));
@@ -255,5 +257,44 @@ describe("POST /api/ledger/live/card", () => {
   it("returns 500 on a database failure", async () => {
     queues.ledger_items = [{ data: null, error: { message: "boom" } }];
     expect((await raise()).status).toBe(500);
+  });
+
+  describe("project call (manage need)", () => {
+    const PROJECT_MEETING = { id: "live", ownerId: "creator", projectId: "p1" };
+    beforeEach(() => mockFind.mockResolvedValue(PROJECT_MEETING));
+
+    it("returns 404 to a non member", async () => {
+      queues.project_members = [{ data: null, error: null }];
+      const res = await raise("stranger");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Meeting not found" });
+      expect(writes).toEqual([]);
+    });
+
+    it("returns 403 to a Viewer and to a Developer", async () => {
+      queues.project_members = [
+        { data: { role: "viewer" }, error: null },
+        { data: { role: "developer" }, error: null },
+      ];
+      const viewer = await raise("v1");
+      expect(viewer.status).toBe(403);
+      expect(await viewer.json()).toEqual({ error: "Not authorized" });
+      expect((await raise("d1")).status).toBe(403);
+      expect(writes).toEqual([]);
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 to the creator once demoted to Developer", async () => {
+      queues.project_members = [{ data: { role: "developer" }, error: null }];
+      expect((await raise("creator")).status).toBe(403);
+    });
+
+    it("lets an Admin raise an item from another project meeting", async () => {
+      queues.project_members = [{ data: { role: "admin" }, error: null }];
+      queueRaise(null);
+      const res = await raise("a1");
+      expect(res.status).toBe(200);
+      expect((await res.json()).card).toMatchObject({ itemId: "i1" });
+    });
   });
 });

@@ -8,6 +8,7 @@ import { auth } from "@clerk/nextjs/server";
 import { StreamClient } from "@stream-io/node-sdk"; // only for call-event emit
 import { getGuest, admit } from "@/lib/guest-store";
 import { supabaseServer } from "@/lib/supabase-server";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
 const secret = process.env.STREAM_SECRET_KEY!;
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
-    .select("id, user_id")
+    .select("id, user_id, project_id")
     .eq("stream_call_id", meeting_id)
     .maybeSingle();
 
@@ -50,8 +51,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
   }
 
-  if (meeting.user_id !== userId) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  // Personal meeting: the creator only. Project meeting: Owner or Admin.
+  try {
+    await checkMeetingAccess(supabase, userId, meeting, "manage", {
+      personalDenied: { status: 403, message: "Not authorized" },
+    });
+  } catch (err) {
+    const denied = accessErrorResponse(err);
+    if (denied) return denied;
+    throw err;
   }
 
   // 5. Call admit() directly — it is the single source of truth for the

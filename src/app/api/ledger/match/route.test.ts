@@ -9,7 +9,8 @@ const { queues, mockAuth, mockSupabase, mockRunMatch, JudgeError } = vi.hoisted(
       const next = () =>
         Promise.resolve(queues[table]?.shift() ?? { data: null, error: null });
       const builder: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "limit"]) builder[m] = () => builder;
+      for (const m of ["select", "eq", "limit", "is"])
+        builder[m] = () => builder;
       builder.maybeSingle = next;
       builder.then = (
         res: (v: unknown) => unknown,
@@ -28,6 +29,7 @@ const { queues, mockAuth, mockSupabase, mockRunMatch, JudgeError } = vi.hoisted(
   },
 );
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 vi.mock("@/agent/ledger-match", () => ({
@@ -48,7 +50,7 @@ const call = (userId: string | null, body: unknown) => {
 };
 
 const owned = () => {
-  queues.meetings = [{ data: { id: "m1" }, error: null }];
+  queues.meetings = [{ data: { id: "m1", user_id: "u1" }, error: null }];
 };
 
 describe("POST /api/ledger/match", () => {
@@ -70,6 +72,39 @@ describe("POST /api/ledger/match", () => {
     queues.meetings = [{ data: null, error: null }];
     expect((await call("intruder", { meetingId: "m1" })).status).toBe(404);
     expect(mockRunMatch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a non member", null, 404],
+    ["a Viewer", "viewer", 403],
+    ["a Developer", "developer", 403],
+  ] as const)(
+    "on a project meeting %s gets %i (spec 0004, manage)",
+    async (_who, role, status) => {
+      queues.meetings = [
+        { data: { id: "m1", user_id: "u1", project_id: "p1" }, error: null },
+      ];
+      queues.project_members = [{ data: role ? { role } : null, error: null }];
+      expect((await call("u2", { meetingId: "m1" })).status).toBe(status);
+      expect(mockRunMatch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("lets a project Admin match, scoped to the project", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "u1", project_id: "p1" }, error: null },
+    ];
+    queues.project_members = [{ data: { role: "admin" }, error: null }];
+    queues.transcripts = [{ data: { raw_text: "Ali: hi" }, error: null }];
+    queues.meeting_chunks = [{ data: [{ id: "c" }], error: null }];
+    mockRunMatch.mockResolvedValue({ matched: 0 });
+    expect((await call("admin", { meetingId: "m1" })).status).toBe(200);
+    expect(mockRunMatch).toHaveBeenCalledWith(expect.anything(), {
+      meetingId: "m1",
+      userId: "u1",
+      projectId: "p1",
+      rawText: "Ali: hi",
+    });
   });
 
   it("returns 409 when there is no transcript", async () => {

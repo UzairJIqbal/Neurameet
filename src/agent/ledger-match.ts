@@ -73,16 +73,24 @@ interface LiveCandidates {
 /**
  * Live Ledger reconcile (spec 0002 AC-14): items the owner marked kept or
  * reversed during this call join the candidates even when similarity would
- * leave them out. Still only open items the user owns from other meetings.
- * Never throws: without live marks the match runs exactly as before.
+ * leave them out. Still only open items from other meetings in the same scope
+ * as match_ledger_candidates: the user's personal meetings, or on a project
+ * meeting the whole project. Never throws: without live marks the match runs
+ * exactly as before.
  */
 async function loadLiveCandidates(
   supabase: SupabaseClient,
   {
     meetingId,
     userId,
+    projectId,
     have,
-  }: { meetingId: string; userId: string; have: Set<string> },
+  }: {
+    meetingId: string;
+    userId: string;
+    projectId: string | null;
+    have: Set<string>;
+  },
 ): Promise<LiveCandidates> {
   const empty: LiveCandidates = { marks: new Map(), extra: [] };
   try {
@@ -112,11 +120,13 @@ async function loadLiveCandidates(
     const items = (itemData ?? []) as Array<Omit<CandidateRow, "similarity">>;
     if (items.length === 0) return { marks, extra: [] };
 
-    const { data: ownedData, error: ownedErr } = await supabase
+    const ownedQuery = supabase
       .from("meetings")
       .select("id")
-      .in("id", [...new Set(items.map((i) => i.meeting_id))])
-      .eq("user_id", userId);
+      .in("id", [...new Set(items.map((i) => i.meeting_id))]);
+    const { data: ownedData, error: ownedErr } = projectId
+      ? await ownedQuery.eq("project_id", projectId)
+      : await ownedQuery.eq("user_id", userId).is("project_id", null);
     if (ownedErr) throw ownedErr;
     const owned = new Set(
       ((ownedData ?? []) as Array<{ id: string }>).map((m) => m.id),
@@ -151,8 +161,14 @@ export async function runLedgerMatch(
   {
     meetingId,
     userId,
+    projectId = null,
     rawText,
-  }: { meetingId: string; userId: string; rawText: string },
+  }: {
+    meetingId: string;
+    userId: string;
+    projectId?: string | null;
+    rawText: string;
+  },
 ): Promise<{ matched: number }> {
   await embedMissingItems(supabase, meetingId);
 
@@ -178,6 +194,7 @@ export async function runLedgerMatch(
   const live = await loadLiveCandidates(supabase, {
     meetingId,
     userId,
+    projectId,
     have: new Set(candidates.map((c) => c.id)),
   });
   candidates.push(...live.extra);

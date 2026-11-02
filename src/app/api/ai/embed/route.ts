@@ -3,6 +3,30 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { embedAndStore } from "@/agent/embed";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
+
+// True when the caller has an attendance row for the meeting. Guests may have
+// a NULL user_id in attendance_events, so the Stream identity is checked too.
+async function isRecordedParticipant(
+  meetingId: string,
+  userId: string,
+): Promise<boolean> {
+  const supabase = supabaseServer();
+  const { data: part } = await supabase
+    .from("attendance_events")
+    .select("user_id")
+    .eq("meeting_id", meetingId)
+    .eq("user_id", userId)
+    .limit(1);
+  if (part && part.length > 0) return true;
+  const { data: guestPart } = await supabase
+    .from("attendance_events")
+    .select("user_id")
+    .eq("meeting_id", meetingId)
+    .eq("stream_user_id", userId)
+    .limit(1);
+  return !!guestPart && guestPart.length > 0;
+}
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -32,7 +56,7 @@ export async function POST(request: Request) {
     // surface "Meeting not found" (404) to the client.
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id, user_id")
+      .select("id, user_id, project_id")
       .eq("id", meetingId)
       .single();
 
@@ -44,30 +68,17 @@ export async function POST(request: Request) {
       );
     }
 
-    if (meeting.user_id !== userId) {
-      const { data: part } = await supabase
-        .from("attendance_events")
-        .select("user_id")
-        .eq("meeting_id", meeting.id)
-        .eq("user_id", userId)
-        .limit(1);
-      if (!part || part.length === 0) {
-        // Guests may have a NULL user_id in attendance_events;
-        // match on stream_user_id (the guest's Stream identity).
-        const { data: guestPart } = await supabase
-          .from("attendance_events")
-          .select("user_id")
-          .eq("meeting_id", meeting.id)
-          .eq("stream_user_id", userId)
-          .limit(1);
-        if (!guestPart || guestPart.length === 0) {
-          console.error("Meeting not authorized for user:", userId);
-          return NextResponse.json(
-            { error: "Meeting not found" },
-            { status: 404 },
-          );
-        }
-      }
+    // Personal meeting: owner or recorded participant (the fallback below).
+    // Project meeting: owner or admin ("manage" need).
+    try {
+      await checkMeetingAccess(supabase, userId, meeting, "manage", {
+        personalFallback: () => isRecordedParticipant(meeting.id, userId),
+      });
+    } catch (accessErr) {
+      const denied = accessErrorResponse(accessErr);
+      if (!denied) throw accessErr;
+      console.error("Meeting not authorized for user:", userId);
+      return denied;
     }
 
     // Fetch the transcript for this meeting

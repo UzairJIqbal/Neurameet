@@ -8,7 +8,7 @@ const { queues, mockAuth, mockSupabase } = vi.hoisted(() => {
     const next = () =>
       Promise.resolve(queues[table]?.shift() ?? { data: null, error: null });
     const builder: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "in", "order", "not"])
+    for (const m of ["select", "eq", "in", "order", "not", "is"])
       builder[m] = () => builder;
     builder.maybeSingle = next;
     builder.then = (
@@ -24,6 +24,7 @@ const { queues, mockAuth, mockSupabase } = vi.hoisted(() => {
   };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 
@@ -92,7 +93,7 @@ describe("GET /api/ledger", () => {
 
   it("derives overdue and counts non rejected reversals", async () => {
     queues.meetings = [
-      { data: { id: "m1" }, error: null },
+      { data: { id: "m1", user_id: "u1" }, error: null },
       {
         data: [
           { id: "m0", title: "Kickoff", started_at: "2026-10-01T12:00:00Z" },
@@ -131,7 +132,7 @@ describe("GET /api/ledger", () => {
 
   it("carries live marks, agreement counts and unbacked live marks (spec 0002)", async () => {
     queues.meetings = [
-      { data: { id: "m1" }, error: null },
+      { data: { id: "m1", user_id: "u1" }, error: null },
       {
         data: [
           { id: "m0", title: "Kickoff", started_at: "2026-10-01T12:00:00Z" },
@@ -213,8 +214,30 @@ describe("GET /api/ledger", () => {
     });
   });
 
+  it("returns 404 to a non member on a project meeting (spec 0004)", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "u1", project_id: "p1" }, error: null },
+    ];
+    queues.project_members = [{ data: null, error: null }];
+    const res = await call("outsider", "meetingId=m1&today=2026-10-30");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Meeting not found" });
+  });
+
+  it("lets a Viewer read a project meeting's ledger (spec 0004, read)", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "u1", project_id: "p1" }, error: null },
+    ];
+    queues.project_members = [{ data: { role: "viewer" }, error: null }];
+    queues.ledger_items = [{ data: [], error: null }];
+    queues.ledger_links = [{ data: [], error: null }];
+    queues.ledger_live_marks = [{ data: [], error: null }];
+    const res = await call("viewer", "meetingId=m1&today=2026-10-30");
+    expect(res.status).toBe(200);
+  });
+
   it("returns 500 on a database failure", async () => {
-    queues.meetings = [{ data: { id: "m1" }, error: null }];
+    queues.meetings = [{ data: { id: "m1", user_id: "u1" }, error: null }];
     queues.ledger_items = [{ data: null, error: { message: "boom" } }];
     const res = await call("u1", "meetingId=m1&today=2026-10-30");
     expect(res.status).toBe(500);

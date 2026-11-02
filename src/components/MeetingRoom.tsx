@@ -167,6 +167,60 @@ const RecordingsPanelLoading = () => (
   </div>
 );
 
+// The meetings row for a call is created by the first attendance event, so
+// the by-call lookup may 404 for a moment after join: retry a few times.
+const CAN_MANAGE_ATTEMPTS = 4;
+const CAN_MANAGE_RETRY_MS = 3000;
+
+// Resolves `canManage` for the signed-in caller: call id -> meeting id via
+// GET /api/meetings/by-call/[callId], then GET /api/meetings/[id]. Returns
+// null while loading or when it can't be resolved (the caller falls back).
+function useCanManageMeeting(
+  callId: string | undefined,
+  signedIn: boolean,
+): boolean | null {
+  const [canManage, setCanManage] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!callId || !signedIn) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const attempt = async (n: number) => {
+      try {
+        const lookup = await fetch(
+          `/api/meetings/by-call/${encodeURIComponent(callId)}`,
+        );
+        if (lookup.status === 404 && n + 1 < CAN_MANAGE_ATTEMPTS) {
+          if (!cancelled) {
+            timer = setTimeout(() => void attempt(n + 1), CAN_MANAGE_RETRY_MS);
+          }
+          return;
+        }
+        if (!lookup.ok) return;
+        const { meetingId } = (await lookup.json()) as { meetingId?: string };
+        if (!meetingId) return;
+        const res = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}`);
+        if (!res.ok) return;
+        const body = (await res.json()) as { canManage?: unknown };
+        if (!cancelled && typeof body.canManage === "boolean") {
+          setCanManage(body.canManage);
+        }
+      } catch (err) {
+        console.warn("[MeetingRoom] canManage lookup failed:", err);
+      }
+    };
+
+    void attempt(0);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [callId, signedIn]);
+
+  return canManage;
+}
+
 const MeetingRoom = ({
   guestName,
   guestEmail,
@@ -216,9 +270,15 @@ const MeetingRoom = ({
         }
       : undefined,
   );
-  // D3.4: the owner is the call creator. The Record control is owner-only
-  // (UI gating) and the recording consent toast is broadcast to everyone.
-  const isOwner = !!call && call.state.createdBy?.id === user?.id;
+  // Phase W (spec 0004): host controls follow `canManage` from
+  // GET /api/meetings/[id] (the creator on a personal meeting, Owner or Admin on
+  // a project meeting). Until it loads, or when the call has no meetings row
+  // yet, fall back to D3.4's rule: the owner is the call creator. The Record
+  // control is owner-only (UI gating) and the recording consent toast is
+  // broadcast to everyone.
+  const canManage = useCanManageMeeting(call?.id, !!user);
+  const isOwner =
+    !!call && (canManage ?? call.state.createdBy?.id === user?.id);
   // Live Ledger (spec 0002): card and agreement state for everyone in the call.
   const liveLedger = useLiveLedger(call, guestStreamToken ?? null);
   const [isRecording, setIsRecording] = useState(false);
@@ -284,7 +344,7 @@ const MeetingRoom = ({
         if (!opts?.silent) setRecordingsLoading(false);
       }
     },
-    [call],
+    [call, isOwner],
   );
 
   // D3.4 /debug: a composite frame recording is only queryable once Stream has

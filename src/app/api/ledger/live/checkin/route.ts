@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { findLiveMeeting, liveManagerDenial } from "@/lib/live-ledger-auth";
 import {
   rankCheckinItems,
   type CheckinMeeting,
@@ -24,8 +25,9 @@ function isIsoDate(value: string): boolean {
 }
 
 /**
- * Owner only check-in list for a live call (spec 0002 AC-1, AC-2): open items
- * from the owner's other meetings, ranked deterministically. No AI call.
+ * Manager only check-in list for a live call (spec 0002 AC-1, AC-2): open
+ * items from the owner's other meetings (a project call: the project's other
+ * meetings), ranked deterministically. No AI call.
  */
 export async function GET(request: Request) {
   const { userId } = await auth();
@@ -49,23 +51,23 @@ export async function GET(request: Request) {
   try {
     const supabase = supabaseServer();
 
-    // Ownership comes from the stored meeting, never the client's call state.
-    const { data: meeting, error: meetingErr } = await supabase
-      .from("meetings")
-      .select("id")
-      .eq("stream_call_id", callId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (meetingErr) throw meetingErr;
+    // Manage rights come from the stored meeting, never the client's call state.
+    const meeting = await findLiveMeeting(supabase, callId);
     if (!meeting) {
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
-    const liveMeetingId = (meeting as { id: string }).id;
+    const denied = await liveManagerDenial(supabase, userId, meeting);
+    if (denied) return denied;
+    const liveMeetingId = meeting.id;
+    const projectId = meeting.projectId;
 
-    const { data: meetingData, error: meetingsErr } = await supabase
+    // Personal call: the owner's own meetings. Project call: the project's.
+    const scopeQuery = supabase
       .from("meetings")
-      .select("id, title, started_at")
-      .eq("user_id", userId);
+      .select("id, title, started_at");
+    const { data: meetingData, error: meetingsErr } = await (projectId
+      ? scopeQuery.eq("project_id", projectId)
+      : scopeQuery.eq("user_id", userId));
     if (meetingsErr) throw meetingsErr;
     const meetings = ((meetingData ?? []) as CheckinMeeting[]).filter(
       (m) => m.id !== liveMeetingId,

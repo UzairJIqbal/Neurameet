@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getAllPending } from "@/lib/guest-store";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -15,11 +16,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "meetingId query param is required" }, { status: 400 });
   }
 
-  // Owner check — reuse the pattern from meetings/by-call/[callId]/route.ts.
+  // Manage check (spec 0004): the meeting row by its Stream call id.
   const supabase = supabaseServer();
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
-    .select("id, user_id")
+    .select("id, user_id, project_id")
     .eq("stream_call_id", meetingId)
     .maybeSingle();
 
@@ -31,8 +32,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ pending: [] });
   }
 
-  if (meeting.user_id !== userId) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  // Personal meeting: the creator only. Project meeting: Owner or Admin.
+  try {
+    await checkMeetingAccess(supabase, userId, meeting, "manage", {
+      personalDenied: { status: 403, message: "Not authorized" },
+    });
+  } catch (err) {
+    const denied = accessErrorResponse(err);
+    if (denied) return denied;
+    throw err;
   }
 
   // Return all pending guests for this meeting so the owner can discover

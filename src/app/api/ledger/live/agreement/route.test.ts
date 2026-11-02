@@ -52,7 +52,9 @@ const {
 vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
-vi.mock("@/lib/live-ledger-auth", () => ({
+vi.mock("@/lib/live-ledger-auth", async (importOriginal) => ({
+  // The real manager gate (liveManagerDenial) runs against the mocked meeting.
+  ...(await importOriginal<typeof import("@/lib/live-ledger-auth")>()),
   findLiveMeeting: mockFind,
   resolveLiveCaller: mockResolve,
 }));
@@ -222,5 +224,43 @@ describe("POST /api/ledger/live/agreement", () => {
     expect((await close()).status).toBe(409);
     expect(writes.some((w) => w.table === "ledger_items")).toBe(false);
     expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  describe("project call (manage need)", () => {
+    const PROJECT_MEETING = { id: "live", ownerId: "creator", projectId: "p1" };
+    beforeEach(() => mockFind.mockResolvedValue(PROJECT_MEETING));
+    const openAs = (userId: string) => open("We ship Friday", userId);
+
+    it("returns 404 to a non member", async () => {
+      queues.project_members = [{ data: null, error: null }];
+      const res = await openAs("stranger");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Meeting not found" });
+      expect(writes).toEqual([]);
+    });
+
+    it("returns 403 to a Viewer and to a Developer", async () => {
+      queues.project_members = [
+        { data: { role: "viewer" }, error: null },
+        { data: { role: "developer" }, error: null },
+      ];
+      const viewer = await openAs("v1");
+      expect(viewer.status).toBe(403);
+      expect(await viewer.json()).toEqual({ error: "Not authorized" });
+      expect((await openAs("d1")).status).toBe(403);
+      expect(writes).toEqual([]);
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 to the creator once demoted to Developer", async () => {
+      queues.project_members = [{ data: { role: "developer" }, error: null }];
+      expect((await openAs("creator")).status).toBe(403);
+    });
+
+    it("lets an Admin open an agreement", async () => {
+      queues.project_members = [{ data: { role: "admin" }, error: null }];
+      queues.ledger_agreements = [{ data: { id: "a1" }, error: null }];
+      expect((await open("We ship Friday", "a1")).status).toBe(200);
+    });
   });
 });

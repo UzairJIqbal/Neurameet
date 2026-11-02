@@ -3,6 +3,36 @@ import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { parseMeetingDate } from "@/lib/meeting-date";
+import {
+  accessErrorResponse,
+  checkMeetingAccess,
+  type MeetingAccess,
+} from "@/lib/project-auth";
+
+type Supabase = ReturnType<typeof supabaseServer>;
+
+// A recorded attendee of the meeting. Guests may have a NULL user_id in
+// attendance_events, so match on stream_user_id (the guest's Stream identity) too.
+async function hasAttended(
+  supabase: Supabase,
+  meetingId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data: part } = await supabase
+    .from("attendance_events")
+    .select("user_id")
+    .eq("meeting_id", meetingId)
+    .eq("user_id", userId)
+    .limit(1);
+  if (part && part.length > 0) return true;
+  const { data: guestPart } = await supabase
+    .from("attendance_events")
+    .select("user_id")
+    .eq("meeting_id", meetingId)
+    .eq("stream_user_id", userId)
+    .limit(1);
+  return !!guestPart && guestPart.length > 0;
+}
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -48,7 +78,7 @@ export async function POST(request: Request) {
     if (meetingId) {
       const { data: existing, error: existingErr } = await supabase
         .from("meetings")
-        .select("id, user_id")
+        .select("id, user_id, project_id")
         .eq("id", meetingId)
         .single();
       if (existingErr || !existing) {
@@ -57,40 +87,37 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       }
-      // Allow the owner, or any recorded participant of the meeting. A person can
-      // be in the same call under a different Clerk account than the one that
-      // created it (e.g. two Gmail sign-ins), so a strict owner check would block
-      // a legitimate upload with "Meeting not found or not authorized". Everyone
-      // else is still rejected.
-      if (existing.user_id !== userId) {
-        const { data: part } = await supabase
-          .from("attendance_events")
-          .select("user_id")
-          .eq("meeting_id", existing.id)
-          .eq("user_id", userId)
-          .limit(1);
-        if (!part || part.length === 0) {
-          // Guests may have a NULL user_id in attendance_events;
-          // match on stream_user_id (the guest's Stream identity).
-          const { data: guestPart } = await supabase
-            .from("attendance_events")
-            .select("user_id")
-            .eq("meeting_id", existing.id)
-            .eq("stream_user_id", userId)
-            .limit(1);
-          if (!guestPart || guestPart.length === 0) {
-            return NextResponse.json(
-              { error: "Meeting not found or not authorized" },
-              { status: 403 },
-            );
-          }
-        }
+      // Personal meeting: allow the owner, or any recorded participant. A person
+      // can be in the same call under a different Clerk account than the one
+      // that created it (e.g. two Gmail sign-ins), so a strict owner check would
+      // block a legitimate upload. Everyone else is still rejected. Project
+      // meeting: Owner or Admin (spec 0004, manage).
+      let access: MeetingAccess;
+      try {
+        access = await checkMeetingAccess(
+          supabase,
+          userId,
+          existing,
+          "manage",
+          {
+            personalFallback: () => hasAttended(supabase, existing.id, userId),
+            personalDenied: {
+              status: 403,
+              message: "Meeting not found or not authorized",
+            },
+          },
+        );
+      } catch (err) {
+        const denied = accessErrorResponse(err);
+        if (denied) return denied;
+        throw err;
       }
       // Tasdeeq AC-7: never rewrite a transcript under a minutes review.
       const locked = await assertMinutesUnlocked(supabase, existing.id);
       if (locked) return locked;
       meetingIdResolved = existing.id;
-      canProcess = existing.user_id === userId;
+      // A project caller passed the manage check, so they may run processing.
+      canProcess = access.projectId !== null || existing.user_id === userId;
     } else {
       // No meetingId supplied, so this is an external transcript (a meeting from
       // another platform with no NeuraMeet call): create a fresh meetings row to

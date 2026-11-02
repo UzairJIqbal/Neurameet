@@ -3,6 +3,7 @@ import { ok, queue, resetQueues } from "@/test/supabase-queue-mock";
 
 const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock(
   "@/lib/supabase-server",

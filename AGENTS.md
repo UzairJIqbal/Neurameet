@@ -124,7 +124,7 @@ POST /api/guest/admit               → owner-only: admit a pending guest (401/4
 POST /api/guest/deny                → owner-only: deny a pending guest (401/403/409 guarded)
 POST /api/attendance/event          → record a join/leave/mic/camera attendance event to attendance_events (service-role, server-only)
 GET  /api/attendance/report          → owner-only PDF report for a meeting (?meetingId=), application/pdf with Content-Disposition attachment
-GET  /api/search                    → cross-meeting semantic search across the user's meeting_chunks (pgvector, user-scoped)
+POST /api/search                   → cross-meeting semantic search across the user's meeting_chunks (pgvector, user-scoped)
 POST /api/prep                     → meeting prep suggestions from related past meetings (Gemini/Groq via AI SDK)
 POST /api/transcript/download      → generate + download merged speaker-labeled transcript (.txt) for an ended meeting (any signed-in participant)
 GET  /api/transcript/status          → poll transcript generation state (not_started/pending/ready/no_recording/too_short/failed)
@@ -156,11 +156,54 @@ POST /api/ai/process              → (extended) also writes minutes_draft; 409 
 POST /api/transcript/upload       → (extended) 409 when meetingId has a minutes review
 POST /api/transcript/download     → (extended) 409 when generation would rewrite a transcript under a minutes review
 DELETE /api/meetings/[id]         → (extended) 409 "Sealed minutes can't be deleted" when sealed
+POST /api/projects                 → create a project { name, taskPrefix (2 to 5 capital letters) }, caller becomes Owner
+GET  /api/projects                 → projects you are an active member of, with your role
+GET  /api/projects/[id]            → member: project, your role, counts
+PATCH /api/projects/[id]           → owner only: { name }
+DELETE /api/projects/[id]          → owner only: { confirmName }, deletes the project and its meetings; 409 while any meeting has sealed minutes
+GET  /api/projects/[id]/members    → member: active members with role
+PATCH /api/projects/[id]/members/[userId]  → owner or admin: { role }; only the owner grants or removes admin; never your own role
+DELETE /api/projects/[id]/members/[userId] → owner or admin removes, or you leave; open tasks go Unassigned; the owner must transfer first
+POST /api/projects/[id]/transfer   → owner only: { userId } of an active admin
+POST /api/projects/[id]/invitations        → owner or admin: { kind: "email" | "link", email?, role }, returns the link once
+GET  /api/projects/[id]/invitations        → owner or admin: active invitations, never the token
+DELETE /api/projects/[id]/invitations/[invitationId] → owner or admin: revoke
+POST /api/invitations/accept       → signed in: { token }; email kind joins, link kind creates a pending join request
+GET  /api/projects/[id]/join-requests      → owner or admin: pending join requests
+POST /api/projects/[id]/join-requests/[requestId] → owner or admin: { decision: "approve" | "deny" }
+POST /api/meetings/[id]/project    → meeting creator with developer or higher in the target: { projectId }, moves a personal meeting in; 409 under a minutes review
+POST /api/meetings/[id]/consent    → member: { noticeVersion }, stores the consent tick before joining a project call
+GET  /api/projects/[id]/proposals  → owner, admin, developer (read only): AI task proposals with quotes
+POST /api/proposals/[id]/review    → owner or admin: { decision: "confirm" | "reject" | "merge", title?, assigneeId?, dueDate?, mergeIntoTaskId?, confirmWithoutQuote? }
+GET  /api/projects/[id]/tasks      → member: board tasks (?status=&assigneeId=&q=&cursor=)
+POST /api/projects/[id]/tasks      → developer or higher: { title, description?, assigneeId?, dueDate? }
+GET  /api/tasks/[id]               → member: task, events, PR links, Proof Chain
+PATCH /api/tasks/[id]              → developer (own or unassigned) or owner/admin: { status?, position?, assigneeId?, title?, description?, dueDate?, completionEvidence?, ifVersion }, 409 when stale
+GET  /api/github/callback          → owner (signed state): GitHub App install callback, installation checked against your own GitHub installations; the user token is discarded
+POST /api/github/webhook           → public, HMAC SHA-256 over the raw body, dedupe on X-GitHub-Delivery, 202 then after()
+GET  /api/projects/[id]/github/repos       → owner only: repos your installations can see, with link state, and the install URL
+POST /api/projects/[id]/github/repos       → owner only: { repoId } from your installation's repo list, 409 when linked to another project
+DELETE /api/projects/[id]/github/repos/[repoId] → owner only: unlink
+POST /api/projects/[id]/github/sync        → owner or admin: read PR state again for open links and apply the same rules
+GET  /api/projects/[id]/ledger     → member: Decisions and Promises across the project's meetings (?kind=&status=&cursor=), redacted for viewers
+POST /api/ledger/links/[id]/review → (extended) accepts code links; on a project meeting owner or admin
+GET  /api/projects/[id]/activity   → member: Activity timeline (?before=)
+GET  /api/projects/search          → signed in: Ctrl K palette (?q=), title and key match across your active projects only
+GET  /api/notifications            → signed in: your notifications (?cursor=), unread count
+POST /api/notifications/read       → signed in: { ids } or { all: true }
+POST /api/settings/notifications   → signed in: { emailNotifications }, the server copy of the email toggle
+GET  /api/cron/daily               → Vercel cron only (Bearer CRON_SECRET): digest, delivery purge, GitHub sync
+POST /api/ai/chat                  → (extended) { projectId } project assistant, developer or higher, project filtered in SQL, citations built in code
+POST /api/ai/process               → (extended) on a project meeting writes proposals, never follow ups; 409 once any proposal was reviewed
+GET  /api/meetings                 → (extended) adds project meetings from your active projects, with projectId and role (?projectId= for one project)
+GET  /api/meetings/[id]            → (extended) adds projectId, role, canManage; Viewers get no transcript fields and only confirmed action items
+(all owner only meeting routes)    → (extended) on a project meeting the project Owner or Admin passes; meeting delete stays Owner only
+POST /api/search                   → (extended) { query, projectId? } scopes to one project where you are developer or higher
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 
 ## Security
-Never expose to the browser: `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `STREAM_SECRET_KEY`, `CLERK_SECRET_KEY`, `MINUTES_SIGNING_PRIVATE_KEY`.
+Never expose to the browser: `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `STREAM_SECRET_KEY`, `CLERK_SECRET_KEY`, `MINUTES_SIGNING_PRIVATE_KEY`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_CLIENT_SECRET`, `CRON_SECRET`.
 Never run from the browser: embedding generation, RAG retrieval, LLM calls, Supabase service-role writes. All of the above go through API routes only, using the Supabase server client and AI SDK server-side.
 
 ## Code Standards
