@@ -6,6 +6,7 @@ const { store, mockAuth, mockEmbedAndStore, mockSupabase } = vi.hoisted(() => {
     meetings: { data: null as unknown, error: null as unknown },
     attendance: { data: null as unknown, error: null as unknown },
     transcript: { data: null as unknown, error: null as unknown },
+    members: { data: null as unknown, error: null as unknown },
   };
   const makeClient = () => ({
     from: (table: string) => {
@@ -14,12 +15,16 @@ const { store, mockAuth, mockEmbedAndStore, mockSupabase } = vi.hoisted(() => {
           ? store.meetings
           : table === "attendance_events"
             ? store.attendance
-            : store.transcript;
+            : table === "project_members"
+              ? store.members
+              : store.transcript;
       // Chainable builder: every .eq returns itself so .eq().eq().single()
       // (attendance) and .eq().single() (meetings/transcripts) both resolve.
       const builder = {
         eq: () => builder,
+        is: () => builder,
         single: () => Promise.resolve(result),
+        maybeSingle: () => Promise.resolve(result),
         limit: () => Promise.resolve(result),
       };
       return {
@@ -35,6 +40,7 @@ const { store, mockAuth, mockEmbedAndStore, mockSupabase } = vi.hoisted(() => {
   };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 vi.mock("@/agent/embed", () => ({ embedAndStore: mockEmbedAndStore }));
@@ -58,6 +64,43 @@ describe("POST /api/ai/embed authorization", () => {
     store.meetings = { data: null, error: null };
     store.attendance = { data: null, error: null };
     store.transcript = { data: null, error: null };
+    store.members = { data: null, error: null };
+  });
+
+  const projectMeeting = { id: "m1", user_id: "owner", project_id: "p1" };
+
+  it("returns 404 for a non member on a project meeting", async () => {
+    store.meetings = { data: projectMeeting, error: null };
+
+    const res = await call("stranger", { meetingId: "m1" });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Meeting not found" });
+    expect(mockEmbedAndStore).not.toHaveBeenCalled();
+  });
+
+  it.each(["viewer", "developer"])(
+    "returns 403 for a %s on a project meeting",
+    async (role) => {
+      store.meetings = { data: projectMeeting, error: null };
+      store.members = { data: { role }, error: null };
+
+      const res = await call("member", { meetingId: "m1" });
+
+      expect(res.status).toBe(403);
+      expect(mockEmbedAndStore).not.toHaveBeenCalled();
+    },
+  );
+
+  it("embeds for an admin on a project meeting", async () => {
+    store.meetings = { data: projectMeeting, error: null };
+    store.members = { data: { role: "admin" }, error: null };
+    store.transcript = { data: { raw_text: "Hello world." }, error: null };
+    mockEmbedAndStore.mockResolvedValue({ chunkCount: 1 });
+
+    const res = await call("admin", { meetingId: "m1" });
+
+    expect(res.status).toBe(200);
   });
 
   it("rejects when not authenticated", async () => {

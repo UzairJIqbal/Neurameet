@@ -25,6 +25,7 @@ import {
 import { useState, useEffect, useCallback, useRef } from "react";
 import { LoaderOne } from "./ui/loader";
 import {
+  BookCheck,
   LayoutList,
   ListVideo,
   RefreshCw,
@@ -45,6 +46,10 @@ import { useClerk } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 import { useAttendanceTracking } from "@/hooks/useAttendanceTracking";
 import EndCallButton from "@/components/EndCallButton";
+import { LiveLedgerPanel } from "@/components/live-ledger/LiveLedgerPanel";
+import { LiveLedgerCard } from "@/components/live-ledger/LiveLedgerCard";
+import { AgreementPrompt } from "@/components/live-ledger/AgreementPrompt";
+import { useLiveLedger } from "@/hooks/useLiveLedger";
 
 type callTypesLayout = "grid" | "speaker-left" | "speaker-right";
 
@@ -162,6 +167,60 @@ const RecordingsPanelLoading = () => (
   </div>
 );
 
+// The meetings row for a call is created by the first attendance event, so
+// the by-call lookup may 404 for a moment after join: retry a few times.
+const CAN_MANAGE_ATTEMPTS = 4;
+const CAN_MANAGE_RETRY_MS = 3000;
+
+// Resolves `canManage` for the signed-in caller: call id -> meeting id via
+// GET /api/meetings/by-call/[callId], then GET /api/meetings/[id]. Returns
+// null while loading or when it can't be resolved (the caller falls back).
+function useCanManageMeeting(
+  callId: string | undefined,
+  signedIn: boolean,
+): boolean | null {
+  const [canManage, setCanManage] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!callId || !signedIn) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const attempt = async (n: number) => {
+      try {
+        const lookup = await fetch(
+          `/api/meetings/by-call/${encodeURIComponent(callId)}`,
+        );
+        if (lookup.status === 404 && n + 1 < CAN_MANAGE_ATTEMPTS) {
+          if (!cancelled) {
+            timer = setTimeout(() => void attempt(n + 1), CAN_MANAGE_RETRY_MS);
+          }
+          return;
+        }
+        if (!lookup.ok) return;
+        const { meetingId } = (await lookup.json()) as { meetingId?: string };
+        if (!meetingId) return;
+        const res = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}`);
+        if (!res.ok) return;
+        const body = (await res.json()) as { canManage?: unknown };
+        if (!cancelled && typeof body.canManage === "boolean") {
+          setCanManage(body.canManage);
+        }
+      } catch (err) {
+        console.warn("[MeetingRoom] canManage lookup failed:", err);
+      }
+    };
+
+    void attempt(0);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [callId, signedIn]);
+
+  return canManage;
+}
+
 const MeetingRoom = ({
   guestName,
   guestEmail,
@@ -174,6 +233,9 @@ const MeetingRoom = ({
   const [layout, setLayout] = useState<callTypesLayout>("speaker-right");
   const [showParticipants, setShowParticipants] = useState(false);
   const [showRecordings, setShowRecordings] = useState(false);
+  // Live Ledger (spec 0002): owner only check-in panel, a sibling of the
+  // layout so it never touches the participant tile tree.
+  const [showLedger, setShowLedger] = useState(false);
   const [recordings, setRecordings] = useState<CallRecording[]>([]);
   // Start in the loading state so the panel never flashes the misleading
   // "No recordings available" empty message on first open (recordings is
@@ -208,9 +270,17 @@ const MeetingRoom = ({
         }
       : undefined,
   );
-  // D3.4: the owner is the call creator. The Record control is owner-only
-  // (UI gating) and the recording consent toast is broadcast to everyone.
-  const isOwner = !!call && call.state.createdBy?.id === user?.id;
+  // Phase W (spec 0004): host controls follow `canManage` from
+  // GET /api/meetings/[id] (the creator on a personal meeting, Owner or Admin on
+  // a project meeting). Until it loads, or when the call has no meetings row
+  // yet, fall back to D3.4's rule: the owner is the call creator. The Record
+  // control is owner-only (UI gating) and the recording consent toast is
+  // broadcast to everyone.
+  const canManage = useCanManageMeeting(call?.id, !!user);
+  const isOwner =
+    !!call && (canManage ?? call.state.createdBy?.id === user?.id);
+  // Live Ledger (spec 0002): card and agreement state for everyone in the call.
+  const liveLedger = useLiveLedger(call, guestStreamToken ?? null);
   const [isRecording, setIsRecording] = useState(false);
 
   // Mic / camera toggles via the device managers (stable across renders).
@@ -274,7 +344,7 @@ const MeetingRoom = ({
         if (!opts?.silent) setRecordingsLoading(false);
       }
     },
-    [call],
+    [call, isOwner],
   );
 
   // D3.4 /debug: a composite frame recording is only queryable once Stream has
@@ -880,13 +950,14 @@ const MeetingRoom = ({
             gives a phone user an obvious escape. It sits below the control bar
             (z-50) and the panel (z-40) so those stay interactive; only the
             video area (z-0) is dimmed and clickable to close. */}
-        {(showParticipants || showRecordings) && (
+        {(showParticipants || showRecordings || showLedger) && (
           <div
             data-testid="panel-backdrop"
             aria-hidden="true"
             onClick={() => {
               setShowParticipants(false);
               setShowRecordings(false);
+              setShowLedger(false);
             }}
             className="fixed inset-0 z-30 bg-inverse-surface/50"
           />
@@ -921,6 +992,28 @@ const MeetingRoom = ({
             LoadingCallRecordingList={RecordingsPanelLoading}
           />
         </div>
+        {isOwner && showLedger && call && (
+          <div
+            data-testid="live-ledger-panel"
+            className="fixed top-16 bottom-32 right-2 z-40 w-[calc(100vw-1rem)] max-w-[350px] overflow-y-auto rounded-lg border border-outline-variant/20 bg-inverse-surface sm:static sm:ml-2 sm:h-[calc(100vh-10rem)]"
+          >
+            <LiveLedgerPanel
+              callId={call.id}
+              onClose={() => setShowLedger(false)}
+              live={liveLedger.state}
+              actions={liveLedger.actions}
+            />
+          </div>
+        )}
+        {/* Live Ledger overlays for everyone: plain props, outside the tiles. */}
+        <LiveLedgerCard
+          live={liveLedger.state.card}
+          cardSeq={liveLedger.state.cardSeq}
+        />
+        <AgreementPrompt
+          agreement={liveLedger.state.agreement}
+          onVote={liveLedger.actions.vote}
+        />
       </main>
 
       {/* Control bar: pill with icon + label controls */}
@@ -994,6 +1087,7 @@ const MeetingRoom = ({
             onClick={() => {
               setShowParticipants((prev) => !prev);
               setShowRecordings(false);
+              setShowLedger(false);
             }}
             className="flex cursor-pointer items-center gap-2 rounded-xl bg-inverse-surface px-3 py-2 text-inverse-on-surface hover:bg-inverse-on-surface/10 sm:px-4"
           >
@@ -1009,6 +1103,7 @@ const MeetingRoom = ({
               onClick={() => {
                 setShowRecordings((prev) => !prev);
                 setShowParticipants(false);
+                setShowLedger(false);
               }}
               aria-expanded={showRecordings}
               className={cn(
@@ -1025,6 +1120,34 @@ const MeetingRoom = ({
                 Recordings
               </span>
             </Button>
+          )}
+
+          {/* Live Ledger (spec 0002): owner only. A plain button, not the
+              stateful-loader Button, so nothing morphs on click. */}
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowLedger((prev) => !prev);
+                setShowParticipants(false);
+                setShowRecordings(false);
+              }}
+              aria-expanded={showLedger}
+              aria-label="Open Live Ledger"
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-xl bg-inverse-surface px-3 py-2 text-inverse-on-surface hover:bg-inverse-on-surface/10 sm:px-4",
+                showLedger && "bg-inverse-on-surface/10",
+              )}
+            >
+              <BookCheck
+                size={20}
+                className="text-inverse-on-surface"
+                aria-hidden
+              />
+              <span className="hidden text-body-md text-inverse-on-surface sm:inline">
+                Ledger
+              </span>
+            </button>
           )}
 
           {/* Reactions: tokened control opening an emoji picker that sends via

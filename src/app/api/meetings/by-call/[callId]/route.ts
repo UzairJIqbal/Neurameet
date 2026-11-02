@@ -3,6 +3,37 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { StreamClient } from "@stream-io/node-sdk";
 import { supabaseServer } from "@/lib/supabase-server";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
+
+// Lookup a meeting by its Stream call id (MeetingRoom uses it to reach
+// GET /api/meetings/[id] for canManage). Returns only the meeting id, never any
+// project details; access to the meeting itself is checked by that route.
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ callId: string }> },
+) {
+  const { callId } = await params;
+  const { userId } = await auth();
+
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data, error } = await supabaseServer()
+    .from("meetings")
+    .select("id")
+    .eq("stream_call_id", callId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("by-call lookup failed:", error);
+    return NextResponse.json({ error: "Failed to load meeting" }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
+  }
+  return NextResponse.json({ meetingId: (data as { id: string }).id });
+}
 
 // Delete a meeting keyed by its Stream call id. Used by the Upcoming and Previous
 // pages, which render Stream calls (not Supabase meeting rows). The Stream call
@@ -33,14 +64,24 @@ export async function DELETE(
 
     const { data: meeting } = await supabase
       .from("meetings")
-      .select("id, user_id")
+      .select("id, user_id, project_id")
       .eq("stream_call_id", callId)
       .maybeSingle();
 
     // The meeting row exists: only its owner may delete (don't touch the Stream
     // call for a non-owner, so we fail closed before any destructive action).
-    if (meeting && meeting.user_id !== userId) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    // Personal meeting: the creator (403 otherwise). Project meeting: the
+    // project Owner only (spec 0004, need "owner"); a non member gets 404.
+    if (meeting) {
+      try {
+        await checkMeetingAccess(supabase, userId, meeting, "owner", {
+          personalDenied: { status: 403, message: "Not authorized" },
+        });
+      } catch (err) {
+        const denied = accessErrorResponse(err);
+        if (denied) return denied;
+        throw err;
+      }
     }
 
     const client = new StreamClient(apiKey, secretKey);
@@ -72,7 +113,7 @@ export async function DELETE(
     }
 
     // Cascade-remove the Supabase meeting row (and all child data) if present.
-    if (meeting && meeting.user_id === userId) {
+    if (meeting) {
       const { error: deleteError } = await supabase
         .from("meetings")
         .delete()

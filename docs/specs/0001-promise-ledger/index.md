@@ -1,6 +1,6 @@
 # 0001. Promise Ledger
 
-**Status**: In Progress
+**Status**: Accepted
 **Date**: 2026-10-30
 **Mode**: FEATURE
 **Scope feature**: [docs/scope/scope.md, row 17. Promise Ledger](../../scope/scope.md)

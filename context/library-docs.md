@@ -204,3 +204,16 @@ Only used if a meeting's detected topic/company benefits from a short public-web
 - Render timestamps in **UTC** and label them `(UTC)` — deterministic, avoids server-locale drift. This is a PDF byte buffer, not a DOM component, so the "no hex colors" UI rule does not apply; use plain `rgb()`.
 - Return the PDF from a route as `new NextResponse(pdfBytes, { headers: { "Content-Type": "application/pdf", "Content-Disposition": \`attachment; filename="..."\` } })`.
 - Keep the layout small and explicit (this is a tabular report). `buildReportRows()` is the pure, unit-testable core; `generateAttendancePdf()` wraps it. Test with `npx tsx scripts/check-attendance-pdf.ts` (no browser needed — asserts columns/counts + `%PDF-` header).
+
+---
+
+## Phase W candidates (not installed — confirm at Step W0, zero cost, no card)
+
+- **GitHub App + webhooks:** `@octokit/webhooks-methods` (~24 KB) is enough to verify `X-Hub-Signature-256`; `@octokit/app` (~97 KB) for installation tokens. Verify against the raw body (`await req.text()`) before parsing. GitHub does not retry failed deliveries; dedupe on `X-GitHub-Delivery`. Issue creation is capped at 80/min and 500/hour. smee.io forwards webhooks to localhost.
+- **Next.js `after()`:** run webhook processing after the response; same 300 s Hobby limit. Read `node_modules/next/dist/docs/` first (non standard Next version).
+- **Kanban drag and drop:** `@hello-pangea/dnd` 18.x (React 19 supported) recommended; `@dnd-kit/core` + `@dnd-kit/sortable` as the flexible alternative.
+- **Ctrl K palette:** `cmdk` 1.x, backed by Postgres full text search (`simple` config so Urdu is not mangled) plus the existing `/api/search` vector search.
+- **Resend:** the `resend` package is not in `node_modules` today; free tier sends only to the account owner until a domain is verified, so invitations must also work as a copyable link.
+- **Clerk Organizations:** not used (free tier caps orgs at 20 members, Admin and Member only, custom roles are paid).
+- **Live captions:** browser Web Speech API only, as a post W9 experiment; never Stream captions (paid add-on, no Urdu in SDK 1.40.2).
+

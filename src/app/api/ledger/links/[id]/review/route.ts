@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 import { recomputeLedgerItemStatus } from "@/agent/ledger";
 import type {
   LedgerLinkState,
@@ -81,12 +82,16 @@ export async function POST(
 
     const { data: meeting, error: meetingErr } = await supabase
       .from("meetings")
-      .select("id")
+      .select("id, user_id, project_id")
       .eq("id", (item as { meeting_id: string }).meeting_id)
-      .eq("user_id", userId)
       .maybeSingle();
     if (meetingErr) throw meetingErr;
     if (!meeting) return NextResponse.json(NOT_FOUND, { status: 404 });
+    // The link's item belongs to this meeting. Personal meeting: the creator
+    // only. Project meeting: Owner or Admin.
+    await checkMeetingAccess(supabase, userId, meeting, "manage", {
+      notFoundMessage: NOT_FOUND.error,
+    });
 
     const update = nextState(decision);
     const { error: updateErr } = await supabase
@@ -98,6 +103,8 @@ export async function POST(
     await recomputeLedgerItemStatus(supabase, itemId);
     return NextResponse.json({ id, state: update.state });
   } catch (err) {
+    const denied = accessErrorResponse(err);
+    if (denied) return denied;
     console.error("[ledger] review failed", { linkId: id, err });
     return NextResponse.json(
       { error: "Failed to save review" },

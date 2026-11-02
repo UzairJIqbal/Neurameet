@@ -56,12 +56,16 @@ const incoming = (
     lineNumber: 2,
     status: "open",
     createdAt: "2026-10-01T00:00:00.000Z",
+    source: "transcript",
+    agreedCount: null,
+    totalCount: null,
   },
   sourceMeeting: {
     id: "m1",
     title: "Kickoff",
     startedAt: "2026-10-01T00:00:00.000Z",
   },
+  liveMark: null,
 });
 
 const response = (
@@ -70,6 +74,7 @@ const response = (
 ): LedgerResponse => ({
   items: [],
   incoming: links,
+  liveOnly: [],
   reversalCount,
 });
 
@@ -186,6 +191,10 @@ const ownItem = (overrides: Partial<LedgerItemView> = {}): LedgerItemView => ({
   createdAt: "2026-10-01T00:00:00.000Z",
   derivedStatus: "open",
   links: [],
+  source: "transcript",
+  agreedCount: null,
+  totalCount: null,
+  liveMark: null,
   ...overrides,
 });
 
@@ -214,6 +223,7 @@ describe("LedgerTab said in this meeting (AC-1, AC-10)", () => {
       {
         items: [ownItem({ derivedStatus: "overdue" })],
         incoming: [],
+        liveOnly: [],
         reversalCount: 0,
       },
     ];
@@ -231,6 +241,7 @@ describe("LedgerTab said in this meeting (AC-1, AC-10)", () => {
       {
         items: [ownItem({ derivedStatus: "kept", links: [link] })],
         incoming: [],
+        liveOnly: [],
         reversalCount: 0,
       },
     ];
@@ -367,5 +378,71 @@ describe("LedgerTab loading guard (AC-17)", () => {
       await vi.advanceTimersByTimeAsync(12000);
     });
     expect(screen.getByText("We couldn't load the ledger.")).toBeTruthy();
+  });
+});
+
+describe("LedgerTab Live Ledger badges (spec 0002 AC-15)", () => {
+  it("shows 'Agreed live by N of M' instead of a line number", async () => {
+    ledgerResponses = [
+      {
+        items: [
+          ownItem({
+            kind: "decision",
+            statement: "We launch Friday",
+            quote: "We launch Friday",
+            source: "live_agreement",
+            agreedCount: 3,
+            totalCount: 4,
+            lineNumber: 0,
+            assignee: null,
+            dueDate: null,
+          }),
+        ],
+        incoming: [],
+        liveOnly: [],
+        reversalCount: 0,
+      },
+    ];
+    render(<LedgerTab meetingId="m2" />);
+    expect(await screen.findByText("Agreed live by 3 of 4")).toBeTruthy();
+    expect(screen.queryByText(/line 0/)).toBeNull();
+  });
+
+  it("badges a live marked item and a live marked match", async () => {
+    ledgerResponses = [
+      {
+        items: [ownItem({ liveMark: "kept" })],
+        incoming: [{ ...incoming("y", "kept", "confirmed"), liveMark: "kept" }],
+        liveOnly: [],
+        reversalCount: 0,
+      },
+    ];
+    render(<LedgerTab meetingId="m2" />);
+    await screen.findByText("Ali sends the survey");
+    expect(screen.getAllByText("Marked live")).toHaveLength(2);
+  });
+
+  it("explains a live mark no transcript evidence backs", async () => {
+    const link = incoming("z", "kept", "suggested");
+    ledgerResponses = [
+      {
+        items: [],
+        incoming: [],
+        liveOnly: [
+          { mark: "kept", item: link.item, sourceMeeting: link.sourceMeeting },
+        ],
+        reversalCount: 0,
+      },
+    ];
+    render(<LedgerTab meetingId="m2" />);
+    expect(
+      await screen.findByText(
+        "Marked live as kept, no transcript evidence found",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Statement z")).toBeTruthy();
+    expect(
+      screen.queryByText("No earlier promises were mentioned here yet."),
+    ).toBeNull();
   });
 });

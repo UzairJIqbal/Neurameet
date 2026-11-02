@@ -26,7 +26,7 @@ export function normalizeForMatch(text: string): string {
   return text.normalize("NFC").toLowerCase().replace(/\s+/gu, " ").trim();
 }
 
-function speakerLabel(line: string): string | null {
+export function speakerLabel(line: string): string | null {
   const match = SPEAKER_PREFIX.exec(line);
   if (!match) return null;
   const label = match[1].trim();
@@ -58,6 +58,24 @@ export function findQuoteLine(
     }
   }
   return null;
+}
+
+/** Every 1 based line of `rawText` containing `quote`, in order (Tasdeeq, spec 0003). */
+export function findQuoteLines(
+  rawText: string,
+  quote: string,
+): QuoteLocation[] {
+  const needle = normalizeForMatch(stripSpeakerPrefix(quote));
+  if (needle.length < MIN_QUOTE_CHARS) return [];
+
+  const matches: QuoteLocation[] = [];
+  const lines = rawText.split(/\r?\n/u);
+  for (let i = 0; i < lines.length; i++) {
+    if (normalizeForMatch(lines[i]).includes(needle)) {
+      matches.push({ lineNumber: i + 1, speaker: speakerLabel(lines[i]) });
+    }
+  }
+  return matches;
 }
 
 /** Read time status: an open item past its due date shows as overdue. */
@@ -181,7 +199,9 @@ export async function writeLedgerItems(
     const { data: existing, error: existingErr } = await supabase
       .from("ledger_items")
       .select("id, quote")
-      .eq("meeting_id", meetingId);
+      .eq("meeting_id", meetingId)
+      // Live Agreement items have no transcript line; reprocessing never drops them.
+      .eq("source", "transcript");
     if (existingErr) throw existingErr;
 
     const existingRows = (existing ?? []) as Array<{

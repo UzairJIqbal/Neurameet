@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { generateTranscriptForMeeting } from "@/agent/transcript-generation";
 import { setTranscriptState } from "@/lib/transcript-state";
+import {
+  accessErrorResponse,
+  checkMeetingAccess,
+  NEED_ROLES,
+  type MeetingAccess,
+} from "@/lib/project-auth";
 
 // Native ffmpeg (ffmpeg-static) requires the Node runtime (never edge).
 export const runtime = "nodejs";
@@ -49,23 +56,33 @@ export async function POST(request: Request) {
     // attendee. Otherwise any signed-in user could transcribe any meeting.
     const { data: meeting } = await supabase
       .from("meetings")
-      .select("user_id, stream_call_id")
+      .select("id, user_id, project_id, stream_call_id")
       .eq("id", meetingId)
       .maybeSingle();
     if (!meeting || meeting.stream_call_id !== streamCallId) {
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
-    if (meeting.user_id !== userId) {
-      const { data: attended } = await supabase
-        .from("attendance_events")
-        .select("id")
-        .eq("meeting_id", meetingId)
-        .eq("user_id", userId)
-        .limit(1)
-        .maybeSingle();
-      if (!attended) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    // Personal meeting: owner or recorded attendee. Project meeting: content
+    // (Owner, Admin, Developer) to download; generating needs manage (below).
+    let access: MeetingAccess;
+    try {
+      access = await checkMeetingAccess(supabase, userId, meeting, "content", {
+        personalFallback: async () => {
+          const { data: attended } = await supabase
+            .from("attendance_events")
+            .select("id")
+            .eq("meeting_id", meetingId)
+            .eq("user_id", userId)
+            .limit(1)
+            .maybeSingle();
+          return !!attended;
+        },
+        personalDenied: { status: 403, message: "Forbidden" },
+      });
+    } catch (err) {
+      const denied = accessErrorResponse(err);
+      if (denied) return denied;
+      throw err;
     }
 
     // Cache read: only serve a ready transcript that actually has text. A row in
@@ -93,6 +110,16 @@ export async function POST(request: Request) {
         cached: true,
       });
     }
+
+    // Generating writes the meeting's transcript: on a project meeting only an
+    // Owner or Admin may do that (spec 0004, manage).
+    if (access.role && !NEED_ROLES.manage.includes(access.role)) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+
+    // Tasdeeq AC-7: generation would rewrite a transcript under a minutes review.
+    const locked = await assertMinutesUnlocked(supabase, meetingId);
+    if (locked) return locked;
 
     // No ready cache: mark in-flight so a concurrent click (or a later poll)
     // sees `pending` instead of starting a second transcription.

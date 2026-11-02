@@ -17,6 +17,7 @@ import {
   Settings,
   Search,
   ListChecks,
+  FolderKanban,
 } from "lucide-react";
 
 export type SidebarLink = {
@@ -31,6 +32,11 @@ export const sidebarLinks: SidebarLink[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    label: "Projects",
+    href: "/projects",
+    icon: <FolderKanban className="h-5 w-5" />,
   },
   {
     label: "Meeting Intelligence",

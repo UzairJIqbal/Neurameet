@@ -9,7 +9,7 @@ const { queues, updates, mockAuth, mockRpc, mockSupabase } = vi.hoisted(() => {
     const next = () =>
       Promise.resolve(queues[table]?.shift() ?? { data: null, error: null });
     const builder: Record<string, unknown> = {};
-    for (const m of ["select", "eq"]) builder[m] = () => builder;
+    for (const m of ["select", "eq", "is"]) builder[m] = () => builder;
     builder.update = (payload: unknown) => {
       updates.push({ table, payload });
       return builder;
@@ -34,6 +34,7 @@ const { queues, updates, mockAuth, mockRpc, mockSupabase } = vi.hoisted(() => {
   };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 
@@ -59,7 +60,7 @@ const owned = () => {
     { data: null, error: null }, // the update
   ];
   queues.ledger_items = [{ data: { meeting_id: "m1" }, error: null }];
-  queues.meetings = [{ data: { id: "m1" }, error: null }];
+  queues.meetings = [{ data: { id: "m1", user_id: "u1" }, error: null }];
 };
 
 describe("POST /api/ledger/links/[id]/review", () => {
@@ -106,6 +107,31 @@ describe("POST /api/ledger/links/[id]/review", () => {
     expect(updates).toHaveLength(0);
     expect(mockRpc).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["a non member", null, 404],
+    ["a Viewer", "viewer", 403],
+    ["a Developer", "developer", 403],
+  ] as const)(
+    "on a project meeting %s gets %i and nothing is saved (spec 0004, manage)",
+    async (_who, role, status) => {
+      queues.ledger_links = [
+        { data: { id: LINK_ID, item_id: ITEM_ID }, error: null },
+      ];
+      queues.ledger_items = [{ data: { meeting_id: "m1" }, error: null }];
+      queues.meetings = [
+        { data: { id: "m1", user_id: "u1", project_id: "p1" }, error: null },
+      ];
+      queues.project_members = [{ data: role ? { role } : null, error: null }];
+      const res = await call("u2", { decision: "confirm" });
+      expect(res.status).toBe(status);
+      if (status === 404) {
+        expect(await res.json()).toEqual({ error: "Link not found" });
+      }
+      expect(updates).toHaveLength(0);
+      expect(mockRpc).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     ["confirm", "confirmed", true],

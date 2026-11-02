@@ -1,6 +1,6 @@
 # Scope: NeuraMeet
 
-NeuraMeet is an AI integrated meeting platform. Users create or join real time video meetings, upload or auto generate transcripts, and get AI summaries, action items, categories, and a meeting aware chat over every meeting. This scope restructures the plan. The already built Steps 0 to 9 become the Core NeuraMeet Pipeline. A new Advanced Pipeline Features phase adds three layers, then a Meeting Experience Polish phase (Steps D0–D3+) redesigns the live-call UI to Zoom/Meet quality, a Signature Feature phase adds the Promise Ledger (a feature none of the meeting apps we reviewed offer), and Deploy moves to the very end, after that.
+NeuraMeet is an AI integrated meeting platform. Users create or join real time video meetings, upload or auto generate transcripts, and get AI summaries, action items, categories, and a meeting aware chat over every meeting. This scope restructures the plan. The already built Steps 0 to 9 become the Core NeuraMeet Pipeline. A new Advanced Pipeline Features phase adds three layers, then a Meeting Experience Polish phase (Steps D0–D3+) redesigns the live-call UI to Zoom/Meet quality, a Signature Feature phase adds the Promise Ledger (a feature none of the meeting apps we reviewed offer), a Project Workspace phase (W, adopted 2026-11-02 from the PDF `NeuraMeet UI Overview`) connects conversations with code, and Deploy moves to the very end, after that.
 
 **Build approach:** Extend (add features to the working Core Pipeline without re architecting).
 **Workflow:** Beta (after develop: check verify, then test). Any feature can carry its own tag to do more or less.
@@ -72,7 +72,17 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | P11 | Meeting Intelligence tabs real-meeting audit: Attendance Report, Category, Action Items, Recording | Product Final Polishing | done |
 | P12 | Meeting pages updation: delete across meetings/recordings/follow-ups, fix stuck scroll, rework useless controls (Upcoming Start gated by time) | Product Final Polishing | done |
 | P13 | Responsive Polishing: audit + fix responsiveness across every screen at mobile/tablet/desktop | Product Final Polishing | done |
-| 17 | Promise Ledger: cross meeting memory of decisions and promises (kept, open, overdue, reversed) with quote evidence, Urdu English aware | Signature Feature | in-progress |
+| 17 | Promise Ledger: cross meeting memory of decisions and promises (kept, open, overdue, reversed) with quote evidence, Urdu English aware | Signature Feature | done |
+| 18 | Live Ledger: bring the Promise Ledger into the live call (Promise Check-in quote cards + one tap Agreement Check saved to the ledger) | Signature Feature | in-progress |
+| 19 | Tasdeeq, Verified Minutes: every attendee confirms, corrects, or records a dissent on the AI minutes attributed to them, then the confirmed minutes are sealed so any later change is detectable | Signature Feature | in-progress |
+| 20 | Project workspaces, members, roles, and invitations (W1, W2) | Project Workspace | in-progress |
+| 21 | Project meetings with a consent notice (W3) | Project Workspace | planned |
+| 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | planned |
+| 23 | GitHub App integration with strict linking rules (W5) | Project Workspace | planned |
+| 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | planned |
+| 25 | Project AI assistant with code built citations (W7) | Project Workspace | planned |
+| 26 | Workspace shell, personal views, notifications, Ctrl K (W8) | Project Workspace | planned |
+| 27 | Workspace verify and security suite (W9) | Project Workspace | planned |
 | 11 | Deploy and harden | Deploy | planned |
 | 12 | General AI chat page | FYP Polish | done |
 | 13 | Change category write path | FYP Polish | done |
@@ -517,9 +527,9 @@ Audit every screen at mobile, tablet, and desktop, then fix responsiveness so th
 
 ## Signature Feature (before Deploy)
 
-The one feature meant to make NeuraMeet stand out to the FYP panel and in the market. Chosen from the October 2026 research in `reports/NeuraMeet unique FYP feature.md`, which found that summaries, action items, chat, search, prep, and engagement insights already ship in Zoom, Teams, Otter, Read.ai, and Fireflies. It runs after the meeting on transcripts NeuraMeet already has, so it stays inside the zero cost rule.
+The Promise Ledger (#17) is the feature meant to make NeuraMeet stand out to the FYP panel and in the market; Live Ledger (#18) extends it into the live call. The Promise Ledger was chosen from the October 2026 research in `reports/NeuraMeet unique FYP feature.md`, which found that summaries, action items, chat, search, prep, and engagement insights already ship in Zoom, Teams, Otter, Read.ai, and Fireflies. It runs after the meeting on transcripts NeuraMeet already has. Live Ledger was chosen from the November 2026 research in `reports/NeuraMeet second signature feature.md` and reuses Stream custom events plus the existing ledger data. Tasdeeq, Verified Minutes (#19) was chosen from the third research pass in `reports/NeuraMeet third signature feature.md`. All three stay inside the zero cost rule.
 
-### 17. Promise Ledger · in-progress · GA
+### 17. Promise Ledger · done · GA
 Pull every decision and every promise (who, what, by when) out of each meeting, in English, Urdu, or mixed Urdu English, and carry them forward. When a later meeting is processed, mark each one kept, still open, overdue, or reversed, always with the exact quote and timestamp as proof, and let the owner confirm or reject each match. Claim for the panel: no major meeting platform or mainstream notetaker in our review checks promise follow through across meetings, and none does it for Urdu English speech.
 **Done when:** after two or more related meetings, the ledger shows every extracted decision and promise with its status and a quote behind each verdict, a reversed decision raises a visible alert, the owner can confirm or reject a match, it works on a bilingual Urdu English meeting, and accuracy is measured on a small hand labelled set with Urdu English results reported separately.
 **Spec:** [0001](../specs/0001-promise-ledger/index.md)
@@ -535,6 +545,104 @@ Pull every decision and every promise (who, what, by when) out of each meeting, 
 - [x] Review it (fresh model): `/check review promise ledger`
 - [x] Document it: `/document promise ledger`
 
+### 18. Live Ledger · in-progress · GA
+Bring the Promise Ledger into the call while it is still running. **Promise Check-in:** the owner sees a ranked panel of open and overdue promises, raises one so every participant sees it as a quote card, and marks it Kept, Still open, or Reversed on the spot. **Agreement Check:** the host types a decision, each participant taps Agree or Not yet, and it is saved to the ledger as "agreed by N of M". Chosen from `reports/NeuraMeet second signature feature.md`. Claim for the panel stays narrow: none of the platforms or notetakers we reviewed puts a past promise with its exact quote into a live call with owner confirmation and a logged agreement check.
+**Done when:** in a live call the owner can raise an open promise and every participant sees its quote card; the owner's live mark (kept, still open, reversed) lands in the ledger after the call; an Agreement Check collects votes and saves an "agreed by N of M" decision to the ledger; only the owner can raise or mark; it runs on the Stream free tier with no paid captions, no extra Whisper calls, and no new provider.
+Spec: [0002. Live Ledger](../specs/0002-live-ledger/index.md)
+- [x] Design it (spec): `/architect live ledger`
+- [x] LL1 Schema plus owner check-in panel
+- [x] LL2 Raise, mark, close card plus late join state
+- [x] LL3 Agreement Check
+- [x] LL4 Post call reconcile plus Ledger tab badges
+- [ ] LL5 Live two person verify
+
+### 19. Tasdeeq, Verified Minutes · in-progress · GA
+After each meeting, every attendee (not just the host) reviews the AI minutes lines attributed to them and confirms, corrects, or taps "Record my view" to enter a formal dissent. Each minutes line links to the transcript lines behind it, and lines with no support are flagged. Once enough attendees confirm, or a deadline passes, the minutes are sealed and a fingerprint of the sealed version is sent to every attendee, so any later change can be detected. It fits Pakistan's official minutes practice (decisions only, individual views recorded on request, minutes confirmed by members). Chosen from `reports/NeuraMeet third signature feature.md`. Claim for the panel stays narrow: none of the meeting apps or AI notetakers we reviewed let each attendee confirm, correct, or record their own view against the AI minutes, then seal the result. Say "tamper evident", never "legally binding".
+**Done when:** every attendee can claim their speaker label and confirm, correct, or record a view on their own minutes lines; each line shows its supporting transcript lines and unsupported lines are flagged; reprocessing never overwrites minutes once review starts; minutes seal on quorum or deadline and a verify step detects any later change; a planted error study reports how many errors attendees catch; it adds no paid service and no new provider.
+Spec: [0003. Tasdeeq, Verified Minutes](../specs/0003-tasdeeq-verified-minutes/index.md)
+- [x] Design it (spec): `/architect tasdeeq verified minutes`
+- [x] Build it: `/develop tasdeeq verified minutes`
+  - [x] T1 Schema plus minutes draft with evidence and owner draft view (AC-1 to AC-4, AC-19, AC-20)
+  - [x] T2 Open, cancel, freeze, speaker claims, review open email (AC-5 to AC-8, AC-17)
+  - [x] T3 Attest, suggestions, Finish my review (AC-9 to AC-12)
+  - [x] T4 Seal, verify route and page, sealed email (AC-13 to AC-17)
+  - [x] T5 PDF plus evaluation seed script and end to end check (AC-18, AC-19, AC-21, AC-22)
+- [ ] Verify it: `/check verify tasdeeq verified minutes`
+- [ ] Test it: `/test tasdeeq verified minutes`
+- [ ] Review it (fresh model): `/check review tasdeeq verified minutes`
+- [ ] Document it: `/document tasdeeq verified minutes`
+
+## Project Workspace: Conversations to Code (Steps W-pre to W9, after the Signature Features, before Deploy)
+
+Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview` and the research in `reports/Conversations to code workspace.md`. NeuraMeet grows from a meeting app into a project workspace that connects conversations with code. The research found every PDF screen already ships somewhere (Huly, Linear, Jira with Loom and Rovo, Fireflies), so the centre of this phase is the **Proof Chain**: a spoken promise, with its verified quote, speaker, and timestamp, becomes a reviewed task, is closed by a PR merged into the default branch, and shows as kept back on the meeting and in the Promise Ledger. Claim stays narrow: "none of the products we reviewed". The PDF is used for layout and information architecture only; the locked Stitch tokens stay (decision 2026-11-02). Live captions leave the core (deferred below). The three signature features stay and get permanent homes: the Promise Ledger becomes the project Decisions and Promises tab, Live Ledger the live meeting panel, Tasdeeq an optional Verify minutes step before tasks are confirmed.
+
+Before any W step: commit the in flight Live Ledger and Tasdeeq work and run LL5 plus the Tasdeeq three person live run (W-pre).
+
+- [ ] W-pre Commit in flight work, run LL5 and the Tasdeeq live run
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [x] Design it (spec): `/architect conversations to code` (W0, spec written and accepted 2026-11-03: scope amendment, role matrix including Viewer, offboarding and retention, GitHub linking rules, merge completes directly or pending owner confirm, one repo per project or shared, Resend sending domain, new API contracts and secrets added to AGENTS.md before code)
+
+### 20. Project workspaces, members, roles, and invitations · in-progress · GA
+Projects with Owner, Admin, Developer, and Viewer roles kept in our own Supabase tables (not Clerk Organizations, which caps free orgs at 20 members and two roles). One shared server role check replaces the per route `meetings.user_id` owner checks. Invitations by email or copyable link with hashed single use tokens, expiry, and owner approval. Personal meetings keep working (`meetings.project_id` is nullable).
+**Done when:** a non member gets 403 or 404 on every project route; forged, expired, and replayed invite tokens are rejected; an invited member joins with the right role after owner approval.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop project workspaces`
+  - [x] W1 Projects, members, shared role check, route migration (AC-1 to AC-12) (`src/lib/project-auth.ts`, `src/app/api/projects/`)
+  - [ ] W2 Invitations and join requests (AC-13 to AC-22)
+
+### 21. Project meetings with a consent notice · planned · GA
+Schedule a meeting inside a project with a participant picker; project members see project meetings; everyone, guests included, sees a recording consent notice before joining.
+**Done when:** a project member sees the project's meetings and an outsider does not; the consent notice shows before join.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop project meetings`
+  - [ ] W3 Project picker, consent notice, guest consent, move into a project (AC-23 to AC-29)
+
+### 22. Review gate plus project tasks on a Kanban board · planned · GA
+AI proposed tasks and decisions wait for human review (no more auto created follow ups). Each proposal carries a code verified quote, a suggested assignee only when that person's own audio track holds the acceptance, and a pgvector duplicate check against open tasks. Confirmed proposals become keyed tasks (To Do, In Progress, In Review, Completed, Blocked) on a Kanban board. Tasks without GitHub complete manually with a comment or link as evidence. Follow ups migrate into tasks.
+**Done when:** a planted hallucinated item is dropped, a duplicate is flagged, nothing becomes a task without review, and a task moves across the board.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop review gate and tasks`
+  - [ ] W4 Proposals, review, keyed tasks, board (AC-30 to AC-42)
+
+### 23. GitHub App integration with strict linking rules · planned · GA
+A free GitHub App (not an OAuth App or token) installed per project repo. Webhooks verify the `X-Hub-Signature-256` HMAC over the raw body, dedupe on `X-GitHub-Delivery`, reply fast and process in `after()`. A task completes only on a closing reference plus `merged == true` plus a merge into the default branch plus all linked PRs done; drafts stay In Progress, closed unmerged PRs do nothing, a revert reopens. A Sync GitHub action reconciles missed deliveries. Optional "also create GitHub issue" on confirm. GitHub never assigns tasks, so no GitHub account mapping is stored (decided in the W0 spec).
+**Done when:** a forged webhook is rejected, and partial, draft, unmerged, non default branch, and revert PRs each behave correctly.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop github integration`
+  - [ ] W5 App install callback, webhook, linking, merge completion, revert, Sync (AC-43 to AC-56)
+
+### 24. Proof Chain: a promise traced from meeting quote to merged PR · planned · GA
+The project Decisions and Promises tab built on `ledger_items`; a qualifying merge adds code evidence to the linked promise (owner confirms, same flow as ledger links); the meeting gets an Outcome card showing the chain; an Activity timeline joins meetings, decisions, tasks, and PRs; Live Ledger check in is scoped to the project.
+**Done when:** one demo promise from a real Urdu English meeting is traced in the UI from quote to reviewed task to merged PR to kept.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop proof chain`
+  - [ ] W6 Decisions and Promises tab, Outcome card, Activity, Viewer redaction (AC-57 to AC-62)
+
+### 25. Project AI assistant with code built citations · planned · GA
+Extend `/api/ai/chat` and `/api/search` with a project scope rather than new routes. Retrieval filters by project inside SQL, covers meetings, ledger items, and task titles, treats transcripts, PR text, and commits as untrusted data, stays read only, and builds citations in code from retrieved record ids, answering "not found in this project's records" when nothing matches.
+**Done when:** a cross project question returns nothing from other projects and injected PR text does not change answers.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop project assistant`
+  - [ ] W7 Project scoped chat and search with code built citations (AC-63 to AC-69)
+
+### 26. Workspace shell, personal views, notifications, Ctrl K · planned · GA
+New sidebar and navigation from the PDF layout (My Dashboard, My Tasks, My Meetings, My Projects, Notifications, project tabs), styled with the locked Stitch tokens plus new success and warning tokens. Notifications table and bell, one daily digest via the once a day Vercel cron, a Ctrl K palette, and a useful empty state in every project tab. Recordings fold into meeting detail, Prep into the project overview, Search into Ctrl K. No per developer contribution views (they read as surveillance).
+**Done when:** every tab renders a useful empty state in a fresh project and every PDF screen in the core has a working home.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop workspace shell`
+  - [ ] W8 Tabs, notifications, email budget, daily cron, My Tasks, Ctrl K, tokens (AC-70 to AC-79)
+
+### 27. Workspace verify and security suite · planned · GA
+Security tests (non member access, forged webhook, invite replay, role escalation), planted PR scenarios, and one real bilingual project meeting run through the full chain, plus the demo script.
+**Done when:** all checks are green and the demo script runs end to end.
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [ ] Build it: `/develop workspace security suite`
+  - [ ] W9 Route matrix, webhook and invite attack tests, injection tests, bilingual run (AC-80 to AC-84)
+- [ ] Verify it: `/check verify conversations to code`
+- [ ] Test it: `/test conversations to code`
+- [ ] Review it (fresh model): `/check review conversations to code`
+- [ ] Document it: `/document conversations to code`
+
 ## Deploy
 
 ### 11. Deploy and harden · planned
@@ -547,7 +655,14 @@ Deploy to Vercel on the free tier, then verify and harden. Re-enable Clerk email
 Out of scope for the current build pass, kept so the plan stays honest.
 - Oxylabs topic or company enrichment (stretch, needs a paid API, forbidden by the zero cost rule) · needs a decision
 - Urdu English meeting intelligence (summaries and chat answers that keep code mixing, with English, Urdu script, or Roman Urdu output). Runner up from the October 2026 research; partly folded into the Promise Ledger · needs a decision
-- Anonymous AI devil's advocate (a participant privately submits a concern during a live call and the AI raises it as its own question). Runner up from the October 2026 research; touches live Stream code, so only after the Promise Ledger is done · needs a decision
+- Anonymous AI devil's advocate (a participant privately submits a concern during a live call and the AI raises it as its own question). Runner up from the October 2026 research; touches live Stream code, so only after the Promise Ledger is done. The November 2026 research (`reports/NeuraMeet second signature feature.md`) recommends against it: a CSCW 2026 study found anonymous AI relayed dissent lowered junior members' psychological safety · needs a decision
+- While You Were Gone (a recap of what you missed when your connection drops, for load shedding and weak networks). Runner up from the November 2026 research; blocked until stored transcripts keep timestamps · needs a decision
+- Viva / FYP Panel Mode (a meeting mode for viva and panel sessions). Runner up from the November 2026 research · needs a decision
+- Offline Safe Voice (keep recording your own mic during load shedding or a dropped connection, then merge it into the transcript when you reconnect). Runner up from the third research pass (`reports/NeuraMeet third signature feature.md`) · needs a decision
+- Meeting Purpose and Goal Attainment (state a meeting goal, then show whether it was met). Runner up from the third research pass; a large field study found goal nudges did not help · needs a decision
+- Cross meeting Fact Drift (flag numbers, dates, or requirements stated differently across meetings). Runner up from the third research pass; reads as a Promise Ledger variant · needs a decision
+- Live captions in the meeting (from the PDF). Stream captions are a paid add-on ($8 per 1,000 call minutes) with no Urdu, and Groq's free Whisper limits cannot cover live captions plus post call transcripts. Optional stretch after W9: browser Web Speech captions for each speaker's own mic, labelled experimental (Chrome and Edge only, audio processed by Google), with the post call transcript staying the record · needs a decision
+- Cut from the PDF for this build: the development simulator on Task Details (fake evidence next to real), the Contributors tab and per developer contribution widgets, a global AI assistant outside projects, sprints and milestones, raw commit ingestion beyond PR linked commits, Clerk Organizations
 
 ## Step 9.5 FYP Polish Pass
 

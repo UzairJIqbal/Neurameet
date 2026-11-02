@@ -7,6 +7,7 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
     attendance: { data: null as unknown, error: null as unknown },
     transcripts: { data: null as unknown, error: null as unknown },
     insights: { data: null as unknown, error: null as unknown },
+    members: { data: null as unknown, error: null as unknown },
   };
   const makeClient = () => ({
     from: (table: string) => {
@@ -19,7 +20,9 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
               ? store.transcripts
               : table === "meeting_insights"
                 ? store.insights
-                : { data: null, error: null };
+                : table === "project_members"
+                  ? store.members
+                  : { data: null, error: null };
       // `.eq()` filters array results by field so the participant lookup only
       // matches rows for the requested user.
       const filters: Array<[string, unknown]> = [];
@@ -39,6 +42,7 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
           filters.push([field, value]);
           return builder;
         },
+        is: () => builder,
         single: () => Promise.resolve(result),
         limit: () => resolve(),
         maybeSingle: () => Promise.resolve(result),
@@ -84,6 +88,38 @@ describe("POST /api/engagement authorization", () => {
     // check from the (un-mocked) speaker-insights AI call.
     store.transcripts = { data: null, error: null };
     store.insights = { data: null, error: null };
+    store.members = { data: null, error: null };
+  });
+
+  const projectRow = {
+    id: "m1",
+    title: "Test",
+    user_id: "owner",
+    project_id: "p1",
+  };
+
+  it("returns 404 for a non member on a project meeting", async () => {
+    store.meetings = { data: projectRow, error: null };
+
+    const res = await call("stranger", "m1");
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Meeting not found" });
+  });
+
+  it("returns 403 for a viewer on a project meeting", async () => {
+    store.meetings = { data: projectRow, error: null };
+    store.members = { data: { role: "viewer" }, error: null };
+
+    expect((await call("viewer", "m1")).status).toBe(403);
+  });
+
+  it("returns engagement for a developer on a project meeting", async () => {
+    store.meetings = { data: projectRow, error: null };
+    store.members = { data: { role: "developer" }, error: null };
+    store.attendance = { data: [], error: null };
+
+    expect((await call("dev", "m1")).status).toBe(200);
   });
 
   it("rejects when not authenticated", async () => {

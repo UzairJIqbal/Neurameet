@@ -499,3 +499,287 @@ as $$
 $$;
 
 GRANT EXECUTE ON FUNCTION match_ledger_prep_items(vector, text, int) TO service_role;
+
+-- ---------------------------------------------------------------------------
+-- Live Ledger (spec docs/specs/0002-live-ledger): live marks raised during a
+-- call, Agreement Checks, and their votes. Same posture as the ledger tables:
+-- RLS on with no policies, so only the service_role client can touch rows.
+-- ---------------------------------------------------------------------------
+create table if not exists ledger_live_marks (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid references meetings(id) on delete cascade not null, -- the live meeting
+  item_id uuid references ledger_items(id) on delete cascade not null, -- an item from an earlier meeting
+  mark text check (mark in ('kept', 'open', 'reversed')),             -- null while raised, not marked
+  raised_at timestamptz not null default now(),
+  marked_at timestamptz,
+  closed_at timestamptz,
+  unique (meeting_id, item_id)
+);
+create index if not exists ledger_live_marks_meeting_idx
+  on ledger_live_marks (meeting_id, raised_at desc);
+
+create table if not exists ledger_agreements (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid references meetings(id) on delete cascade not null,
+  statement text not null check (char_length(statement) between 1 and 280),
+  status text not null default 'open' check (status in ('open', 'closed')),
+  agreed_count integer,
+  total_count integer,
+  ledger_item_id uuid references ledger_items(id) on delete set null,
+  opened_at timestamptz not null default now(),
+  closed_at timestamptz
+);
+create unique index if not exists ledger_agreements_one_open
+  on ledger_agreements (meeting_id) where status = 'open';
+
+create table if not exists ledger_agreement_votes (
+  agreement_id uuid references ledger_agreements(id) on delete cascade not null,
+  voter_id text not null, -- Clerk id or verified Stream guest id
+  vote text not null check (vote in ('agree', 'not_yet')),
+  voted_at timestamptz not null default now(),
+  primary key (agreement_id, voter_id)
+);
+
+alter table ledger_items
+  add column if not exists source text not null default 'transcript'
+    check (source in ('transcript', 'live_agreement')),
+  add column if not exists agreed_count integer,
+  add column if not exists total_count integer;
+
+alter table ledger_live_marks enable row level security;
+alter table ledger_agreements enable row level security;
+alter table ledger_agreement_votes enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON ledger_live_marks, ledger_agreements, ledger_agreement_votes TO service_role;
+
+-- Tasdeeq, Verified Minutes (spec docs/specs/0003-tasdeeq-verified-minutes):
+-- attendees confirm, correct, or record a view on the AI minutes, then the
+-- owner seals them with a signed, chained SHA-256 fingerprint.
+alter table meeting_insights
+  add column if not exists minutes_draft jsonb; -- null for meetings processed before Tasdeeq
+
+create table if not exists minutes_reviews (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid unique references meetings(id) on delete cascade not null,
+  status text not null default 'open' check (status in ('open', 'sealing', 'sealed')), -- cancel deletes the row
+  deadline_days integer not null check (deadline_days in (3, 7)),
+  deadline_at timestamptz not null,
+  opened_at timestamptz not null default now(),
+  coverage jsonb not null,                -- { lastLine, totalLines, text }
+  transcript_source text not null check (transcript_source in ('upload', 'recording')),
+  transcript_sha256 text not null
+);
+
+create table if not exists minutes_lines (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  position integer not null,
+  section text not null check (section in ('summary', 'key_point', 'decision', 'action_item')),
+  text text not null,
+  evidence jsonb not null default '[]',   -- [{ quote, lineNumber, speaker }], at most 2
+  supported boolean not null,
+  speaker_labels text[] not null default '{}',
+  action_item_id uuid references action_items(id) on delete set null,
+  assignee text,
+  unique (review_id, position)
+);
+
+create table if not exists minutes_attesters (
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  user_id text not null,                  -- Clerk id
+  display_name text not null,
+  email text,
+  is_owner boolean not null default false,
+  done_at timestamptz,
+  primary key (review_id, user_id)
+);
+
+create table if not exists minutes_speaker_claims (
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  speaker_label text not null,           -- the label key (lowercase, trimmed, spaces collapsed)
+  display_label text not null,           -- first seen spelling
+  user_id text not null,
+  claimed_by text not null check (claimed_by in ('self', 'owner')),
+  claimed_at timestamptz not null default now(),
+  primary key (review_id, speaker_label),
+  foreign key (review_id, user_id) references minutes_attesters(review_id, user_id) on delete cascade
+);
+
+create table if not exists minutes_attestations (
+  line_id uuid references minutes_lines(id) on delete cascade not null,
+  user_id text not null,
+  action text not null check (action in ('confirm', 'correct', 'view')),
+  note text check (note is null or char_length(note) between 1 and 500),
+  late boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (line_id, user_id),
+  check (action = 'confirm' or note is not null)
+);
+
+create table if not exists minutes_dissent_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid references minutes_reviews(id) on delete cascade not null,
+  speaker_label text not null,
+  topic text not null,
+  position text not null,
+  quote text not null,
+  line_number integer not null,
+  related_line_id uuid references minutes_lines(id) on delete set null,
+  status text not null default 'suggested' check (status in ('suggested', 'adopted', 'dismissed'))
+);
+
+create table if not exists minutes_seals (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid unique references minutes_reviews(id) on delete restrict not null,
+  meeting_id uuid references meetings(id) on delete restrict not null,
+  owner_id text not null,
+  content_sha256 text not null,
+  prev_seal_sha256 text,
+  signature text not null,                -- base64 Ed25519
+  key_id text not null,
+  bundle jsonb not null,
+  status_text text not null,
+  sealed_at timestamptz not null default now()
+);
+create index if not exists minutes_seals_owner_idx on minutes_seals (owner_id, sealed_at desc);
+
+alter table minutes_reviews enable row level security;
+alter table minutes_lines enable row level security;
+alter table minutes_attesters enable row level security;
+alter table minutes_speaker_claims enable row level security;
+alter table minutes_attestations enable row level security;
+alter table minutes_dissent_suggestions enable row level security;
+alter table minutes_seals enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON minutes_reviews, minutes_lines, minutes_attesters, minutes_speaker_claims,
+     minutes_attestations, minutes_dissent_suggestions, minutes_seals TO service_role;
+
+-- ===== W1. Projects and members (spec 0004) =====
+create table if not exists projects (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 1 and 80),
+  task_prefix text not null check (task_prefix ~ '^[A-Z]{2,5}$'), -- fixed after creation
+  next_task_number integer not null default 1,
+  created_by text not null,                                        -- Clerk user id
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists project_members (
+  project_id uuid references projects(id) on delete cascade not null,
+  user_id text not null,                                           -- Clerk user id
+  role text not null check (role in ('owner', 'admin', 'developer', 'viewer')),
+  added_by text,
+  joined_at timestamptz not null default now(),
+  removed_at timestamptz,                                          -- null = active
+  removed_by text,
+  primary key (project_id, user_id)
+);
+create unique index if not exists project_members_one_owner
+  on project_members (project_id) where role = 'owner' and removed_at is null;
+create index if not exists project_members_active_user
+  on project_members (user_id) where removed_at is null;
+
+create table if not exists audit_log (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid,                     -- no FK, the trail outlives a deleted project
+  actor_id text,                       -- null = system or GitHub
+  action text not null,                -- e.g. member.removed, invite.created, repo.linked
+  target_type text,
+  target_id text,
+  detail jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists audit_log_project on audit_log (project_id, created_at desc);
+
+alter table meetings
+  add column if not exists project_id uuid references projects(id) on delete restrict;
+create index if not exists meetings_project on meetings (project_id) where project_id is not null;
+
+-- Atomic helpers (supabase-js has no transactions).
+create or replace function create_project(p_name text, p_prefix text, p_user text)
+returns projects language plpgsql set search_path = public as $$
+declare p projects;
+begin
+  insert into projects (name, task_prefix, created_by) values (p_name, p_prefix, p_user) returning * into p;
+  insert into project_members (project_id, user_id, role, added_by) values (p.id, p_user, 'owner', p_user);
+  insert into audit_log (project_id, actor_id, action, target_type, target_id)
+    values (p.id, p_user, 'project.created', 'project', p.id::text);
+  return p;
+end $$;
+
+create or replace function transfer_project_ownership(p_project uuid, p_from text, p_to text)
+returns void language plpgsql set search_path = public as $$
+begin
+  perform 1 from project_members where project_id = p_project and user_id = p_from
+    and role = 'owner' and removed_at is null for update;
+  if not found then raise exception 'not_owner'; end if;
+  perform 1 from project_members where project_id = p_project and user_id = p_to
+    and role = 'admin' and removed_at is null for update;
+  if not found then raise exception 'target_not_admin'; end if;
+  update project_members set role = 'admin' where project_id = p_project and user_id = p_from;
+  update project_members set role = 'owner' where project_id = p_project and user_id = p_to;
+  insert into audit_log (project_id, actor_id, action, target_type, target_id)
+    values (p_project, p_from, 'project.ownership_transferred', 'member', p_to);
+end $$;
+
+-- W1 body: tasks do not exist yet. W4 replaces this with the full body that also
+-- unassigns the member's unfinished tasks (see the umbrella spec).
+create or replace function remove_project_member(p_project uuid, p_user text, p_actor text,
+  p_actor_role text)
+returns void language plpgsql set search_path = public as $$
+begin
+  -- An Admin removes only Developers and Viewers (or leaves); the role is checked here,
+  -- in the same statement, so a role change cannot race the removal.
+  update project_members set removed_at = now(), removed_by = p_actor
+    where project_id = p_project and user_id = p_user and removed_at is null and role <> 'owner'
+      and (p_actor = p_user or p_actor_role = 'owner' or role in ('developer', 'viewer'));
+  if not found then raise exception 'not_removable'; end if;
+  insert into audit_log (project_id, actor_id, action, target_type, target_id)
+    values (p_project, p_actor, case when p_actor = p_user then 'member.left' else 'member.removed' end, 'member', p_user);
+end $$;
+
+-- Promise Ledger matching on a project meeting looks at the whole project, not only
+-- the creator's meetings. Same signature, so the existing callers keep working.
+create or replace function match_ledger_candidates(
+  p_meeting_id uuid, p_user_id text, match_count int default 15
+) returns table (id uuid, meeting_id uuid, kind text, statement text, quote text,
+                 assignee text, due_date date, similarity float)
+language sql stable set search_path = public as $$
+  with target as (select project_id, started_at from meetings where id = p_meeting_id)
+  select li.id, li.meeting_id, li.kind, li.statement, li.quote, li.assignee, li.due_date,
+         best.similarity
+  from ledger_items li
+  join meetings m on m.id = li.meeting_id
+  cross join target
+  cross join lateral (
+    select max(1 - (mc.embedding <=> li.embedding)) as similarity
+    from meeting_chunks mc where mc.meeting_id = p_meeting_id
+  ) best
+  where (case when target.project_id is null
+              then m.user_id = p_user_id and m.project_id is null
+              else m.project_id = target.project_id end)
+    and li.status = 'open' and li.embedding is not null
+    and li.meeting_id <> p_meeting_id
+    and m.started_at < target.started_at
+    and best.similarity is not null
+  order by best.similarity desc
+  limit match_count;
+$$;
+
+alter table projects enable row level security;
+alter table project_members enable row level security;
+alter table audit_log enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON projects, project_members, audit_log TO service_role;
+
+revoke execute on function create_project(text, text, text) from public, anon, authenticated;
+revoke execute on function transfer_project_ownership(uuid, text, text) from public, anon, authenticated;
+revoke execute on function remove_project_member(uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function match_ledger_candidates(uuid, text, int) from public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION create_project(text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION transfer_project_ownership(uuid, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION remove_project_member(uuid, text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION match_ledger_candidates(uuid, text, int) TO service_role;

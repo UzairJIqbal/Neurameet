@@ -2,6 +2,8 @@
 
 Concise rules for building NeuraMeet UI. The supplied UI reference (Dashboard, Meeting Intelligence, Follow-ups, forms) is the source of truth for visual decisions on new AI-feature screens. Existing Meeting Room / Meeting Setup screens keep their current dark, full-bleed video-call styling — these rules apply to the Dashboard and Meeting Intelligence surfaces being added.
 
+**Phase W (2026-11-02):** new workspace screens (My Dashboard, My Tasks, My Projects, project tabs, Kanban, invitations, notifications) follow the layout and information architecture of the PDF `NeuraMeet UI Overview`, styled only with the locked tokens in `ui-tokens.md`. Never copy colours from the PDF. Kanban columns use status badges, not coloured column backgrounds. Every project tab needs a useful empty state. AI proposals show their evidence quote and are never shown as created until confirmed. Never show per developer rankings or contribution leaderboards.
+
 ---
 
 ## Font

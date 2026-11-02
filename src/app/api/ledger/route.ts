@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 import { deriveLedgerStatus } from "@/agent/ledger";
 import type {
   LedgerIncomingLink,
   LedgerItem,
   LedgerLink,
+  LedgerLiveMark,
+  LedgerLiveOnlyMark,
   LedgerResponse,
 } from "@/lib/meeting-types";
 
@@ -26,6 +29,16 @@ interface LedgerItemRow {
   line_number: number;
   status: LedgerItem["status"];
   created_at: string;
+  source: LedgerItem["source"];
+  agreed_count: number | null;
+  total_count: number | null;
+}
+
+interface LiveMarkRow {
+  meeting_id: string;
+  item_id: string;
+  mark: LedgerLiveMark;
+  marked_at: string | null;
 }
 
 interface LedgerLinkRow {
@@ -49,7 +62,7 @@ interface SourceMeetingRow {
 }
 
 const ITEM_COLUMNS =
-  "id, meeting_id, action_item_id, kind, statement, quote, quote_language, speaker, assignee, due_date, line_number, status, created_at";
+  "id, meeting_id, action_item_id, kind, statement, quote, quote_language, speaker, assignee, due_date, line_number, status, created_at, source, agreed_count, total_count";
 const LINK_COLUMNS =
   "id, item_id, evidence_meeting_id, relation, quote, speaker, line_number, confidence, state, decided_at, created_at";
 
@@ -77,6 +90,9 @@ function toItem(row: LedgerItemRow): LedgerItem {
     lineNumber: row.line_number,
     status: row.status,
     createdAt: row.created_at,
+    source: row.source,
+    agreedCount: row.agreed_count,
+    totalCount: row.total_count,
   };
 }
 
@@ -117,14 +133,20 @@ export async function GET(request: Request) {
 
     const { data: meeting, error: meetingErr } = await supabase
       .from("meetings")
-      .select("id")
+      .select("id, user_id, project_id")
       .eq("id", meetingId)
-      .eq("user_id", userId)
       .maybeSingle();
     if (meetingErr) throw meetingErr;
     if (!meeting) {
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
+    // Personal meeting: the creator only. Project meeting: any member.
+    const { projectId } = await checkMeetingAccess(
+      supabase,
+      userId,
+      meeting,
+      "read",
+    );
 
     // Items said in this meeting, plus the links later meetings suggested.
     const { data: itemRows, error: itemsErr } = await supabase
@@ -136,6 +158,7 @@ export async function GET(request: Request) {
     const items = ((itemRows ?? []) as LedgerItemRow[]).map(toItem);
 
     let outgoing: LedgerLink[] = [];
+    const itemMarks = new Map<string, LedgerLiveMark>();
     if (items.length > 0) {
       const { data: outRows, error: outErr } = await supabase
         .from("ledger_links")
@@ -146,6 +169,22 @@ export async function GET(request: Request) {
         );
       if (outErr) throw outErr;
       outgoing = ((outRows ?? []) as LedgerLinkRow[]).map(toLink);
+
+      // Live marks later calls made on these items (spec 0002 AC-15).
+      const { data: markRows, error: markErr } = await supabase
+        .from("ledger_live_marks")
+        .select("meeting_id, item_id, mark, marked_at")
+        .in(
+          "item_id",
+          items.map((i) => i.id),
+        )
+        .not("mark", "is", null)
+        .order("marked_at", { ascending: true });
+      if (markErr) throw markErr;
+      // Ascending, so the latest mark per item wins.
+      for (const row of (markRows ?? []) as LiveMarkRow[]) {
+        itemMarks.set(row.item_id, row.mark);
+      }
     }
 
     // Links found in this meeting that point back at earlier items.
@@ -156,29 +195,44 @@ export async function GET(request: Request) {
     if (inErr) throw inErr;
     const incomingLinks = ((inRows ?? []) as LedgerLinkRow[]).map(toLink);
 
+    // Marks the owner made live in this meeting on earlier items.
+    const { data: hereMarkRows, error: hereMarkErr } = await supabase
+      .from("ledger_live_marks")
+      .select("meeting_id, item_id, mark, marked_at")
+      .eq("meeting_id", meetingId)
+      .not("mark", "is", null);
+    if (hereMarkErr) throw hereMarkErr;
+    const hereMarks = new Map(
+      ((hereMarkRows ?? []) as LiveMarkRow[]).map((r) => [r.item_id, r.mark]),
+    );
+
     const incoming: LedgerIncomingLink[] = [];
-    if (incomingLinks.length > 0) {
+    const liveOnly: LedgerLiveOnlyMark[] = [];
+    const srcItemIds = [
+      ...new Set([...incomingLinks.map((l) => l.itemId), ...hereMarks.keys()]),
+    ];
+    if (srcItemIds.length > 0) {
       const { data: srcItemRows, error: srcItemsErr } = await supabase
         .from("ledger_items")
         .select(ITEM_COLUMNS)
-        .in(
-          "id",
-          incomingLinks.map((l) => l.itemId),
-        );
+        .in("id", srcItemIds);
       if (srcItemsErr) throw srcItemsErr;
       const srcItems = new Map(
         ((srcItemRows ?? []) as LedgerItemRow[]).map((r) => [r.id, toItem(r)]),
       );
 
-      // Scoped to the caller, so a link can never surface another user's meeting.
-      const { data: srcMeetingRows, error: srcMeetingsErr } = await supabase
+      // Scoped to the caller (or, on a project meeting, to the project), so a
+      // link can never surface another user's or another project's meeting.
+      const srcMeetingQuery = supabase
         .from("meetings")
         .select("id, title, started_at")
         .in(
           "id",
           [...srcItems.values()].map((i) => i.meetingId),
-        )
-        .eq("user_id", userId);
+        );
+      const { data: srcMeetingRows, error: srcMeetingsErr } = projectId
+        ? await srcMeetingQuery.eq("project_id", projectId)
+        : await srcMeetingQuery.eq("user_id", userId);
       if (srcMeetingsErr) throw srcMeetingsErr;
       const srcMeetings = new Map(
         ((srcMeetingRows ?? []) as SourceMeetingRow[]).map((m) => [m.id, m]),
@@ -196,6 +250,28 @@ export async function GET(request: Request) {
             title: source.title,
             startedAt: source.started_at,
           },
+          liveMark: hereMarks.get(link.itemId) ?? null,
+        });
+      }
+
+      // A live mark no transcript link backs (a rejected link backs nothing).
+      const backed = new Set(
+        incomingLinks
+          .filter((l) => l.state !== "rejected")
+          .map((l) => l.itemId),
+      );
+      for (const [itemId, mark] of hereMarks) {
+        const item = srcItems.get(itemId);
+        const source = item ? srcMeetings.get(item.meetingId) : undefined;
+        if (!item || !source || backed.has(itemId)) continue;
+        liveOnly.push({
+          mark,
+          item,
+          sourceMeeting: {
+            id: source.id,
+            title: source.title,
+            startedAt: source.started_at,
+          },
         });
       }
     }
@@ -205,14 +281,18 @@ export async function GET(request: Request) {
         ...item,
         derivedStatus: deriveLedgerStatus(item.status, item.dueDate, today),
         links: outgoing.filter((l) => l.itemId === item.id),
+        liveMark: itemMarks.get(item.id) ?? null,
       })),
       incoming,
+      liveOnly,
       reversalCount: incoming.filter(
         (l) => l.relation === "reversed" && l.state !== "rejected",
       ).length,
     };
     return NextResponse.json(body);
   } catch (err) {
+    const denied = accessErrorResponse(err);
+    if (denied) return denied;
     console.error("[ledger] read failed", { meetingId, err });
     return NextResponse.json(
       { error: "Failed to load the ledger" },
