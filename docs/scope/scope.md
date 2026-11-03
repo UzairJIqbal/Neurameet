@@ -76,7 +76,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 18 | Live Ledger: bring the Promise Ledger into the live call (Promise Check-in quote cards + one tap Agreement Check saved to the ledger) | Signature Feature | in-progress |
 | 19 | Tasdeeq, Verified Minutes: every attendee confirms, corrects, or records a dissent on the AI minutes attributed to them, then the confirmed minutes are sealed so any later change is detectable | Signature Feature | in-progress |
 | 20 | Project workspaces, members, roles, and invitations (W1, W2) | Project Workspace | in-progress |
-| 21 | Project meetings with a consent notice (W3) | Project Workspace | planned |
+| 21 | Project meetings with a consent notice (W3) | Project Workspace | in-progress |
 | 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | planned |
 | 23 | GitHub App integration with strict linking rules (W5) | Project Workspace | planned |
 | 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | planned |
@@ -590,12 +590,21 @@ Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md
   - [x] W1 Projects, members, shared role check, route migration (AC-1 to AC-12) (`src/lib/project-auth.ts`, `src/app/api/projects/`)
   - [x] W2 Invitations, invite preview, and join requests (built 2026-11-03, SQL applied; live test pending) (AC-13 to AC-22c, spec [0004-invitations](../specs/0004-conversations-to-code/0004-invitations.md))
 
-### 21. Project meetings with a consent notice · planned · GA
+### 21. Project meetings with a consent notice · in-progress · GA
 Schedule a meeting inside a project with a participant picker; project members see project meetings; everyone, guests included, sees a recording consent notice before joining.
 **Done when:** a project member sees the project's meetings and an outsider does not; the consent notice shows before join.
-Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md) · W3 child [0004-project-meetings](../specs/0004-conversations-to-code/0004-project-meetings.md)
+- [x] Design it (spec): `/architect project meetings` (W3 updated 2026-11-03: members only `project` Stream call type, offboarding removal from open calls, cross checked)
 - [ ] Build it: `/develop project meetings`
-  - [ ] W3 Project picker, consent notice, guest consent, move into a project (AC-23 to AC-29)
+  - [x] W3a Feasibility gate: `project` call type created and proven (AC-30a)
+  - [x] W3b SQL, call type threaded through server and browser, project picker with server first create (AC-23, AC-28)
+  - [x] W3c Consent notice, consent route, fresh consent check in `/members`, guest consent and admit as call member (AC-26 to AC-30a)
+  - [x] W3d Offboarding removal from open project calls (AC-30b)
+  - [ ] W3e With W4: move a meeting into a project (AC-24, AC-25)
+- [ ] Verify it: `/check verify project meetings`
+- [ ] Test it: `/test project meetings`
+- [ ] Review it (fresh model): `/check review project meetings`
+- [ ] Document it: `/document project meetings`
 
 ### 22. Review gate plus project tasks on a Kanban board · planned · GA
 AI proposed tasks and decisions wait for human review (no more auto created follow ups). Each proposal carries a code verified quote, a suggested assignee only when that person's own audio track holds the acceptance, and a pgvector duplicate check against open tasks. Confirmed proposals become keyed tasks (To Do, In Progress, In Review, Completed, Blocked) on a Kanban board. Tasks without GitHub complete manually with a comment or link as evidence. Follow ups migrate into tasks.

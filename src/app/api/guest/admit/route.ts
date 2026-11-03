@@ -9,6 +9,8 @@ import { StreamClient } from "@stream-io/node-sdk"; // only for call-event emit
 import { getGuest, admit } from "@/lib/guest-store";
 import { supabaseServer } from "@/lib/supabase-server";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
+import { PROJECT_CALL_TYPE } from "@/lib/stream-call-type";
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
 const secret = process.env.STREAM_SECRET_KEY!;
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
-    .select("id, user_id, project_id")
+    .select("id, user_id, project_id, stream_call_type")
     .eq("stream_call_id", meeting_id)
     .maybeSingle();
 
@@ -62,7 +64,31 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
-  // 5. Call admit() directly — it is the single source of truth for the
+  // 5. W3: a `project` call is members only, so add the guest as a
+  //    call_member before admitting. A failure leaves the guest pending.
+  const callType = callTypeOfRow(meeting);
+  if (callType === PROJECT_CALL_TYPE) {
+    if (!guest.stream_user_id) {
+      return NextResponse.json(
+        { error: "Guest is still connecting, try again" },
+        { status: 409 },
+      );
+    }
+    try {
+      const nodeClient = new StreamClient(apiKey, secret);
+      await nodeClient.video.call(callType, meeting_id).updateCallMembers({
+        update_members: [{ user_id: guest.stream_user_id, role: "call_member" }],
+      });
+    } catch (e) {
+      console.error("[guest/admit] project member add failed:", e);
+      return NextResponse.json(
+        { error: "Couldn't admit the guest, try again" },
+        { status: 502 },
+      );
+    }
+  }
+
+  // 6. Call admit() directly — it is the single source of truth for the
   //    check-and-set. Returns false if the guest was already admitted/denied/
   //    expired, which covers the race between concurrent admit requests.
   //    No separate getStatus() precheck — that was redundant and created an
@@ -76,7 +102,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 6. Best-effort emit to the guest's WebSocket (poll fallback is primary per G0 §4.2).
+  // 7. Best-effort emit to the guest's WebSocket (poll fallback is primary per G0 §4.2).
   //    No-op if the guest isn't in-call — they'll pick up the change on their 5s poll.
   //    `user_id` is REQUIRED for server-side auth (mirrors G2's request-join fix:
   //    omitting it makes Stream reject the emit with "either user or user_id must be
@@ -85,7 +111,7 @@ export async function POST(req: NextRequest) {
   try {
     const nodeClient = new StreamClient(apiKey, secret);
     await nodeClient.video.sendCallEvent({
-      type: "default",
+      type: callType,
       id: meeting_id,
       user_id: userId,
       custom: {
@@ -97,7 +123,7 @@ export async function POST(req: NextRequest) {
     console.error("[guest/admit] emit failed (poll-only fallback):", e);
   }
 
-  // 7. Done. The guest's polling loop (guest page GuestWaitingScreen) will see "admitted" and
+  // 8. Done. The guest's polling loop (guest page GuestWaitingScreen) will see "admitted" and
   //    call call.join({ create: false }) to enter the call.
   return NextResponse.json({ status: "admitted" });
 }

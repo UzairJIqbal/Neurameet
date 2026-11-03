@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockAuth, mockGetUserList } = vi.hoisted(() => ({
+const { mockAuth, mockGetUserList, mockOffboard } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockGetUserList: vi.fn(),
+  mockOffboard: vi.fn(async () => {}),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,6 +15,9 @@ vi.mock(
   "@/lib/supabase-server",
   async () => (await import("@/test/supabase-queue-mock")).supabaseServerModule,
 );
+vi.mock("@/lib/project-call-offboarding", () => ({
+  removeFromLiveProjectCalls: mockOffboard,
+}));
 
 import {
   queue,
@@ -399,6 +403,23 @@ describe("DELETE /api/projects/[id]/members/[userId]", () => {
       p_actor: "u1",
       p_actor_role: "viewer",
     });
+    expect(mockOffboard).toHaveBeenCalledWith(expect.anything(), P, "u1");
+  });
+
+  it("removes a member from live project calls after the removal is saved", async () => {
+    role("admin");
+    role("developer");
+    const res = await removeMember(req(undefined, "DELETE"), memberParams("u2"));
+    expect(res.status).toBe(200);
+    expect(mockOffboard).toHaveBeenCalledWith(expect.anything(), P, "u2");
+  });
+
+  it("never takes anyone out of calls when the removal fails", async () => {
+    role("admin");
+    role("admin");
+    queue("rpc:remove_project_member", fail("not_removable"));
+    await removeMember(req(undefined, "DELETE"), memberParams("u2"));
+    expect(mockOffboard).not.toHaveBeenCalled();
   });
 
   it("refuses the owner leaving with 409", async () => {

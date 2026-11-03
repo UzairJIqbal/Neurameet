@@ -61,6 +61,8 @@ export async function createPending(g: {
   request_nonce: string;
   name: string;
   email?: string;
+  // W3: when the guest ticked the recording notice on a project meeting.
+  consented_at?: string | null;
 }): Promise<{ guest: GuestInfo; isNew: boolean; mintPromise: Promise<GuestMint | null> }> {
   const supabase = supabaseServer();
 
@@ -75,6 +77,7 @@ export async function createPending(g: {
       request_nonce: g.request_nonce,
       name: g.name,
       email: g.email ?? null,
+      consented_at: g.consented_at ?? null,
       status: "pending",
       expires_at: expiresAtISO(),
     })
@@ -243,6 +246,21 @@ export async function deny(guest_token: string): Promise<boolean> {
   const { data: rows } = await supabase
     .from("guest_requests")
     .update({ status: "denied" })
+    .eq("guest_token", guest_token)
+    .eq("status", "pending")
+    .select();
+
+  return !!(rows && rows.length > 0);
+}
+
+// expireGuest: marks one pending request expired (W3: the open mode Stream
+// member add failed, so the guest must ask again). Returns false if the row
+// was no longer pending.
+export async function expireGuest(guest_token: string): Promise<boolean> {
+  const supabase = supabaseServer();
+  const { data: rows } = await supabase
+    .from("guest_requests")
+    .update({ status: "expired" })
     .eq("guest_token", guest_token)
     .eq("status", "pending")
     .select();

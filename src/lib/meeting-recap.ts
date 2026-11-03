@@ -1,4 +1,5 @@
 import { StreamClient } from "@stream-io/node-sdk";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   mergeAttendanceParticipants,
@@ -52,7 +53,7 @@ export async function getMeetingRecap(id: string): Promise<MeetingRecap | null> 
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
     .select(
-      "id, title, status, stream_call_id, started_at, ended_at, created_at, user_id",
+      "id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, stream_call_type",
     )
     .eq("stream_call_id", id)
     .single();
@@ -88,7 +89,10 @@ export async function getMeetingRecap(id: string): Promise<MeetingRecap | null> 
     const secret = process.env.STREAM_SECRET_KEY;
     if (apiKey && secret) {
       const client = new StreamClient(apiKey, secret);
-      const call = client.video.call("default", meeting.stream_call_id);
+      const call = client.video.call(
+        callTypeOfRow(meeting),
+        meeting.stream_call_id,
+      );
       const callData = (await call.get()) as StreamCallWithCustom;
       description = callData.custom?.description ?? "";
     }

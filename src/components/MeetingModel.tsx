@@ -27,6 +27,8 @@ import { useRouter } from "next/navigation";
 import { getMeetingIdFromLink } from "@/lib/utils";
 import { createScheduledMeetingRow } from "@/actions/meetings";
 import { withStreamConnectionRetry } from "@/lib/streamRetry";
+import { DEFAULT_CALL_TYPE, type StreamCallType } from "@/lib/stream-call-type";
+import { ProjectPicker } from "@/components/ProjectPicker";
 
 type MeetingType =
   | "isInstantMeeting"
@@ -105,21 +107,65 @@ const MeetingModel = ({
   });
   const [guestAdmissionMode, setGuestAdmissionMode] =
     useState<"open" | "approval">("approval");
+  // W3: null means a personal meeting (today's flow, unchanged).
+  const [projectId, setProjectId] = useState<string | null>(null);
   const client = useStreamVideoClient();
   const { user } = useUser();
+
+  // A project meeting saves its row first, so the server checks the role and
+  // picks the Stream call type before any call exists. Returns null (after a
+  // toast) when the save fails, and then no Stream call is created.
+  const saveProjectRow = async (
+    streamCallId: string,
+    title: string,
+    startsAt: string,
+  ): Promise<StreamCallType | null> => {
+    try {
+      const result = await createScheduledMeetingRow({
+        streamCallId,
+        title,
+        startsAt,
+        guestAdmissionMode,
+        projectId,
+      });
+      if (result.ok) return result.callType;
+      toast.error(result.error);
+    } catch (err) {
+      console.error("Project meeting row not saved:", err);
+      toast.error("Couldn't save the meeting. Please try again.");
+    }
+    return null;
+  };
+
+  // Members: personal calls name the creator as call admin at create time.
+  // A project call is members only (the creator has no update-call-member
+  // grant there), so our server adds everyone, the creator included, through
+  // POST /api/meetings/[id]/members when they join.
+  const creatorMembers = (callType: StreamCallType, userId: string) =>
+    callType === DEFAULT_CALL_TYPE
+      ? { members: [{ user_id: userId, role: "admin" }] }
+      : {};
 
   const createMeeting = async () => {
     try {
       if (!user || !client) return;
       setCreating(true);
       const id = uuidv4();
-      const call = client.call("default", id);
+      const startsAt = new Date().toISOString();
+      const callType = projectId
+        ? await saveProjectRow(id, "Instant Meeting", startsAt)
+        : DEFAULT_CALL_TYPE;
+      if (!callType) {
+        setCreating(false);
+        return;
+      }
+      const call = client.call(callType, id);
       await prepareCallDevices(call);
       await withStreamConnectionRetry(client, () =>
         call.getOrCreate({
           data: {
-            starts_at: new Date().toISOString(),
-            members: [{ user_id: user.id, role: "admin" }],
+            starts_at: startsAt,
+            ...creatorMembers(callType, user.id),
             custom: {
               description: "Instant Meeting",
               owner_id: user.id,
@@ -140,19 +186,22 @@ const MeetingModel = ({
       setCallDetails(call);
       // Persist a Supabase meetings row so the meeting shows in Meeting
       // Intelligence immediately. Best-effort: the Stream call is already
-      // created, so a DB failure must not block the user.
-      try {
-        const result = await createScheduledMeetingRow({
-          streamCallId: call.id,
-          title: "Instant Meeting",
-          startsAt: new Date().toISOString(),
-          guestAdmissionMode,
-        });
-        if (!result.ok) {
-          console.error("Instant meeting row not persisted:", result.error);
+      // created, so a DB failure must not block the user. A project meeting
+      // already saved its row before the call was created.
+      if (!projectId) {
+        try {
+          const result = await createScheduledMeetingRow({
+            streamCallId: call.id,
+            title: "Instant Meeting",
+            startsAt,
+            guestAdmissionMode,
+          });
+          if (!result.ok) {
+            console.error("Instant meeting row not persisted:", result.error);
+          }
+        } catch (dbErr) {
+          console.error("Instant meeting row not persisted:", dbErr);
         }
-      } catch (dbErr) {
-        console.error("Instant meeting row not persisted:", dbErr);
       }
       await copyMeetingLink(call, "Meeting ready. Link copied to clipboard");
       setCreating(false);
@@ -178,13 +227,17 @@ const MeetingModel = ({
       const title = values.title.trim();
       const description = values.description || "";
       const id = uuidv4();
-      const call = client.call("default", id);
+      const callType = projectId
+        ? await saveProjectRow(id, title, startsAt)
+        : DEFAULT_CALL_TYPE;
+      if (!callType) return;
+      const call = client.call(callType, id);
       await prepareCallDevices(call);
       await withStreamConnectionRetry(client, () =>
         call.getOrCreate({
           data: {
             starts_at: startsAt,
-            members: [{ user_id: user.id, role: "admin" }],
+            ...creatorMembers(callType, user.id),
             custom: {
               title,
               description,
@@ -202,18 +255,21 @@ const MeetingModel = ({
       // Persist a Supabase meetings row at schedule time so the meeting shows in
       // Meeting Intelligence with its real title immediately. Best-effort: the
       // Stream call is already created, so a DB failure must not block the user.
-      try {
-        const result = await createScheduledMeetingRow({
-          streamCallId: call.id,
-          title,
-          startsAt,
-          guestAdmissionMode,
-        });
-        if (!result.ok) {
-          console.error("Scheduled meeting row not persisted:", result.error);
+      // A project meeting already saved its row before the call was created.
+      if (!projectId) {
+        try {
+          const result = await createScheduledMeetingRow({
+            streamCallId: call.id,
+            title,
+            startsAt,
+            guestAdmissionMode,
+          });
+          if (!result.ok) {
+            console.error("Scheduled meeting row not persisted:", result.error);
+          }
+        } catch (dbErr) {
+          console.error("Scheduled meeting row not persisted:", dbErr);
         }
-      } catch (dbErr) {
-        console.error("Scheduled meeting row not persisted:", dbErr);
       }
     } catch (error) {
       console.error("Error occur in scheduling meeting", error);
@@ -278,6 +334,11 @@ const MeetingModel = ({
                   </motion.div>
                 ))}
               </div>
+              <ProjectPicker
+                value={projectId}
+                onChange={setProjectId}
+                disabled={creating}
+              />
               {/* Guest admission mode — owner chooses before creating */}
               <div className="flex flex-col gap-2">
                 <label className="text-base font-normal leading-[22.4px] text-on-surface-variant text-center">
@@ -368,6 +429,9 @@ const MeetingModel = ({
                   dateFormat="MMMM d, yyyy h:mm aa"
                   className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
                 />
+              </div>
+              <div className="mt-4">
+                <ProjectPicker value={projectId} onChange={setProjectId} />
               </div>
               {/* Guest admission mode — owner chooses before scheduling */}
               <div className="flex flex-col gap-2 mt-4">

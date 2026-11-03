@@ -55,6 +55,16 @@ Option B wins because it is the only one that keeps a single source of truth for
 - **Assistant safety.** Project filter inside SQL, retrieved text wrapped as data, citations built in code, no write tools (basis: OWASP LLM01 prompt injection).
 - **Zero cost.** GitHub App and webhooks, Vercel Hobby with one daily cron, Supabase, Gemini and Groq, Stream, Clerk free, and Resend free with no card (basis: AGENTS.md zero cost rule and the A2 precedent).
 
+## W3 call gate
+
+Added 2026-11-03, when W3 settled the two Stream checks the umbrella left owed. Verified against the `stream-react` skill (`references/VIDEO.md`: capabilities are grants per role per call type, checked by Stream on the server, so hiding a button is not a gate) and the installed `@stream-io/node-sdk` 0.7.3 types (`createCallType`, `getCallType`, `updateCallMembers`, `kickUser`, `blockUser`).
+
+- **Option 1, members only `project` call type (chosen).** A copy of `default` with `join-call` removed from `user` and `guest`. Only people our server adds as call members can join: members after a fresh consent tick, guests when admitted. Offboarding removes them from open project calls. Strongest guarantee; costs a call type value passed through about fifteen files and a one time setup script. Moved meetings keep `default` (Stream cannot change a call's type).
+- **Option 2, keep `default` and block on removal (runner up, and the fallback if Stream refuses the call type).** Consent enforced only in our screen and `/members`; a token holder can still join through the API. Removal calls `blockUser` on the project's open calls. Far fewer changes, weaker guarantee.
+- **Option 3, keep `default` and document only.** The first version of this spec. No Stream changes, both gaps stay open.
+
+Option 1 won because the consent notice is the one thing in W3 that protects other people's personal data, and Stream enforcing it is the only version that is true when someone bypasses our UI.
+
 ## References
 
 ### Project sources

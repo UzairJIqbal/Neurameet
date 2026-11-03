@@ -4,10 +4,12 @@ import { auth } from "@clerk/nextjs/server";
 import { StreamClient } from "@stream-io/node-sdk";
 import { supabaseServer } from "@/lib/supabase-server";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
 
 // Lookup a meeting by its Stream call id (MeetingRoom uses it to reach
-// GET /api/meetings/[id] for canManage). Returns only the meeting id, never any
-// project details; access to the meeting itself is checked by that route.
+// GET /api/meetings/[id] for canManage). Returns only the meeting id and its
+// Stream call type (W3), never any project details; access to the meeting
+// itself is checked by that route.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ callId: string }> },
@@ -21,7 +23,7 @@ export async function GET(
 
   const { data, error } = await supabaseServer()
     .from("meetings")
-    .select("id")
+    .select("id, stream_call_type")
     .eq("stream_call_id", callId)
     .maybeSingle();
 
@@ -32,7 +34,8 @@ export async function GET(
   if (!data) {
     return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
   }
-  return NextResponse.json({ meetingId: (data as { id: string }).id });
+  const row = data as { id: string; stream_call_type?: unknown };
+  return NextResponse.json({ meetingId: row.id, callType: callTypeOfRow(row) });
 }
 
 // Delete a meeting keyed by its Stream call id. Used by the Upcoming and Previous
@@ -64,7 +67,7 @@ export async function DELETE(
 
     const { data: meeting } = await supabase
       .from("meetings")
-      .select("id, user_id, project_id")
+      .select("id, user_id, project_id, stream_call_type")
       .eq("stream_call_id", callId)
       .maybeSingle();
 
@@ -85,11 +88,12 @@ export async function DELETE(
     }
 
     const client = new StreamClient(apiKey, secretKey);
+    const callType = callTypeOfRow(meeting);
 
     // No meeting row: the caller must be the Stream call's creator.
     if (!meeting) {
       try {
-        const { call } = await client.video.call("default", callId).get();
+        const { call } = await client.video.call(callType, callId).get();
         if (call.created_by.id !== userId) {
           return NextResponse.json({ error: "Not authorized" }, { status: 403 });
         }
@@ -102,7 +106,7 @@ export async function DELETE(
 
     // Delete the Stream call (ownership verified above).
     try {
-      await client.video.deleteCall({ type: "default", id: callId });
+      await client.video.deleteCall({ type: callType, id: callId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // A call that's already gone is still a successful deletion.

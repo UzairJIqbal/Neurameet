@@ -112,6 +112,7 @@ export async function GET(
       { data: insights },
       { data: actionItems },
       { count: attendanceCount },
+      { data: project },
     ] = await Promise.all([
       supabase
         .from("meeting_insights")
@@ -128,6 +129,14 @@ export async function GET(
         .from("attendance_events")
         .select("*", { count: "exact", head: true })
         .eq("meeting_id", id),
+      // W3: the join screen shows the project name in the recording notice.
+      access.projectId
+        ? supabase
+          .from("projects")
+          .select("name")
+          .eq("id", access.projectId)
+          .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     const meetingData: MeetingDetailData = {
@@ -170,6 +179,7 @@ export async function GET(
       actionItems: actionItemsData,
       attendanceCount: attendanceCount ?? 0,
       projectId: access.projectId,
+      projectName: (project as { name?: string } | null)?.name ?? null,
       role: access.role,
       canManage,
     };

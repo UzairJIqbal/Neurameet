@@ -1,49 +1,50 @@
-# Memory — Phase W, Step W1 project workspaces (done, on main)
+# Memory — Phase W, Step W2 invitations (done, on main)
 
 Last updated: 2026-11-03
 
 ## What was built
 
-- W0 `/architect conversations to code` done; spec `docs/specs/0004-conversations-to-code/index.md`. AGENTS.md API contracts and Security lines synced from it.
-- W-pre partly done: Live Ledger + Tasdeeq merged to `main` (PR #13).
-- W1 built from `prompts/step-W1-project-workspaces.md` (approved):
-  - SQL in `supabase/schema.sql` (W1 block): `projects`, `project_members`, `audit_log`, nullable `meetings.project_id`, rpc `create_project`, `transfer_project_ownership`, `remove_project_member`, and `match_ledger_candidates` scoped by project (same signature).
-  - Shared role check `src/lib/project-auth.ts` (needs read/content/manage/owner; non member 404, wrong role 403). Every meeting scoped route migrated to it.
-  - Project routes under `src/app/api/projects/` (list/create, `[id]`, members, `members/[userId]`, transfer).
-  - UI: `src/app/(root)/(home)/projects/` and `src/components/projects/` (ProjectList, CreateProjectDialog, ProjectDetailView, MembersTab), sidebar link, `/projects(.*)` protected in middleware.
-  - Helpers: `src/lib/project-client.ts`, `project-types.ts`, `projects.ts`.
-  - Ledger match scoped per project (`src/agent/ledger-match.ts`, `loadLiveCandidates(projectId)`).
-  - Follow ups exclude project meetings (`src/actions/follow-ups.ts` adds `.is("project_id", null)`).
-- Commit `3c44df6` (102 files) merged to `main` via PR #14 into #13; `main` head `7e75913` holds Live Ledger, Tasdeeq, specs, and W1.
-- Docs updated: progress-tracker (W1 DONE, SQL applied), build-plan (W1 ✅), scope (W1 ticked), ui-registry (Project Workspace section).
+- W2 built from `prompts/step-W2-invitations.md` (approved). Commit `05fca83`, pushed straight to `main`. Working tree clean.
+  - SQL `supabase/schema.sql` (W2 block): tables `project_invitations`, `project_join_requests`; 4 indexes; rpc `upsert_project_member`, `create_project_invitation`, `accept_email_invitation`, `request_project_join`, `revoke_project_invitation`, `decide_join_request`.
+  - Server lib `src/lib/invitations.ts` (token hashing, expiry, email binding, rate limit, email budget, Clerk caller profile).
+  - Routes: `src/app/api/projects/[id]/invitations/` (POST, GET, `[invitationId]` DELETE), `src/app/api/invitations/preview` (GET), `src/app/api/invitations/accept` (POST), `src/app/api/projects/[id]/join-requests/` (GET, `[requestId]` POST).
+  - Email: `sendProjectInviteEmail` + `workspaceEmailConfigured` in `src/lib/email.ts`, gated on `RESEND_WORKSPACE_FROM`.
+  - UI: `src/components/projects/InviteDialog.tsx`, `InvitesPanel.tsx` (inside MembersTab, Owner/Admin only), `InviteView.tsx`, page `src/app/(root)/(home)/invite/[token]/page.tsx`.
+  - `/invite(.*)` added to `isProtectedRoute` in `src/middleware.ts`; `headers()` in `next.config.ts` sets `Referrer-Policy: no-referrer` on `/invite/:path*`.
+  - Client functions in `src/lib/project-client.ts`; types and `inviteRoleOptions` / `canManageInvites` in `project-types.ts`.
+  - Tests: `src/lib/invitations.test.ts`, `src/app/api/invitations/invitations.test.ts`, `src/components/projects/invites-ui.test.tsx`.
+- AGENTS.md API Contracts gained `GET /api/invitations/preview` (returns projectId only when already a member).
+- Docs updated: progress-tracker (W2 DONE), build-plan (W2 ✅), scope (W2 ticked), ui-registry (Invitations section).
 
 ## Decisions made
 
-- Projects, members, roles, invites live in our own Supabase tables, not Clerk Organizations.
-- Personal meetings = `project_id` null and behave exactly as before.
-- On a project meeting: project Owner or Admin passes every owner only meeting route; meeting delete stays Owner only. by-call DELETE is now Owner only on project meetings; by-call gained a GET returning `{ meetingId }` (user was asked to confirm both; no answer yet).
-- Stream call role: `admin` for project Owner/Admin, `call_member` otherwise. MeetingRoom host controls follow `canManage`.
-- rpc functions: execute revoked from public/anon/authenticated, granted to service_role only.
+- W2 SQL functions are invoker (like W1), not security definer; execute granted to service_role only.
+- A pending join request short circuits only for link invites.
+- Default invite role in the dialog is Developer; Admin only for the Owner on email invites; links never grant Admin.
+- Audit names for joining: `member.joined` / `member.restored`. Email budget counts `invite.emailed` audit rows (60 a day) until W8 adds notifications.
 
 ## Problems solved
 
-- eslint chokes on paths with brackets: lint `src` and `constants` with JSON output, then filter to changed files.
-- Remaining lint errors (guest admit/deny tests `any`, prettier in engagement, guest routes, `Sidebar.tsx`) existed on HEAD before W1; not ours.
-- Live Supabase project for this app is "NeuraMeet" id `lsjiwxohfpzdvenbxpeu` (not "Kunji").
+- `src/middleware.ts` uses CRLF line endings; python rewrites convert them. Restore CRLF after editing or the diff balloons.
+- eslint on bracket paths: run with `-f json` and filter; prettier `--write` fixes the formatting errors.
+- No `timeout` command on this Mac.
+- Smoke testing SQL live: use a `do $$ ... raise exception 'SMOKE_OK' $$` block so everything rolls back (insert a temp project inside it; there are no projects live yet).
 
 ## Current state
 
-- W1 SQL applied to live Supabase as migration `w1_projects_and_members` and verified: tables, column, 4 indexes, RLS on, anon cannot execute the functions, all 202 existing meetings have null `project_id`.
-- Tests 759/759, tsc clean, `npm run build` passes (last run before commit).
-- Known gaps carried to later steps: a Viewer sees an empty action item list until W4 adds `review_state`; guests on project calls not handled until W3; freezeAttesters, seal `owner_id`, and live events still use the creator id.
+- W2 SQL applied live to `lsjiwxohfpzdvenbxpeu` as migration `w2_invitations` and verified (RLS on, anon cannot read tables or run functions, rollback smoke test of every function passed, no data left).
+- Tests 839/839, tsc clean, lint clean on changed files, `npm run build` passes.
+- Not yet done: the two account manual test of W2 (steps at the end of `prompts/step-W2-invitations.md`). Without `RESEND_WORKSPACE_FROM`, every email invite shows "Email not sent, copy the link" (expected).
+- Carried gaps: Viewer sees an empty action item list until W4; guests on project calls until W3; freezeAttesters, seal `owner_id`, live events still use the creator id.
 - LL5 and Tasdeeq live runs still owed (W-pre).
 
 ## Next session starts with
 
-1. Step W2 invitations: write `prompts/step-W2-...md` from the 0004 spec (hashed single use tokens, expiry, owner approval, Resend email + copy link fallback), get approval, build.
+1. Ask whether the W2 two account manual test passed; fix anything found.
+2. Step W3, project meetings + consent notice: write `prompts/step-W3-...md` from `docs/specs/0004-conversations-to-code/` (W3 child spec), get approval, build.
 
 ## Open questions
 
-- Confirm by-call DELETE Owner only on project meetings and the new by-call GET.
+- by-call DELETE Owner only on project meetings was confirmed by the user; the by-call GET returning `{ meetingId }` was not explicitly confirmed.
 - When to do the LL5 and Tasdeeq live runs.
-- Rules that hold: work on `main` and push there, no branches or PRs; ask before commit/push; SQL to live Supabase only with explicit OK per block; never read `.env`; plain words, no dashes; end reports with a 2 line summary.
+- Rules that hold: work on `main` and push there, no branches or PRs; ask before commit/push; SQL to live Supabase only with explicit OK; never read or touch `.env` files; plain words, no dashes; end reports with a 2 line summary.

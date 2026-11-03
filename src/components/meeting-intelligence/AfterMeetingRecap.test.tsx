@@ -99,7 +99,6 @@ describe("AfterMeetingRecap transcript language selector", () => {
     expect(body).toEqual({
       meetingId: "meeting_test",
       streamCallId: "call_test",
-      streamCallType: "default",
     });
   });
 });

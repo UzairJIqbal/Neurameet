@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ok, queue, resetQueues } from "@/test/supabase-queue-mock";
 
-const { mockAuth, mockGet, mockUpdate } = vi.hoisted(() => {
+const { mockAuth, mockGet, mockUpdate, mockCall } = vi.hoisted(() => {
   process.env.NEXT_PUBLIC_STREAM_API_KEY = "key";
   process.env.STREAM_SECRET_KEY = "secret";
-  return { mockAuth: vi.fn(), mockGet: vi.fn(), mockUpdate: vi.fn() };
+  return {
+    mockAuth: vi.fn(),
+    mockGet: vi.fn(),
+    mockUpdate: vi.fn(),
+    mockCall: vi.fn(),
+  };
 });
 
 vi.mock("server-only", () => ({}));
@@ -17,7 +22,7 @@ vi.mock("@stream-io/node-sdk", () => ({
   StreamClient: vi.fn(function () {
     return {
       video: {
-        call: () => ({ get: mockGet, updateCallMembers: mockUpdate }),
+        call: mockCall,
       },
     };
   }),
@@ -31,7 +36,14 @@ const post = (userId: string | null) => {
     params: Promise.resolve({ id: "call_1" }),
   });
 };
-const projectMeeting = ok({ id: "m1", user_id: "owner", project_id: "p1" });
+const projectMeeting = ok({
+  id: "m1",
+  user_id: "owner",
+  project_id: "p1",
+  stream_call_type: "project",
+});
+const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
+const freshConsent = ok({ consented_at: minutesAgo(1), notice_version: "w3-v1" });
 
 describe("POST /api/meetings/[id]/members", () => {
   beforeEach(() => {
@@ -40,6 +52,7 @@ describe("POST /api/meetings/[id]/members", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     mockGet.mockResolvedValue({});
     mockUpdate.mockResolvedValue({});
+    mockCall.mockReturnValue({ get: mockGet, updateCallMembers: mockUpdate });
   });
 
   it("rejects when not signed in", async () => {
@@ -52,6 +65,7 @@ describe("POST /api/meetings/[id]/members", () => {
     expect(mockUpdate).toHaveBeenCalledWith({
       update_members: [{ user_id: "u2" }],
     });
+    expect(mockCall).toHaveBeenCalledWith("default", "call_1");
   });
 
   it("keeps a call with no meetings row unchanged", async () => {
@@ -77,10 +91,33 @@ describe("POST /api/meetings/[id]/members", () => {
   ])("maps project %s to Stream %s", async (role, streamRole) => {
     queue("meetings", projectMeeting);
     queue("project_members", ok({ role }));
+    queue("meeting_participants", freshConsent);
     expect((await post("u2")).status).toBe(200);
     expect(mockUpdate).toHaveBeenCalledWith({
       update_members: [{ user_id: "u2", role: streamRole }],
     });
+    expect(mockCall).toHaveBeenCalledWith("project", "call_1");
+  });
+
+  it.each([
+    ["missing", ok(null)],
+    ["stale", ok({ consented_at: minutesAgo(16), notice_version: "w3-v1" })],
+    ["an old version", ok({ consented_at: minutesAgo(1), notice_version: "w2-v0" })],
+  ])("returns 409 when the consent tick is %s", async (_label, row) => {
+    queue("meetings", projectMeeting);
+    queue("project_members", ok({ role: "developer" }));
+    queue("meeting_participants", row);
+    const res = await post("u2");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Please accept the recording notice" });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("asks for consent on a moved meeting that kept the default call type", async () => {
+    queue("meetings", ok({ id: "m1", user_id: "owner", project_id: "p1", stream_call_type: "default" }));
+    queue("project_members", ok({ role: "developer" }));
+    queue("meeting_participants", ok(null));
+    expect((await post("u2")).status).toBe(409);
   });
 
   it("fails closed when the meeting lookup errors", async () => {

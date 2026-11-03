@@ -18,6 +18,13 @@ import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { LoadError } from "@/components/ui/load-error";
 import { LoaderOne } from "@/components/ui/loader";
 import { cn } from "@/lib/utils";
+import { ConsentNotice } from "@/components/ConsentNotice";
+import { CONSENT_REQUIRED_CODE } from "@/lib/consent";
+import {
+  DEFAULT_CALL_TYPE,
+  isStreamCallType,
+  type StreamCallType,
+} from "@/lib/stream-call-type";
 
 export type JoinPhase =
   | "lobby"
@@ -62,6 +69,11 @@ function GuestLobby() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [nameError, setNameError] = useState("");
+  // W3: a project meeting answers the first request with consent_required;
+  // the guest then ticks the notice and asks again. The tick resets per visit.
+  const [consentRequired, setConsentRequired] = useState(false);
+  const [consented, setConsented] = useState(false);
+  const [callType, setCallType] = useState<StreamCallType>(DEFAULT_CALL_TYPE);
   const requestNonceRef = useRef<string>("");
 
   // Generate a request_nonce once per mount (ref so it survives re-renders).
@@ -102,6 +114,11 @@ function GuestLobby() {
         setGuestDisplayName={setGuestDisplayName}
         setGuestToken={setGuestToken}
         requestNonceRef={requestNonceRef}
+        consentRequired={consentRequired}
+        setConsentRequired={setConsentRequired}
+        consented={consented}
+        setConsented={setConsented}
+        setCallType={setCallType}
       />
     );
   }
@@ -119,6 +136,7 @@ function GuestLobby() {
     >
       <GuestCallFlow
         meetingId={meetingId}
+        callType={callType}
         guestToken={guestToken}
         accessToken={accessToken}
         phase={phase}
@@ -148,6 +166,7 @@ const ADMITTED_CALL_TIMEOUT_MS = 12000;
 
 function GuestCallFlow({
   meetingId,
+  callType,
   guestToken,
   accessToken,
   phase,
@@ -158,6 +177,7 @@ function GuestCallFlow({
   guestDisplayName,
 }: {
   meetingId: string;
+  callType: StreamCallType;
   guestToken: string;
   accessToken: string;
   phase: JoinPhase;
@@ -194,7 +214,7 @@ function GuestCallFlow({
     if (call) return; // already have a call object
 
     let cancelled = false;
-    const c = client.call("default", meetingId);
+    const c = client.call(callType, meetingId);
     // call.get() runs the SDK's device setup, which auto-enables the camera
     // if `camera_default_on` is true in call settings (Stream SDK default).
     // Without disabling first, this logs "[devices]: Failed to get video stream"
@@ -216,7 +236,7 @@ function GuestCallFlow({
       }
     })();
     return () => { cancelled = true; };
-  }, [client, meetingId, setPhase]);
+  }, [client, meetingId, callType, setPhase]);
 
   // When the owner admits (phase becomes "admitted"), fire call.join({ create: false })
   // exactly once. This is the ONLY place call.join() is called — never in the lobby.
@@ -603,6 +623,11 @@ function NameModal({
   setGuestDisplayName,
   setGuestToken,
   requestNonceRef,
+  consentRequired,
+  setConsentRequired,
+  consented,
+  setConsented,
+  setCallType,
 }: {
   meetingId: string;
   name: string;
@@ -621,8 +646,14 @@ function NameModal({
   setGuestDisplayName: (v: string) => void;
   setGuestToken: (v: string) => void;
   requestNonceRef: MutableRefObject<string>;
+  consentRequired: boolean;
+  setConsentRequired: (v: boolean) => void;
+  consented: boolean;
+  setConsented: (v: boolean) => void;
+  setCallType: (v: StreamCallType) => void;
 }) {
   const handleAskToJoin = async () => {
+    if (consentRequired && !consented) return;
     // client-side validation
     if (!name || name.length < 2) {
       setNameError("Name must be at least 2 characters");
@@ -651,15 +682,25 @@ function NameModal({
           name,
           email: email || undefined,
           request_nonce: requestNonceRef.current,
+          ...(consentRequired ? { consented } : {}),
         }),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        // W3: a project meeting needs the notice ticked. Nothing was created
+        // server side, so go back to the modal and show the notice.
+        if (res.status === 400 && data.code === CONSENT_REQUIRED_CODE) {
+          setConsentRequired(true);
+          setConsented(false);
+          setPhase("lobby");
+          return;
+        }
         throw new Error(data.error || `request-join failed (${res.status})`);
       }
 
       const data = await res.json();
+      setCallType(isStreamCallType(data.callType) ? data.callType : DEFAULT_CALL_TYPE);
       setAccessToken(data.access_token);
       setGuestUserId(data.user.id);
       // Capture the server-minted display name (authoritative, not client-supplied)
@@ -795,6 +836,10 @@ function NameModal({
             />
           </div>
 
+          {consentRequired && (
+            <ConsentNotice checked={consented} onChange={setConsented} />
+          )}
+
           {(pollError || nameError) && (
             <div className="rounded-lg border border-error-container bg-error-container/20 px-3 py-2 text-body-sm text-error">
               {pollError || nameError}
@@ -804,7 +849,8 @@ function NameModal({
         <button
           type="button"
           onClick={handleAskToJoin}
-          className="mt-4 w-full rounded-2xl bg-primary-container px-6 py-3 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary focus:ring-2 focus:ring-primary/30 whitespace-nowrap"
+          disabled={consentRequired && !consented}
+          className="mt-4 w-full rounded-2xl bg-primary-container px-6 py-3 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary focus:ring-2 focus:ring-primary/30 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
         >
           Join meeting
         </button>

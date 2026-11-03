@@ -987,3 +987,19 @@ GRANT EXECUTE ON FUNCTION accept_email_invitation(uuid, text) TO service_role;
 GRANT EXECUTE ON FUNCTION request_project_join(uuid, text, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION revoke_project_invitation(uuid, uuid, text) TO service_role;
 GRANT EXECUTE ON FUNCTION decide_join_request(uuid, uuid, text, text) TO service_role;
+
+-- ===== W3. Project meetings and consent (spec 0004, child 0004-project-meetings) =====
+create table if not exists meeting_participants (
+  meeting_id uuid references meetings(id) on delete cascade not null,
+  user_id text not null,
+  consented_at timestamptz not null,     -- latest tick; every join ticks again
+  notice_version text not null,          -- e.g. 'w3-v1'
+  primary key (meeting_id, user_id)
+);
+alter table guest_requests add column if not exists consented_at timestamptz;
+alter table meetings add column if not exists stream_call_type text not null default 'default'
+  check (stream_call_type in ('default', 'project'));   -- 'project' = members only Stream call type
+
+alter table meeting_participants enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON meeting_participants TO service_role;

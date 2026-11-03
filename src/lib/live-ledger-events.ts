@@ -1,6 +1,9 @@
 import "server-only";
 import { StreamClient } from "@stream-io/node-sdk";
 import { EVENT_MAX_BYTES, type LiveLedgerEvent } from "@/lib/live-ledger-types";
+import { supabaseServer } from "@/lib/supabase-server";
+import { streamCallTypeFor } from "@/lib/stream-call-type-server";
+import type { StreamCallType } from "@/lib/stream-call-type";
 
 export const eventByteSize = (custom: LiveLedgerEvent): number =>
   Buffer.byteLength(JSON.stringify(custom), "utf8");
@@ -9,6 +12,16 @@ function streamClient(): StreamClient | null {
   const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
   const secret = process.env.STREAM_SECRET_KEY;
   return apiKey && secret ? new StreamClient(apiKey, secret) : null;
+}
+
+/** The stored Stream call type for this call id (W3), or null on a DB error. */
+async function callTypeOf(callId: string): Promise<StreamCallType | null> {
+  try {
+    return await streamCallTypeFor(supabaseServer(), callId);
+  } catch (err) {
+    console.error("[live-ledger] call type lookup failed", { callId, err });
+    return null;
+  }
 }
 
 /**
@@ -36,9 +49,11 @@ export async function sendLiveLedgerEvent(
     console.error("[live-ledger] Stream keys missing, event not sent");
     return false;
   }
+  const type = await callTypeOf(callId);
+  if (!type) return false;
   try {
     await client.video.sendCallEvent({
-      type: "default",
+      type,
       id: callId,
       user_id: ownerId,
       custom: custom as unknown as Record<string, unknown>,
@@ -60,9 +75,11 @@ export async function countCallParticipants(
 ): Promise<number | null> {
   const client = streamClient();
   if (!client) return null;
+  const type = await callTypeOf(callId);
+  if (!type) return null;
   try {
     const res = await client.video.queryCallParticipants({
-      type: "default",
+      type,
       id: callId,
     });
     return res.total_participants;

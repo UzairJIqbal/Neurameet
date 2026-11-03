@@ -9,6 +9,7 @@ import { StreamClient } from "@stream-io/node-sdk"; // only for call-event emit
 import { getGuest, deny } from "@/lib/guest-store";
 import { supabaseServer } from "@/lib/supabase-server";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
 const secret = process.env.STREAM_SECRET_KEY!;
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
-    .select("id, user_id, project_id")
+    .select("id, user_id, project_id, stream_call_type")
     .eq("stream_call_id", meeting_id)
     .maybeSingle();
 
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
   try {
     const nodeClient = new StreamClient(apiKey, secret);
     await nodeClient.video.sendCallEvent({
-      type: "default",
+      type: callTypeOfRow(meeting),
       id: meeting_id,
       user_id: userId,
       custom: {

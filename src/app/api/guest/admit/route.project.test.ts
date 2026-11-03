@@ -5,10 +5,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queue, ok, resetQueues } from "@/test/supabase-queue-mock";
 
-const { mockAuth, mockStore } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
-  mockStore: vi.fn(async () => true),
-}));
+const { mockAuth, mockStore, mockGetGuest, mockUpdate, mockCall, mockSend } =
+  vi.hoisted(() => ({
+    mockAuth: vi.fn(),
+    mockStore: vi.fn(async () => true),
+    mockGetGuest: vi.fn(),
+    mockUpdate: vi.fn(),
+    mockCall: vi.fn(),
+    mockSend: vi.fn(async () => ({})),
+  }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
@@ -17,12 +22,12 @@ vi.mock(
   async () => (await import("@/test/supabase-queue-mock")).supabaseServerModule,
 );
 vi.mock("@/lib/guest-store", () => ({
-  getGuest: vi.fn(async () => ({ guest_token: "gt", meeting_id: "call-1" })),
+  getGuest: mockGetGuest,
   admit: mockStore,
 }));
 vi.mock("@stream-io/node-sdk", () => ({
   StreamClient: class {
-    video = { sendCallEvent: vi.fn(async () => ({})) };
+    video = { sendCallEvent: mockSend, call: mockCall };
   },
 }));
 
@@ -39,7 +44,8 @@ const post = () =>
 describe("POST /api/guest/admit on a project meeting (spec 0004, manage)", () => {
   beforeEach(() => {
     resetQueues();
-    mockStore.mockClear();
+    vi.clearAllMocks();
+    mockGetGuest.mockResolvedValue({ guest_token: "gt", meeting_id: "call-1" });
     mockAuth.mockResolvedValue({ userId: "u2" });
     queue("meetings", ok({ id: "m1", user_id: "u1", project_id: "p1" }));
   });
@@ -68,5 +74,62 @@ describe("POST /api/guest/admit on a project meeting (spec 0004, manage)", () =>
     const res = await post();
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "Not authorized" });
+  });
+});
+
+describe("POST /api/guest/admit on a project call type (W3)", () => {
+  const order: string[] = [];
+
+  beforeEach(() => {
+    resetQueues();
+    vi.clearAllMocks();
+    order.length = 0;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockAuth.mockResolvedValue({ userId: "u1" });
+    mockGetGuest.mockResolvedValue({
+      guest_token: "gt",
+      meeting_id: "call-1",
+      stream_user_id: "guest-abc",
+    });
+    mockUpdate.mockImplementation(async () => {
+      order.push("member");
+      return {};
+    });
+    mockStore.mockImplementation(async () => {
+      order.push("admit");
+      return true;
+    });
+    mockCall.mockReturnValue({ updateCallMembers: mockUpdate });
+    queue(
+      "meetings",
+      ok({ id: "m1", user_id: "u1", project_id: "p1", stream_call_type: "project" }),
+    );
+    queue("project_members", ok({ role: "owner" }));
+  });
+
+  it("adds the guest as a call member before admitting", async () => {
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(mockCall).toHaveBeenCalledWith("project", "call-1");
+    expect(mockUpdate).toHaveBeenCalledWith({
+      update_members: [{ user_id: "guest-abc", role: "call_member" }],
+    });
+    expect(order).toEqual(["member", "admit"]);
+    expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({ type: "project" }));
+  });
+
+  it("returns 409 while the guest has no Stream identity yet", async () => {
+    mockGetGuest.mockResolvedValue({ guest_token: "gt", meeting_id: "call-1", stream_user_id: "" });
+    const res = await post();
+    expect(res.status).toBe(409);
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockStore).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 and keeps the guest pending when Stream fails", async () => {
+    mockUpdate.mockRejectedValue(new Error("stream down"));
+    const res = await post();
+    expect(res.status).toBe(502);
+    expect(mockStore).not.toHaveBeenCalled();
   });
 });

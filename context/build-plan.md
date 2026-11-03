@@ -702,7 +702,7 @@ Tables plus a shared server helper (`requireProjectRole`) that replaces the ~29 
 ### Step W2 — Invitations ✅ (built 2026-11-03, SQL applied as migration `w2_invitations`; live two account test pending)
 Hashed 256 bit single use tokens, expiry, email binding, owner approval on by default, public `/invite/[token]` route, Resend email with a copy link fallback (Resend free sends only to the account owner until a domain is verified), audit rows. Exit: forged, expired, and replayed tokens rejected.
 
-### Step W3 — Project meetings + consent notice ⬜
+### Step W3 — Project meetings + consent notice ✅ (built 2026-11-03, gate passed, SQL applied; move a meeting in ships with W4; live test pending)
 Project and participant picker in the schedule dialog, `meeting_participants`, project meeting lists, pre join recording consent notice for members and guests. Exit: a project member sees project meetings; an outsider does not.
 
 ### Step W4 — Review gate + tasks + Kanban ⬜

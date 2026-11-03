@@ -10,11 +10,19 @@ import {
   type MeetingCategory,
   type GuestAdmissionMode,
 } from "@/lib/meeting-types";
+import { NEED_ROLES, requireProjectRole } from "@/lib/project-auth";
+import {
+  callTypeForNewMeeting,
+  DEFAULT_CALL_TYPE,
+  isStreamCallType,
+  type StreamCallType,
+} from "@/lib/stream-call-type";
 
 export type UpdateCategoryResult = { ok: true } | { ok: false; error: string };
 
 export type CreateMeetingRowResult =
-  | { ok: true }
+  // callType is the Stream call type the saved row holds (W3).
+  | { ok: true; callType: StreamCallType }
   | { ok: false; error: string };
 
 // Persist a Supabase meetings row at schedule time so the scheduled meeting
@@ -23,11 +31,15 @@ export type CreateMeetingRowResult =
 // the Stream call's custom.title; this writes it into meetings.title.
 // Re-scheduling the same call id updates the caller's own row; a row owned by
 // someone else is never touched, so a known call id cannot take over ownership.
+// W3: a `projectId` needs Developer or higher in that project; the server picks
+// the Stream call type from it. A re schedule never changes project_id or
+// stream_call_type (moving a meeting in is the W4 route only).
 export async function createScheduledMeetingRow(params: {
   streamCallId: string;
   title: string;
   startsAt: string;
   guestAdmissionMode?: GuestAdmissionMode;
+  projectId?: string | null;
 }): Promise<CreateMeetingRowResult> {
   const { userId } = await auth();
   if (!userId) {
@@ -39,8 +51,17 @@ export async function createScheduledMeetingRow(params: {
     return { ok: false, error: "Missing call id or title" };
   }
 
+  const projectId = params.projectId || null;
+
   try {
     const supabase = supabaseServer();
+    if (projectId) {
+      try {
+        await requireProjectRole(supabase, userId, projectId, NEED_ROLES.content);
+      } catch {
+        return { ok: false, error: "Not authorized" };
+      }
+    }
     const fields = {
       title,
       status: "scheduled",
@@ -50,7 +71,7 @@ export async function createScheduledMeetingRow(params: {
 
     const { data: existing, error: findError } = await supabase
       .from("meetings")
-      .select("id, user_id")
+      .select("id, user_id, stream_call_type")
       .eq("stream_call_id", params.streamCallId)
       .maybeSingle();
 
@@ -62,12 +83,20 @@ export async function createScheduledMeetingRow(params: {
       return { ok: false, error: "Not authorized" };
     }
 
+    const callType: StreamCallType = existing
+      ? isStreamCallType(existing.stream_call_type)
+        ? existing.stream_call_type
+        : DEFAULT_CALL_TYPE
+      : callTypeForNewMeeting(projectId);
+
     const { error } = existing
       ? await supabase.from("meetings").update(fields).eq("id", existing.id)
       : await supabase.from("meetings").insert({
           ...fields,
           user_id: userId,
           stream_call_id: params.streamCallId,
+          project_id: projectId,
+          stream_call_type: callType,
         });
 
     if (error) {
@@ -75,7 +104,7 @@ export async function createScheduledMeetingRow(params: {
       return { ok: false, error: "Failed to save meeting" };
     }
 
-    return { ok: true };
+    return { ok: true, callType };
   } catch (err) {
     console.error("createScheduledMeetingRow error:", err);
     return { ok: false, error: "Failed to save meeting" };

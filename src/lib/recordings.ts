@@ -11,6 +11,8 @@ import {
   type MeetingAccessRow,
   type ProjectRole,
 } from "@/lib/project-auth";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
+import { DEFAULT_CALL_TYPE, type StreamCallType } from "@/lib/stream-call-type";
 
 // Minimal shape for the Stream queryCalls response items (the SDK's full type
 // is awkward to map here). Kept explicit so we avoid `any`.
@@ -55,6 +57,8 @@ type ProjectCallAccess = {
   // (their access is decided by the project role, never by being the creator).
   createdProjectCalls: Map<string, string>;
   roleByProject: Map<string, ProjectRole>;
+  // Stream call id -> stored Stream call type (W3: `project` or `default`).
+  typeByCall: Map<string, StreamCallType>;
 };
 
 const PROJECT_CALL_LIMIT = 100;
@@ -84,17 +88,23 @@ async function loadProjectCallAccess(
   }
 
   const roleByCall = new Map<string, ProjectRole>();
+  const typeByCall = new Map<string, StreamCallType>();
   if (roleByProject.size > 0) {
     const { data, error } = await supabase
       .from("meetings")
-      .select("stream_call_id, project_id")
+      .select("stream_call_id, project_id, stream_call_type")
       .in("project_id", [...roleByProject.keys()])
       .order("created_at", { ascending: false })
       .limit(PROJECT_CALL_LIMIT);
     if (error) throw error;
-    for (const row of (data ?? []) as { stream_call_id: string; project_id: string }[]) {
+    for (const row of (data ?? []) as {
+      stream_call_id: string;
+      project_id: string;
+      stream_call_type: unknown;
+    }[]) {
       const role = roleByProject.get(row.project_id);
       if (role) roleByCall.set(row.stream_call_id, role);
+      typeByCall.set(row.stream_call_id, callTypeOfRow(row));
     }
   }
 
@@ -102,7 +112,7 @@ async function loadProjectCallAccess(
   for (const row of (created.data ?? []) as { stream_call_id: string; project_id: string }[]) {
     createdProjectCalls.set(row.stream_call_id, row.project_id);
   }
-  return { roleByCall, createdProjectCalls, roleByProject };
+  return { roleByCall, createdProjectCalls, roleByProject, typeByCall };
 }
 
 // Lists one call's recordings, each with a stable synthesized id.
@@ -150,7 +160,8 @@ async function fetchProjectRecordings(
       const cached = projectCallCache.get(callId);
       if (cached && Date.now() < cached.expiry) return cached.value;
       try {
-        const value = await listCallRecordings(client, "default", callId);
+        const callType = access.typeByCall.get(callId) ?? DEFAULT_CALL_TYPE;
+        const value = await listCallRecordings(client, callType, callId);
         projectCallCache.set(callId, {
           expiry: Date.now() + RECORDINGS_CACHE_TTL_MS,
           value,
@@ -341,17 +352,17 @@ async function findDeletableRecording(
   const callId = recordingId.split(":")[0];
   const { data: meeting, error } = await supabase
     .from("meetings")
-    .select("id, user_id, project_id")
+    .select("id, user_id, project_id, stream_call_type")
     .eq("stream_call_id", callId)
     .maybeSingle();
   if (error) throw error;
 
-  const row = meeting as MeetingAccessRow | null;
+  const row = meeting as (MeetingAccessRow & { stream_call_type?: unknown }) | null;
   if (row?.project_id) {
     await checkMeetingAccess(supabase, userId, row, "manage", {
       notFoundMessage: "Recording not found",
     });
-    const recordings = await listCallRecordings(client, "default", callId);
+    const recordings = await listCallRecordings(client, callTypeOfRow(row), callId);
     return recordings.find((r) => r.id === recordingId) ?? null;
   }
 

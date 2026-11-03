@@ -160,7 +160,6 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
         body: JSON.stringify({
           meetingId: recap.id,
           streamCallId: recap.streamCallId,
-          streamCallType: "default",
         }),
         signal: controller.signal,
       });

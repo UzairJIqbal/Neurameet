@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { StreamClient } from "@stream-io/node-sdk";
+import { DEFAULT_CALL_TYPE, type StreamCallType } from "@/lib/stream-call-type";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { verifyStreamUserToken } from "@/lib/stream-token";
 
@@ -50,13 +52,18 @@ interface CallInfo {
 // copy it, otherwise the dashboard "Meeting Title" column is always blank. The
 // owner is the call's creator, never the caller. ownerId is null if the call
 // can't be read.
-async function resolveCallInfo(streamCallId: string): Promise<CallInfo> {
+// `callType` comes from the meetings row; a call with no row yet is `default`
+// (project meetings always save their row before the Stream call exists).
+async function resolveCallInfo(
+  streamCallId: string,
+  callType: StreamCallType = DEFAULT_CALL_TYPE,
+): Promise<CallInfo> {
   const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
   const secretKey = process.env.STREAM_SECRET_KEY;
   if (!apiKey || !secretKey) return { title: "Meeting", ownerId: null };
   try {
     const client = new StreamClient(apiKey, secretKey);
-    const call = client.video.call("default", streamCallId);
+    const call = client.video.call(callType, streamCallId);
     const data = await call.get();
     // Scheduled meetings store the real title in custom.title; instant/personal
     // calls use custom.description. Prefer title, fall back to description.
@@ -159,7 +166,7 @@ export async function POST(request: Request) {
     // create the row (the first joiner owns it) so attendance can persist.
     let { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id, title, status")
+      .select("id, title, status, stream_call_type")
       .eq("stream_call_id", stream_call_id)
       .maybeSingle();
 
@@ -169,7 +176,10 @@ export async function POST(request: Request) {
       // Backfill blank titles from the Stream call custom so the dashboard
       // "Meeting Title" column isn't empty for meetings created before this fix.
       if (!meeting.title) {
-        const { title } = await resolveCallInfo(stream_call_id);
+        const { title } = await resolveCallInfo(
+          stream_call_id,
+          callTypeOfRow(meeting),
+        );
         if (title !== "Meeting") {
           try {
             await supabase
@@ -225,7 +235,7 @@ export async function POST(request: Request) {
         if ((createError as { code?: string }).code === "23505") {
           const { data: existing, error: lookupError } = await supabase
             .from("meetings")
-            .select("id, title, status")
+            .select("id, title, status, stream_call_type")
             .eq("stream_call_id", stream_call_id)
             .single();
           if (lookupError || !existing) {

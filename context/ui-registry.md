@@ -629,6 +629,14 @@ Fonts: **Hanken Grotesk** (UI, `--font-hanken-grotesk`) + **JetBrains Mono** (mo
 | `InvitesPanel` | `components/projects/InvitesPanel.tsx` | Rendered inside `MembersTab` only when `canManageInvites(myRole)`. Right aligned "Invite" primary button (`UserPlus`). Two cards (`rounded-xl border border-surface-variant bg-surface-container-lowest p-5`): "Join requests" (name, email, role, asked date, Approve and Deny secondary buttons; approve also reloads members) and "Active invites" (email or "Link", role, expiry, creator, Revoke through `ConfirmDelete size="sm"` with the warning "Waiting requests from this link are denied" on link invites). Own `useLoadingTimeout` + `LoadError`. |
 | `InviteView` | `components/projects/InviteView.tsx` | Page body of `/invite/[token]` (inside `Sidebar_Com type="projects"`). Centered card `max-w-md`. States: valid (project name, "You're invited as {Role}", Join or "Ask to join"), member ("You're already in this project" + link), pending ("Waiting for approval"), and a plain `role="alert"` message for 410, 403, and 429 using the server text. Joining an email invite toasts and routes to `/projects/{id}`. |
 
+## New Components — Project Meetings (built Step W3, 2026-11-03)
+
+| Component | File | Notes |
+|---|---|---|
+| `ProjectPicker` | `components/ProjectPicker.tsx` | "Project" select in the New Meeting and Schedule Meeting forms, same label and input classes as the other form fields (`rounded-xl border border-outline-variant bg-surface-container-lowest p-3`). "Personal" is always the first option; only projects where you are Owner, Admin, or Developer are listed. Own `useLoadingTimeout` + `LoadError` inline with retry, so a failed load still allows a personal meeting. |
+| `ConsentNotice` | `components/ConsentNotice.tsx` | Recording notice before joining a project meeting, shared by the member join screen and the guest join modal. Card `rounded-xl border border-outline-variant bg-surface-container-low p-4`, `ShieldCheck` icon `text-primary`, text from `consentNoticeText(projectName)` (guests see "this project"), checkbox "I understand and want to join". The parent owns the tick, so it resets every visit and keeps Join disabled until ticked. |
+| `DeviceSetup` props | `components/DeviceSetup.tsx` | New optional `beforeJoin` (rendered full width above the Join row) and `joinDisabled` (Join gets `disabled:cursor-not-allowed disabled:opacity-60`). `MeetingSetup` uses them for the "Checking this meeting…" line, the `LoadError` retry, and `ConsentNotice`. |
+
 ## Registry Update Rule
 
 Every new component gets a row here immediately after creation, with the pattern it establishes so the next session reuses it instead of inventing a variant. Run `/imprint` after any new UI component or page.

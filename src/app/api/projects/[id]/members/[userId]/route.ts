@@ -8,6 +8,7 @@ import {
   requireProjectRole,
 } from "@/lib/project-auth";
 import { isAssignableRole, rpcErrorCode } from "@/lib/projects";
+import { removeFromLiveProjectCalls } from "@/lib/project-call-offboarding";
 
 type Params = { params: Promise<{ id: string; userId: string }> };
 
@@ -127,6 +128,9 @@ export async function DELETE(_request: Request, { params }: Params) {
       }
       throw error;
     }
+    // W3: also take them out of the project's live calls (best effort, never
+    // changes the answer; the removal above is already saved).
+    await removeFromLiveProjectCalls(supabase, id, targetId);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const denied = accessErrorResponse(err);

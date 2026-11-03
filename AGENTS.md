@@ -174,6 +174,8 @@ GET  /api/projects/[id]/join-requests      → owner or admin: pending join requ
 POST /api/projects/[id]/join-requests/[requestId] → owner or admin: { decision: "approve" | "deny" }
 POST /api/meetings/[id]/project    → meeting creator with developer or higher in the target: { projectId }, moves a personal meeting in; 409 under a minutes review
 POST /api/meetings/[id]/consent    → member: { noticeVersion }, stores the consent tick before joining a project call
+GET  /api/meetings/by-call/[callId] → (extended) adds callType ("default" | "project")
+POST /api/guest/request-join       → (extended) on a project meeting requires { consented: true }; response adds callType
 GET  /api/projects/[id]/proposals  → owner, admin, developer (read only): AI task proposals with quotes
 POST /api/proposals/[id]/review    → owner or admin: { decision: "confirm" | "reject" | "merge", title?, assigneeId?, dueDate?, mergeIntoTaskId?, confirmWithoutQuote? }
 GET  /api/projects/[id]/tasks      → member: board tasks (?status=&assigneeId=&q=&cursor=)
@@ -197,7 +199,7 @@ GET  /api/cron/daily               → Vercel cron only (Bearer CRON_SECRET): di
 POST /api/ai/chat                  → (extended) { projectId } project assistant, developer or higher, project filtered in SQL, citations built in code
 POST /api/ai/process               → (extended) on a project meeting writes proposals, never follow ups; 409 once any proposal was reviewed
 GET  /api/meetings                 → (extended) adds project meetings from your active projects, with projectId and role (?projectId= for one project)
-GET  /api/meetings/[id]            → (extended) adds projectId, role, canManage; Viewers get no transcript fields and only confirmed action items
+GET  /api/meetings/[id]            → (extended) adds projectId, projectName, role, canManage; Viewers get no transcript fields and only confirmed action items
 (all owner only meeting routes)    → (extended) on a project meeting the project Owner or Admin passes; meeting delete stays Owner only
 POST /api/search                   → (extended) { query, projectId? } scopes to one project where you are developer or higher
 ```

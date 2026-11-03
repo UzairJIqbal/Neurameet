@@ -52,6 +52,8 @@ export interface MeetingDetailResponse {
   attendanceCount: number;
   /** Phase W: null for a personal meeting. */
   projectId?: string | null;
+  /** W3: the project name for members, null for a personal meeting. */
+  projectName?: string | null;
   /** Phase W: the caller's project role, null for a personal meeting. */
   role?: ProjectRole | null;
   /** Host controls: the creator on a personal meeting, Owner or Admin on a project meeting. */

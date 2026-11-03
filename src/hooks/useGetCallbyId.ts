@@ -3,6 +3,8 @@
 import { Call, useStreamVideoClient } from "@stream-io/video-react-sdk";
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
+import { lookupMeetingByCall } from "@/lib/meeting-lookup-client";
+import { DEFAULT_CALL_TYPE } from "@/lib/stream-call-type";
 
 type UseGetCallByIdOptions = {
     allowLinkAccess?: boolean;
@@ -15,6 +17,10 @@ export default function useGetCallbyId(
     const [call, setCall] = useState<Call>()
     const [callLoading, setCallLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    // W3: the call type lookup failed (not a 404). The page shows LoadError
+    // with retry instead of guessing `default`.
+    const [lookupFailed, setLookupFailed] = useState(false)
+    const [retryNonce, setRetryNonce] = useState(0)
     const clinet = useStreamVideoClient();
     const { user } = useUser();
     const callId = Array.isArray(id) ? id[0] : id;
@@ -26,10 +32,24 @@ export default function useGetCallbyId(
             if (!clinet || !user?.id || !callId) return null
             setCallLoading(true)
             setError(null)
+            setLookupFailed(false)
 
             try {
                 if (options.allowLinkAccess) {
-                    const linkedCall = clinet.call("default", callId);
+                    let callType: string = DEFAULT_CALL_TYPE;
+                    try {
+                        const row = await lookupMeetingByCall(callId);
+                        if (row) callType = row.callType;
+                    } catch (lookupErr) {
+                        console.error("[useGetCallbyId] call type lookup failed:", lookupErr);
+                        if (!cancelled) {
+                            setCall(undefined)
+                            setLookupFailed(true)
+                        }
+                        return
+                    }
+                    if (cancelled) return
+                    const linkedCall = clinet.call(callType, callId);
                     // Disable devices before get(): call.get() runs the SDK device
                     // setup which auto-enables the camera (call settings default
                     // `camera_default_on`) and logs a red "[devices]: Failed to get
@@ -73,12 +93,14 @@ export default function useGetCallbyId(
         return () => {
             cancelled = true;
         }
-    }, [clinet, callId, options.allowLinkAccess, user?.id])
+    }, [clinet, callId, options.allowLinkAccess, user?.id, retryNonce])
 
     return {
         call,
         callLoading,
         error,
+        lookupFailed,
+        retry: () => setRetryNonce((n) => n + 1),
     }
 }
 

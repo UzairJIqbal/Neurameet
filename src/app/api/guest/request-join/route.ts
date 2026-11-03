@@ -4,15 +4,24 @@ import { NextRequest, NextResponse } from "next/server";
 // src/actions/stream.actions.ts intentionally (G0 §4.5.1).
 import { StreamVideoClient } from "@stream-io/video-client";
 import { StreamClient } from "@stream-io/node-sdk"; // only for the call-event emit
-import { createPending, resolveMint, rejectMint, admit } from "@/lib/guest-store";
+import {
+  createPending,
+  resolveMint,
+  rejectMint,
+  admit,
+  expireGuest,
+} from "@/lib/guest-store";
 import { supabaseServer } from "@/lib/supabase-server";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
+import { PROJECT_CALL_TYPE } from "@/lib/stream-call-type";
+import { CONSENT_REQUIRED_CODE, CONSENT_REQUIRED_MESSAGE } from "@/lib/consent";
 import { v4 as uuidv4 } from "uuid"; // request_nonce from the lobby; route validates/replaces if missing
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
 const secret = process.env.STREAM_SECRET_KEY!;
 
 export async function POST(req: NextRequest) {
-  const { meetingId, name, email, request_nonce } = await req.json();
+  const { meetingId, name, email, request_nonce, consented } = await req.json();
 
   // validation
   if (!meetingId || !name || name.length < 2 || name.length > 100) {
@@ -31,12 +40,28 @@ export async function POST(req: NextRequest) {
   // row is only created at first attendance event or transcript upload), the route
   // defaults to 'approval' (safe/closed). Never fail-open.
   const supabase = supabaseServer();
-  const { data: meetingRow } = await supabase
+  const { data: meetingRow, error: meetingError } = await supabase
     .from("meetings")
-    .select("guest_admission_mode")
+    .select("guest_admission_mode, project_id, stream_call_type")
     .eq("stream_call_id", meetingId)
     .maybeSingle();
+  if (meetingError) {
+    // Fail closed: without the row we can't tell whether consent is required.
+    console.error("[guest/request-join] meeting lookup failed:", meetingError);
+    return NextResponse.json({ error: "Failed to load meeting" }, { status: 500 });
+  }
   const mode = meetingRow?.guest_admission_mode ?? "approval";
+  const callType = callTypeOfRow(meetingRow);
+
+  // W3: a project meeting needs the recording notice ticked. Checked before
+  // any mint, so nothing is created; the lobby shows the notice and retries.
+  const isProjectMeeting = Boolean(meetingRow?.project_id);
+  if (isProjectMeeting && consented !== true) {
+    return NextResponse.json(
+      { error: CONSENT_REQUIRED_MESSAGE, code: CONSENT_REQUIRED_CODE },
+      { status: 400 },
+    );
+  }
 
   // 1. Idempotency check FIRST (G0 §4.4.3 / bug #2 / concurrency fix):
   //    createPending returns the SAME `mintPromise` for concurrent POSTs with the
@@ -48,6 +73,7 @@ export async function POST(req: NextRequest) {
     request_nonce: nonce,
     name,
     email,
+    consented_at: isProjectMeeting ? new Date().toISOString() : null,
   });
 
   if (isNew) {
@@ -84,7 +110,7 @@ export async function POST(req: NextRequest) {
       try {
         const nodeClient = new StreamClient(apiKey, secret);
         await nodeClient.video.sendCallEvent({
-          type: "default",
+          type: callType,
           id: meetingId,
           user_id: created.user.id, // required for server-side auth — attributes the event sender
           custom: {
@@ -106,6 +132,23 @@ export async function POST(req: NextRequest) {
       // actually calling call.join() (e.g. page refresh in the lobby). The guest's
       // own call.join({ create: false }) in the guest page is what registers them
       // as a real SFU participant — not a server-side membership grant.
+      // W3 exception: a `project` call is members only, so the guest must be
+      // added as a call_member first, or their join is refused.
+      if (callType === PROJECT_CALL_TYPE) {
+        try {
+          const nodeClient = new StreamClient(apiKey, secret);
+          await nodeClient.video.call(callType, meetingId).updateCallMembers({
+            update_members: [{ user_id: created.user.id, role: "call_member" }],
+          });
+        } catch (e) {
+          console.error("[guest/request-join] project member add failed:", e);
+          await expireGuest(guest.guest_token);
+          return NextResponse.json(
+            { error: "Couldn't admit the guest, try again" },
+            { status: 502 },
+          );
+        }
+      }
       await admit(guest.guest_token);
     }
 
@@ -114,6 +157,7 @@ export async function POST(req: NextRequest) {
       user: created.user,
       guest_token: guest.guest_token,
       waiting: mode === "approval",
+      callType,
     });
   }
 
@@ -148,6 +192,7 @@ export async function POST(req: NextRequest) {
       user: { id: mint.stream_user_id, name: guest.name },
       guest_token: guest.guest_token,
       waiting: mode === "approval",
+      callType,
     });
   } catch {
     // Either a timeout or the first-caller's createGuestUser rejected (rejectMint).

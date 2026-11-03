@@ -15,7 +15,7 @@ export default function Meeting() {
   const { id } = useParams() as { id: string };
   const [isSetupCompleted, setisSetupCompleted] = useState(false);
   const { isLoaded } = useUser();
-  const { call, callLoading, error } = useGetCallbyId(id, {
+  const { call, callLoading, error, lookupFailed, retry } = useGetCallbyId(id, {
     allowLinkAccess: true,
   });
 
@@ -32,6 +32,11 @@ export default function Meeting() {
   }
 
   if (!isLoaded || callLoading) return <LoaderOne />;
+  if (lookupFailed) {
+    return (
+      <LoadError message="We couldn't load this meeting." onRetry={retry} />
+    );
+  }
   if (error || !call) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-inverse-surface px-4 text-center text-inverse-on-surface">

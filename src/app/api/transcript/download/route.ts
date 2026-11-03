@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { callTypeOfRow } from "@/lib/stream-call-type-server";
 import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { generateTranscriptForMeeting } from "@/agent/transcript-generation";
 import { setTranscriptState } from "@/lib/transcript-state";
@@ -34,10 +35,11 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { streamCallId, streamCallType, language } = body as {
+    // A body `streamCallType` (older clients) is ignored: the type comes from
+    // the meeting row (W3), never the browser.
+    const { streamCallId, language } = body as {
       meetingId?: string;
       streamCallId?: string;
-      streamCallType?: string;
       language?: string;
     };
     meetingId = body.meetingId ?? "";
@@ -56,7 +58,7 @@ export async function POST(request: Request) {
     // attendee. Otherwise any signed-in user could transcribe any meeting.
     const { data: meeting } = await supabase
       .from("meetings")
-      .select("id, user_id, project_id, stream_call_id")
+      .select("id, user_id, project_id, stream_call_id, stream_call_type")
       .eq("id", meetingId)
       .maybeSingle();
     if (!meeting || meeting.stream_call_id !== streamCallId) {
@@ -136,7 +138,7 @@ export async function POST(request: Request) {
       userId,
       meetingId,
       streamCallId,
-      streamCallType: streamCallType || "default",
+      streamCallType: callTypeOfRow(meeting),
       enforceOwner: false,
       language: language && language.trim() ? language.trim() : undefined,
     });

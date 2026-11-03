@@ -10,7 +10,7 @@ import {
   SfuModels,
 } from "@stream-io/video-react-sdk";
 import type { Call } from "@stream-io/video-react-sdk";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { FlipWords } from "@/components/ui/flip-words";
 import { words, type audioType } from "../../constants";
 import { Button } from "@/components/ui/stateful-button";
@@ -148,10 +148,15 @@ export default function DeviceSetup({
   call,
   onJoin,
   buttonLabel = "Join Meeting",
+  joinDisabled = false,
+  beforeJoin,
 }: {
   call: Call;
   onJoin: () => void;
   buttonLabel?: string;
+  // W3: the project recording notice keeps Join disabled until it is ticked.
+  joinDisabled?: boolean;
+  beforeJoin?: ReactNode;
 }) {
   // Intended device state for the pre-join lobby (drives the toggle buttons).
   const [camOn, setCamOn] = useState(true);
@@ -432,8 +437,14 @@ export default function DeviceSetup({
           </div>
         </div>
 
+        {beforeJoin && <div className="w-full">{beforeJoin}</div>}
+
         <div className="flex w-full items-center justify-center pt-2 sm:pt-4">
-          <Button className="w-full sm:w-auto" onClick={onJoin}>
+          <Button
+            className="w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onJoin}
+            disabled={joinDisabled}
+          >
             {buttonLabel}
           </Button>
         </div>

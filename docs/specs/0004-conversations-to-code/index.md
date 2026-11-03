@@ -16,7 +16,7 @@ This is an umbrella spec. This file holds the shared contract every step builds 
 |---|---|---|---|
 | [0004-projects-roles.md](0004-projects-roles.md) | W1. Projects, members, roles, `requireProjectRole`, route migration, offboarding | Role matrix, authorization, offboarding | AC-1 to AC-12 |
 | [0004-invitations.md](0004-invitations.md) | W2. Email invites, link invites, join requests, copy link fallback | Invitations | AC-13 to AC-22 |
-| [0004-project-meetings.md](0004-project-meetings.md) | W3. Meetings inside a project, moving a meeting in, the consent notice, retention | Project meetings, retention | AC-23 to AC-29 |
+| [0004-project-meetings.md](0004-project-meetings.md) | W3. Meetings inside a project, moving a meeting in, the consent notice, retention | Project meetings, retention, members only call type | AC-23 to AC-29, AC-30a, AC-30b |
 | [0004-review-gate-tasks.md](0004-review-gate-tasks.md) | W4. Proposals, the review gate, keyed tasks, the Kanban board | Review gate, tasks | AC-30 to AC-42 |
 | [0004-github.md](0004-github.md) | W5. GitHub App, webhooks, linking rules, revert, Sync | GitHub | AC-43 to AC-56 |
 | [0004-proof-chain.md](0004-proof-chain.md) | W6. Decisions and Promises tab, code evidence, Outcome card, Activity | Proof Chain surfaces | AC-57 to AC-62 |
@@ -271,6 +271,8 @@ create table if not exists meeting_participants (
   primary key (meeting_id, user_id)
 );
 alter table guest_requests add column if not exists consented_at timestamptz;
+alter table meetings add column if not exists stream_call_type text not null default 'default'
+  check (stream_call_type in ('default', 'project'));   -- 'project' = members only Stream call type
 
 -- ===== W4. Proposals, tasks, board =====
 alter table action_items
@@ -662,6 +664,8 @@ GET  /api/projects/[id]/join-requests      → owner or admin: pending join requ
 POST /api/projects/[id]/join-requests/[requestId] → owner or admin: { decision: "approve" | "deny" }
 POST /api/meetings/[id]/project    → meeting creator with developer or higher in the target: { projectId }, moves a personal meeting in; 409 under a minutes review
 POST /api/meetings/[id]/consent    → member: { noticeVersion }, stores the consent tick before joining a project call
+GET  /api/meetings/by-call/[callId] → (extended) adds callType ("default" | "project")
+POST /api/guest/request-join       → (extended) on a project meeting requires { consented: true }; response adds callType
 GET  /api/projects/[id]/proposals  → owner, admin, developer (read only): AI task proposals with quotes
 POST /api/proposals/[id]/review    → owner or admin: { decision: "confirm" | "reject" | "merge", title?, assigneeId?, dueDate?, mergeIntoTaskId?, confirmWithoutQuote? }
 GET  /api/projects/[id]/tasks      → member: board tasks (?status=&assigneeId=&q=&cursor=)
@@ -773,7 +777,7 @@ Each W step is one shippable end to end slice: its migration block, its routes, 
 
 1. **W1, Projects and roles** ([0004-projects-roles.md](0004-projects-roles.md)): W1 SQL block, `project-auth.ts`, project and member routes, the route migration onto `requireMeetingAccess`, offboarding, a minimal Projects page and Members tab, satisfies **AC-1** to **AC-12**.
 2. **W2, Invitations** ([0004-invitations.md](0004-invitations.md)): W2 SQL block, invite and join request routes, `/invite/[token]` page, copy link UI, optional Resend email, satisfies **AC-13** to **AC-22** (plus AC-13a and AC-21a, added at the W2 `/architect`).
-3. **W3, Project meetings and consent** ([0004-project-meetings.md](0004-project-meetings.md)): W3 SQL block, project picker on New and Schedule Meeting, move in route, consent notice before join, guest consent, satisfies **AC-23** to **AC-29**.
+3. **W3, Project meetings and consent** ([0004-project-meetings.md](0004-project-meetings.md)): W3 SQL block, project picker on New and Schedule Meeting, members only `project` call type, consent notice before join, guest consent, offboarding removal from live calls (move route ships with W4), satisfies **AC-23** to **AC-29**, **AC-30a**, **AC-30b**.
 4. **W4, Review gate and tasks** ([0004-review-gate-tasks.md](0004-review-gate-tasks.md)): W4 SQL block, proposals from `/api/ai/process`, review route, task routes, Kanban with `@hello-pangea/dnd`, satisfies **AC-30** to **AC-42**.
 5. **W5, GitHub** ([0004-github.md](0004-github.md)): W5 SQL block plus the `ledger_links` change, App JWT and installation tokens with Node `crypto` (no Octokit), setup, account link, webhook, linking rules, revert, Sync, satisfies **AC-43** to **AC-56**.
 6. **W6, Proof Chain surfaces** ([0004-proof-chain.md](0004-proof-chain.md)): `project_activity` view, Decisions and Promises tab, Outcome card, Activity tab, satisfies **AC-57** to **AC-62**.
@@ -806,10 +810,10 @@ Each W step is one shippable end to end slice: its migration block, its routes, 
 - [ ] W-pre is not done: commit the Live Ledger and Tasdeeq work, then run LL5 and the Tasdeeq live run before W1.
 - [ ] Apply the AGENTS.md API Contracts and Security lines above before W1 (your OK, or `/sync`).
 - [ ] Agent skills and MCP discovery was deferred: check for skills covering GitHub Apps and webhooks, `@hello-pangea/dnd`, and `cmdk` before W4, W5, and W8.
-- [ ] Before W3, verify with the `stream-react` skill whether call level permissions can make the consent gate server enforced on the free tier.
+- [x] Before W3, verify with the `stream-react` skill whether call level permissions can make the consent gate server enforced on the free tier. Settled 2026-11-03: yes, a custom `project` call type without `join-call` for `user` and `guest` (see [0004-project-meetings.md](0004-project-meetings.md)); W3 build step 1 confirms Stream accepts it on this plan.
 - [ ] Turn Clerk email verification back on at Deploy; until then the email invite binding trusts an unverified address in dev (see [0004-invitations.md](0004-invitations.md)).
 - [ ] Fix the existing AGENTS.md line `GET  /api/search`: the route in `src/app/api/search/route.ts` is `POST` with `{ query }`; W7 extends that POST.
-- [ ] Before W3, the same `stream-react` check decides whether offboarding can revoke Stream call access (today a removed member keeps a valid Stream token).
+- [x] Before W3, the same `stream-react` check decides whether offboarding can revoke Stream call access. Settled 2026-11-03: removal takes the user off the call members of open `project` calls and kicks them (AC-30b). Their Stream token stays valid but no longer opens any project call.
 - [ ] Clerk `user.deleted` is not handled: a deleted Owner leaves a project with no reachable Owner. Decide a recovery path before Deploy.
 - [ ] Project pages use the PKT day for overdue while the meeting Ledger tab uses the browser's `today`; near midnight they can differ. Align them in a later polish step.
 - [ ] Post W9 stretch: create GitHub issues from tasks (cut from the core, needs Issues write).

@@ -32,11 +32,18 @@ describe("/api/meetings/by-call/[callId]", () => {
     mockDeleteCall.mockResolvedValue({});
   });
 
-  it("GET returns only the meeting id, no project details", async () => {
+  it("GET returns the meeting id and call type, no project details", async () => {
     as("u1");
-    queue("meetings", ok({ id: "m1" }));
+    queue("meetings", ok({ id: "m1", stream_call_type: "default" }));
     const res = await GET(new Request("http://localhost"), ctx);
-    expect(await res.json()).toEqual({ meetingId: "m1" });
+    expect(await res.json()).toEqual({ meetingId: "m1", callType: "default" });
+  });
+
+  it("GET returns the project call type for a project meeting", async () => {
+    as("u1");
+    queue("meetings", ok({ id: "m1", stream_call_type: "project" }));
+    const res = await GET(new Request("http://localhost"), ctx);
+    expect(await res.json()).toEqual({ meetingId: "m1", callType: "project" });
   });
 
   it("GET returns 404 when the call has no meeting row", async () => {
