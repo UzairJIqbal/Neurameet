@@ -708,7 +708,7 @@ Project and participant picker in the schedule dialog, `meeting_participants`, p
 ### Step W4 — Review gate + tasks + Kanban 🟡 (built 2026-11-03, includes W3's move a meeting in; SQL applied 2026-11-05; live test pending)
 `action_items.review_state`; stop auto created follow ups; quote validation through the ledger validator; assignee suggested only from that person's own audio track (or a Tasdeeq speaker claim); pgvector duplicate check; keyed `tasks` (To Do, In Progress, In Review, Completed, Blocked); follow ups migrated; Kanban with a free drag and drop library chosen at W0 (`@hello-pangea/dnd` recommended); manual completion with evidence. Exit: a planted hallucinated item is dropped, a duplicate is flagged.
 
-### Step W5 — GitHub App 🟡 (code built 2026-11-05; SQL applied live; dev GitHub App created; live test run 2026-11-05, merge race fix and second Owner check still owed)
+### Step W5 — GitHub App 🟡 (code built 2026-11-05; SQL applied live; dev GitHub App created; live test run 2026-11-05, merge race fixed 2026-11-06, second Owner check still owed)
 Install callback stores installation and repo ids; webhook route verifies `X-Hub-Signature-256` over the raw body (`await req.text()`, `timingSafeEqual`), dedupes on `X-GitHub-Delivery`, replies within 10 s and processes in `after()`; completion only on closing reference + `merged == true` + base is the default branch + all linked PRs done; drafts stay In Progress; closed unmerged does nothing; revert reopens; "Sync GitHub" reconciles missed deliveries (GitHub does not retry). Exit: forged webhook rejected; partial, draft, unmerged, non default, and revert PRs each behave correctly.
 
 ### Step W6 — Proof Chain surfaces ⬜

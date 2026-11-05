@@ -325,7 +325,7 @@ async function insertLink(
     .select("id");
   if (error) throw error;
   const inserted = ((data ?? []) as Array<{ id: string }>)[0];
-  // A parallel run inserted it first, and that run writes the event and the move.
+  // A parallel run inserted it first. The caller applies this snapshot to that row.
   if (!inserted) return null;
   return {
     id: inserted.id,
@@ -336,6 +336,23 @@ async function insertLink(
     wasClosing: false,
     fromFork: pr.fromFork,
   };
+}
+
+async function refreshLink(
+  supabase: SupabaseClient,
+  repo: LinkedRepo,
+  pr: PrSnapshot,
+  link: LinkRow,
+  closes: boolean,
+): Promise<LinkChange> {
+  const change =
+    link.state === "merged"
+      ? await refreshMergedLink(supabase, repo, pr, link)
+      : await refreshOpenLink(supabase, repo, pr, link, closes);
+  if (change.state !== change.previousState) {
+    await writeLinkEvent(supabase, repo.project_id, change);
+  }
+  return change;
 }
 
 // Step 5: create and refresh links. A key gone from the text keeps its link but
@@ -354,20 +371,15 @@ async function writeLinks(
   const changes: LinkChange[] = [];
 
   for (const link of links) {
-    const change =
-      link.state === "merged"
-        ? await refreshMergedLink(supabase, repo, pr, link)
-        : await refreshOpenLink(
-            supabase,
-            repo,
-            pr,
-            link,
-            closesByTask.get(link.task_id) ?? false,
-          );
-    changes.push(change);
-    if (change.state !== change.previousState) {
-      await writeLinkEvent(supabase, repo.project_id, change);
-    }
+    changes.push(
+      await refreshLink(
+        supabase,
+        repo,
+        pr,
+        link,
+        closesByTask.get(link.task_id) ?? false,
+      ),
+    );
   }
 
   if (alreadyMerged) return changes;
@@ -381,9 +393,16 @@ async function writeLinks(
       target.taskId,
       target.closes,
     );
-    if (!change) continue;
-    changes.push(change);
-    await writeLinkEvent(supabase, repo.project_id, change);
+    if (change) {
+      changes.push(change);
+      await writeLinkEvent(supabase, repo.project_id, change);
+      continue;
+    }
+    // Lost the insert to a parallel run: this snapshot may be the newer one.
+    const reloaded = await loadLinks(supabase, repo.repo_id, pr.number);
+    const winner = reloaded.find((link) => link.task_id === target.taskId);
+    if (!winner) continue;
+    changes.push(await refreshLink(supabase, repo, pr, winner, target.closes));
   }
   return changes;
 }

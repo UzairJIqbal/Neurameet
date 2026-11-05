@@ -232,14 +232,77 @@ describe("linking and completion", () => {
     );
     expect(result.linked).toBe(20);
   });
+});
 
-  it("leaves a link alone when a parallel run inserted it first", async () => {
+describe("losing the insert to a parallel run", () => {
+  /** No links on load, the upsert returns no row, then the reload finds `rows`. */
+  const lostInsert = (rows: unknown[]) => {
     queue("task_links", ok([]));
     tasksExist(1);
     queue("task_links", ok([]));
-    const result = await apply(pr());
+    queue("task_links", ok(rows));
+  };
+
+  const eventKinds = () =>
+    callsOf("task_events", "insert").map(
+      (c) => (c.args[0] as { kind: string }).kind,
+    );
+
+  it("applies a merge the parallel run could not know about", async () => {
+    lostInsert([link()]);
+    queue("task_links", ok([{ id: "l1" }]));
+    queue("rpc:apply_merge_completion", ok("completed"));
+    const result = await apply(merged(), { kind: "webhook", action: "closed" });
+    expect(linkUpdates()[0]).toMatchObject({
+      state: "merged",
+      merge_sha: "abc",
+    });
+    expect(eventKinds()).toEqual(["pr_state_changed"]);
+    expect(rpcArgs("apply_merge_completion")).toEqual([{ p_task: "t1" }]);
+    expect(result).toMatchObject({ linked: 0, completed: 1 });
+  });
+
+  it("moves the card back when the PR was closed without a merge", async () => {
+    lostInsert([link()]);
+    queue("task_links", ok([{ id: "l1" }]));
+    queue("task_links", ok([]));
+    queue("rpc:apply_github_move", ok("moved"));
+    const result = await apply(pr({ state: "closed" }), {
+      kind: "webhook",
+      action: "closed",
+    });
+    expect(rpcArgs("apply_github_move")[0]).toMatchObject({
+      p_from: ["in_review"],
+      p_to: "in_progress",
+    });
+    expect(result.moved).toBe(1);
+  });
+
+  it("leaves a merged link alone when a late opened event loses", async () => {
+    lostInsert([link({ state: "merged", pr_updated_at: T1 })]);
+    await apply(pr());
+    expect(linkUpdates()).toEqual([]);
+    expect(eventKinds()).toEqual([]);
+    expect(rpcArgs("apply_github_move")).toEqual([]);
+  });
+
+  it("writes no event when the stored link is already newer", async () => {
+    lostInsert([link({ pr_updated_at: T1 })]);
+    queue("task_links", ok([]));
+    const result = await apply(pr({ state: "closed", updated_at: T0 }), {
+      kind: "webhook",
+      action: "closed",
+    });
+    expect(eventKinds()).toEqual([]);
     expect(result).toEqual({ linked: 0, moved: 0, completed: 0, reopened: 0 });
-    expect(callsOf("task_events", "insert")).toEqual([]);
+  });
+
+  it("does nothing when the reload finds no row for the task", async () => {
+    lostInsert([]);
+    const result = await apply(pr());
+    expect(linkUpdates()).toEqual([]);
+    expect(eventKinds()).toEqual([]);
+    expect(result).toEqual({ linked: 0, moved: 0, completed: 0, reopened: 0 });
   });
 });
 
