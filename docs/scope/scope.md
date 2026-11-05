@@ -628,11 +628,12 @@ A free GitHub App (not an OAuth App or token) installed per project repo. Webhoo
 Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
 - [x] Design it (spec): `/architect Step W5` (2026-11-05, [W5 child spec](../specs/0004-conversations-to-code/0004-github.md))
 - [ ] Build it: `/develop github integration`
-  - [ ] W5a SQL block with the `ledger_links` change, GitHub client and key parsing (AC-45, AC-48b, AC-50, AC-51) (code done, SQL in `supabase/schema.sql`, applied live 2026-11-05 except `apply_merge_revert`, which goes through the SQL editor)
+  - [x] W5a SQL block with the `ledger_links` change, GitHub client and key parsing (AC-45, AC-48b, AC-50, AC-51) (code done, SQL in `supabase/schema.sql`, applied live 2026-11-05, `apply_merge_revert` through the SQL editor)
   - [x] W5b Install callback, claims, repo linking, GitHub tab (AC-43, AC-43a, AC-46, AC-47)
   - [x] W5c Webhook and shared rules: linking, moves, merge completion, revert, installation events (AC-44, AC-45, AC-48 to AC-53)
   - [x] W5d Sync, task drawer, viewer safe PR data (AC-54, AC-55, AC-56)
   - [x] W5e Code links on the Ledger tab and the reverted PR guard (AC-52a, AC-55a)
+  - [ ] W5 merge race fix: a lost `task_links` insert must still apply its PR state (`prompts/step-W5-merge-race-fix.md`)
 - [ ] Verify it: `/check verify github integration`
 - [ ] Test it: `/test github integration`
 - [ ] Review it (fresh model): `/check review github integration`
