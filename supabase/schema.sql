@@ -1352,3 +1352,202 @@ GRANT EXECUTE ON FUNCTION review_proposal(uuid, text, text, text, boolean, date,
 GRANT EXECUTE ON FUNCTION update_task(uuid, text, jsonb, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION renumber_task_column(uuid, text) TO service_role;
 GRANT EXECUTE ON FUNCTION move_meeting_to_project(uuid, uuid, text) TO service_role;
+
+-- ===== W5. GitHub =====
+create table if not exists github_installations (
+  installation_id bigint primary key,
+  account_login text not null,
+  account_type text not null,               -- 'User' | 'Organization'
+  installed_by text not null,               -- Clerk user id, proven at setup; a second claim never overwrites it
+  suspended_at timestamptz,
+  deleted_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- Who proved access to an installation with their own GitHub token. Stores no GitHub
+-- identity; a claim older than 30 days no longer lets you link repos.
+create table if not exists github_installation_claims (
+  installation_id bigint references github_installations(installation_id) on delete cascade not null,
+  user_id text not null,                    -- Clerk user id
+  claimed_at timestamptz not null default now(),
+  primary key (installation_id, user_id)
+);
+
+create table if not exists github_repos (
+  repo_id bigint primary key,               -- one project per repo
+  installation_id bigint references github_installations(installation_id) on delete cascade not null,
+  project_id uuid references projects(id) on delete cascade not null,
+  full_name text not null,
+  default_branch text not null,             -- refreshed from every webhook payload
+  private boolean not null,
+  linked_by text not null,
+  linked_at timestamptz not null default now()
+);
+create index if not exists github_repos_project on github_repos (project_id);
+
+create table if not exists github_deliveries (
+  delivery_id text primary key,             -- X-GitHub-Delivery
+  event text not null,
+  action text,
+  status text not null default 'received' check (status in ('received', 'processed', 'ignored', 'failed')),
+  error text,
+  received_at timestamptz not null default now(),
+  processed_at timestamptz
+);
+
+create table if not exists task_links (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid references tasks(id) on delete cascade not null,
+  repo_id bigint not null,                  -- no FK, history survives an unlink
+  repo_full_name text not null,             -- snapshot
+  pr_number integer not null,
+  pr_title text not null,
+  pr_url text not null,
+  state text not null check (state in ('draft', 'open', 'closed', 'merged')),
+  closes boolean not null default false,    -- a closing word names this key right now
+  from_fork boolean not null default false, -- moves nothing, blocks nothing, completes only once merged
+  base_ref text not null,
+  merge_sha text,
+  merged_at timestamptz,
+  reverted_at timestamptz,
+  reverted_by_pr integer,
+  pr_updated_at timestamptz not null,       -- pull_request.updated_at; older events are ignored
+  last_synced_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (task_id, repo_id, pr_number)
+);
+create index if not exists task_links_pr on task_links (repo_id, pr_number);
+
+-- Code evidence on the Promise Ledger. Ships here because W5 writes the first code
+-- link, and it must come before the functions below that use these columns.
+alter table ledger_links alter column evidence_meeting_id drop not null;
+alter table ledger_links alter column line_number drop not null;
+alter table ledger_links
+  add column if not exists evidence_kind text not null default 'meeting'
+    check (evidence_kind in ('meeting', 'code')),
+  add column if not exists evidence_task_link_id uuid references task_links(id) on delete cascade;
+alter table ledger_links drop constraint if exists ledger_links_evidence_shape;
+alter table ledger_links add constraint ledger_links_evidence_shape check (
+  (evidence_kind = 'meeting' and evidence_meeting_id is not null and line_number is not null
+     and evidence_task_link_id is null)
+  or (evidence_kind = 'code' and evidence_task_link_id is not null and evidence_meeting_id is null
+     and relation = 'kept'));
+create unique index if not exists ledger_links_code_unique
+  on ledger_links (item_id, evidence_task_link_id) where evidence_task_link_id is not null;
+
+-- A "kept" suggestion for each promise behind this task, including proposals merged into it.
+create or replace function add_code_ledger_links(p_task uuid, p_link uuid)
+returns void language sql set search_path = public as $$
+  insert into ledger_links (item_id, evidence_kind, evidence_task_link_id, relation, quote,
+                            confidence, state)
+  select li.id, 'code', l.id, 'kept', l.pr_title, 1, 'suggested'
+  from task_links l
+  join tasks t on t.id = l.task_id
+  join ledger_items li on li.action_item_id = t.source_action_item_id
+    or li.action_item_id in (select ai.id from action_items ai where ai.merged_into_task_id = t.id)
+  where l.id = p_link and l.task_id = p_task
+  on conflict (item_id, evidence_task_link_id) where evidence_task_link_id is not null do nothing;
+$$;
+
+-- Merge completion under a row lock, so two closing PRs processed at once never
+-- leave the task open, and a later "closed" event can complete it. Only links in a
+-- repo linked now under a live installation can block, or the task would wait forever
+-- on a PR Sync can no longer read. Fork PRs never block. A merge older than the latest
+-- reopen is spent, so a person's reopen sticks.
+create or replace function apply_merge_completion(p_task uuid)
+returns text language plpgsql set search_path = public as $$
+declare t tasks; done task_links; v_reopened timestamptz;
+begin
+  select * into t from tasks where id = p_task for update;
+  if not found then return 'not_found'; end if;
+  if t.completion_kind = 'merge' then return 'already_completed'; end if;
+  if t.status <> 'completed' and exists (
+    select 1 from task_links l
+    join github_repos r on r.repo_id = l.repo_id
+    join github_installations i on i.installation_id = r.installation_id
+    where l.task_id = p_task and l.closes and not l.from_fork and l.state in ('open', 'draft')
+      and i.suspended_at is null and i.deleted_at is null
+  ) then return 'waiting'; end if;
+  select max(created_at) into v_reopened from task_events
+    where task_id = p_task and from_value = 'completed'
+      and kind in ('status_changed', 'reopened_by_revert');
+  select l.* into done from task_links l
+    join github_repos r on r.repo_id = l.repo_id and r.default_branch = l.base_ref
+    where l.task_id = p_task and l.closes and l.state = 'merged' and l.reverted_at is null
+      and (v_reopened is null or l.merged_at > v_reopened)
+    order by l.merged_at desc limit 1;
+  if done.id is null then return 'no_qualifying_merge'; end if;
+  -- Completed by hand before the merge: the task stays manual, the promise still gets evidence.
+  if t.status = 'completed' then
+    perform add_code_ledger_links(p_task, done.id);
+    return 'already_completed';
+  end if;
+  update tasks set status = 'completed', completion_kind = 'merge',
+    completion_evidence = done.pr_url, completed_at = now(), completed_by = null,
+    version = version + 1, updated_at = now() where id = p_task;
+  insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+    values (p_task, t.project_id, null, 'completed_by_merge', t.status, 'completed',
+            jsonb_build_object('source', 'github', 'taskLinkId', done.id));
+  perform add_code_ledger_links(p_task, done.id);
+  return 'completed';
+end $$;
+
+-- A board move from GitHub. update_task needs an actor and ifVersion; this needs neither,
+-- but bumps version so an open board gets the normal 409.
+create or replace function apply_github_move(p_task uuid, p_from text[], p_to text, p_link uuid)
+returns text language plpgsql set search_path = public as $$
+declare t tasks;
+begin
+  select * into t from tasks where id = p_task for update;
+  if not found or not (t.status = any(p_from)) then return 'skipped'; end if;
+  update tasks set status = p_to, version = version + 1, updated_at = now() where id = p_task;
+  insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+    values (p_task, t.project_id, null, 'status_changed', t.status, p_to,
+            jsonb_build_object('source', 'github', 'taskLinkId', p_link));
+  return 'moved';
+end $$;
+
+-- A merged revert. Reopens only when this link is the merge that completed the task.
+create or replace function apply_merge_revert(p_link uuid, p_by_pr integer)
+returns text language plpgsql set search_path = public as $$
+declare l task_links; t tasks; r record;
+begin
+  select * into l from task_links where id = p_link;
+  if not found then return 'not_found'; end if;
+  select * into t from tasks where id = l.task_id for update;
+  select * into l from task_links where id = p_link;     -- read again under the lock
+  if l.state <> 'merged' or l.reverted_at is not null then return 'skipped'; end if;
+  update task_links set reverted_at = now(), reverted_by_pr = p_by_pr where id = p_link;
+  delete from ledger_links where evidence_task_link_id = p_link and state = 'suggested';
+  for r in update ledger_links set state = 'rejected', decided_at = now()
+           where evidence_task_link_id = p_link and state = 'confirmed' returning item_id loop
+    perform ledger_recompute_item_status(r.item_id);
+  end loop;
+  if t.completion_kind is distinct from 'merge' or t.completion_evidence is distinct from l.pr_url then
+    return 'reverted';
+  end if;
+  update tasks set status = 'in_progress', completion_kind = null, completion_evidence = null,
+    completed_at = null, completed_by = null, version = version + 1, updated_at = now()
+    where id = t.id;
+  insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+    values (t.id, t.project_id, null, 'reopened_by_revert', 'completed', 'in_progress',
+            jsonb_build_object('source', 'github', 'taskLinkId', p_link));
+  return 'reopened';
+end $$;
+
+alter table github_installations enable row level security;
+alter table github_installation_claims enable row level security;
+alter table github_repos enable row level security;
+alter table github_deliveries enable row level security;
+alter table task_links enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON github_installations, github_installation_claims, github_repos, github_deliveries, task_links TO service_role;
+
+revoke execute on function add_code_ledger_links(uuid, uuid) from public, anon, authenticated;
+revoke execute on function apply_merge_completion(uuid) from public, anon, authenticated;
+revoke execute on function apply_github_move(uuid, text[], text, uuid) from public, anon, authenticated;
+revoke execute on function apply_merge_revert(uuid, integer) from public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION add_code_ledger_links(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION apply_merge_completion(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION apply_github_move(uuid, text[], text, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION apply_merge_revert(uuid, integer) TO service_role;

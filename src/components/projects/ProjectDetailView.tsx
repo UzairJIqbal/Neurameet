@@ -14,18 +14,23 @@ import { ROLE_LABELS, type ProjectDetail } from "@/lib/project-types";
 import MembersTab from "./MembersTab";
 import TasksBoard from "./TasksBoard";
 import ProposalsPanel from "./ProposalsPanel";
+import GitHubTab from "./GitHubTab";
 
-type TabKey = "members" | "tasks" | "proposals";
+type TabKey = "members" | "tasks" | "proposals" | "github";
 
 const TAB_LABELS: Record<TabKey, string> = {
   members: "Members",
   tasks: "Tasks",
   proposals: "Proposals",
+  github: "GitHub",
 };
 
-// Proposals are hidden for Viewers (AC-37).
-const tabsFor = (project: ProjectDetail): TabKey[] =>
-  project.role === "viewer" ? ["members", "tasks"] : ["members", "tasks", "proposals"];
+// Proposals are hidden for Viewers (AC-37). GitHub is the Owner's alone (AC-47).
+const tabsFor = (project: ProjectDetail): TabKey[] => {
+  if (project.role === "viewer") return ["members", "tasks"];
+  const tabs: TabKey[] = ["members", "tasks", "proposals"];
+  return project.role === "owner" ? [...tabs, "github"] : tabs;
+};
 
 // Page shell: header plus tabs, the selected tab kept in ?tab=.
 const ProjectDetailView = ({ id }: { id: string }) => {
@@ -156,6 +161,7 @@ const ProjectDetailView = ({ id }: { id: string }) => {
       {tab === "members" && <MembersTab project={project} onProjectChanged={reload} />}
       {tab === "tasks" && <TasksBoard project={project} />}
       {tab === "proposals" && <ProposalsPanel project={project} />}
+      {tab === "github" && <GitHubTab project={project} />}
     </section>
   );
 };

@@ -20,6 +20,16 @@ const ProjectList = () => {
   const controllerRef = useRef<AbortController | null>(null);
   const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
 
+  // The GitHub callback lands here when its link has no project it can trust
+  // (AC-43a). Read from window: this page has no Suspense for useSearchParams.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("github") !== "expired") return;
+    toast.error("That GitHub link expired. Open your project's GitHub tab and try again.");
+    url.searchParams.delete("github");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     controllerRef.current = controller;

@@ -184,10 +184,13 @@ GET  /api/tasks/[id]               → member: task, events, PR links, Proof Cha
 PATCH /api/tasks/[id]              → developer (own or unassigned) or owner/admin: { status?, position?, assigneeId?, title?, description?, dueDate?, completionEvidence?, ifVersion }, 409 when stale
 GET  /api/github/callback          → owner (signed state): GitHub App install callback, installation checked against your own GitHub installations; the user token is discarded
 POST /api/github/webhook           → public, HMAC SHA-256 over the raw body, dedupe on X-GitHub-Delivery, 202 then after()
-GET  /api/projects/[id]/github/repos       → owner only: repos your installations can see, with link state, and the install URL
+GET  /api/projects/[id]/github/repos       → owner only: repos your installations can see, with link state, the install URL, and the authorize URL (authorizeUrl, for an account where the App is already installed)
 POST /api/projects/[id]/github/repos       → owner only: { repoId } from your installation's repo list, 409 when linked to another project
 DELETE /api/projects/[id]/github/repos/[repoId] → owner only: unlink
 POST /api/projects/[id]/github/sync        → owner or admin: read PR state again for open links and apply the same rules
+GET  /api/tasks/[id]               → (extended) prLinks holds the real PR links; Viewers get state, merged, and reverted only, never repo name, PR title, or URL
+GET  /api/ledger                   → (extended) links carry evidenceKind, nullable evidenceMeetingId and lineNumber, and pr { repoFullName, prNumber, prUrl, reverted } on a code link
+POST /api/ledger/links/[id]/review → (extended) 409 "This PR was reverted" on confirm or reset when a code link's PR was reverted
 GET  /api/projects/[id]/ledger     → member: Decisions and Promises across the project's meetings (?kind=&status=&cursor=), redacted for viewers
 POST /api/ledger/links/[id]/review → (extended) accepts code links; on a project meeting owner or admin
 GET  /api/projects/[id]/activity   → member: Activity timeline (?before=)

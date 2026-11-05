@@ -7,7 +7,14 @@ import {
   requireProjectRole,
 } from "@/lib/project-auth";
 import { lookupProfiles, rpcErrorCode } from "@/lib/projects";
-import { readTask, toTaskEvent, type TaskEventRow } from "@/lib/project-select";
+import {
+  readTask,
+  taskLinkSelectFor,
+  toTaskEvent,
+  toTaskPrLink,
+  type TaskEventRow,
+  type TaskLinkRow,
+} from "@/lib/project-select";
 import {
   EVIDENCE_MAX_CHARS,
   TASK_DESCRIPTION_MAX,
@@ -48,7 +55,7 @@ async function loadHead(
   return (data as TaskHead | null) ?? null;
 }
 
-// Member: one task with its events, PR links (none until W5), and Proof Chain.
+// Member: one task with its events, PR links, and Proof Chain.
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
   const { userId } = await auth();
@@ -81,6 +88,14 @@ export async function GET(_request: Request, { params }: Params) {
       eventRows.map((e) => e.actor_id).filter((v): v is string => !!v),
     );
 
+    const { data: linkData, error: linkErr } = await supabase
+      .from("task_links")
+      .select(taskLinkSelectFor(role))
+      .eq("task_id", id)
+      .order("created_at", { ascending: true });
+    if (linkErr) throw linkErr;
+    const linkRows = (linkData ?? []) as unknown as TaskLinkRow[];
+
     let meetingTitle: string | null = null;
     if (task.sourceMeetingId) {
       const { data: meeting } = await supabase
@@ -95,7 +110,7 @@ export async function GET(_request: Request, { params }: Params) {
     const response: TaskDetailResponse = {
       task,
       events: eventRows.map((e) => toTaskEvent(e, role, names)),
-      prLinks: [],
+      prLinks: linkRows.map((row) => toTaskPrLink(row, role)),
       proofChain: {
         meetingId: task.sourceMeetingId,
         meetingTitle,

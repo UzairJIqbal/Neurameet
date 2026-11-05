@@ -223,6 +223,54 @@ describe("GET /api/tasks/[id]", () => {
     expect(body.events[0].detail).toEqual({});
     expect(callsOf("tasks", "select")[1].args[0]).not.toMatch(/quote/);
   });
+
+  const LINK = {
+    id: "l1",
+    state: "merged",
+    merged_at: "2026-11-03",
+    reverted_at: null,
+    repo_full_name: "acme/secret",
+    pr_number: 7,
+    pr_title: "Secret title",
+    pr_url: "https://github.com/acme/secret/pull/7",
+  };
+
+  it("gives a Viewer the PR state only, even from a wider row", async () => {
+    queue("tasks", ok(head()));
+    role("viewer");
+    queueReadTask({ completion_kind: "merge" });
+    queue("task_events", ok([]));
+    queue("task_links", ok([LINK]));
+    const res = await getTask(req(undefined, undefined, "GET"), params(T));
+    const body = await res.json();
+    expect(body.prLinks).toEqual([
+      { id: "l1", state: "merged", merged: true, reverted: false },
+    ]);
+    expect(callsOf("task_links", "select")[0].args[0]).not.toMatch(
+      /repo_full_name|pr_title|pr_url|pr_number/,
+    );
+    expect(callsOf("tasks", "select")[1].args[0]).not.toMatch(/completion_evidence/);
+    expect(JSON.stringify(body)).not.toMatch(/secret/i);
+  });
+
+  it("gives a Developer the repo, number, title, and link", async () => {
+    queue("tasks", ok(head()));
+    role("developer");
+    queueReadTask();
+    queue("task_events", ok([]));
+    queue("task_links", ok([LINK]));
+    const res = await getTask(req(undefined, undefined, "GET"), params(T));
+    expect((await res.json()).prLinks[0]).toEqual({
+      id: "l1",
+      state: "merged",
+      merged: true,
+      reverted: false,
+      repoFullName: "acme/secret",
+      prNumber: 7,
+      prTitle: "Secret title",
+      prUrl: "https://github.com/acme/secret/pull/7",
+    });
+  });
 });
 
 describe("GET /api/projects/[id]/tasks", () => {

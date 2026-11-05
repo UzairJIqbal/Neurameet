@@ -650,6 +650,15 @@ Fonts: **Hanken Grotesk** (UI, `--font-hanken-grotesk`) + **JetBrains Mono** (mo
 | `ProjectDetailView` tabs | `components/projects/ProjectDetailView.tsx` | Tabs Members, Tasks, Proposals (hidden for a Viewer), kept in `?tab=`. |
 | `OverviewTab` "Project" card | `components/meeting-intelligence/OverviewTab.tsx` | Shows the project name on a project meeting, or "Move to project" for the creator of a personal meeting. |
 
+## New Components — GitHub App (built Step W5, 2026-11-05)
+
+| Component | File | Notes |
+|---|---|---|
+| `GitHubTab` | `components/projects/GitHubTab.tsx` | Owner only tab in `ProjectDetailView`. "Install the GitHub App" and "I already installed it" links, one `RepoRow` per repo with Link or Unlink, "Linked to another project" text, "Private" badge. Reads `?github=` once, toasts the outcome with a fixed toast id, then clears the param. Own `useLoadingTimeout` + `LoadError`. |
+| `TaskDrawer` | `components/projects/TaskDrawer.tsx` | Right side `role="dialog"` opened from a board card. Key, title, status, "Completed by merge" with the PR link when present, PR rows (`repo #N`, state, "Reverted" badge, title link; state only for a Viewer), last 10 events with "GitHub" as the actor on GitHub rows. |
+| Sync GitHub button | `components/projects/TasksBoard.tsx` | Secondary button for Owner and Admin; toasts a one line summary, including when the run stopped early. |
+| Ledger code link row | `components/meeting-intelligence/LedgerTab.tsx` | `CodeLinkRow` inside `LedgerItemCard`: "Merged PR · repo #N · relation · state", " · reverted", quote as the PR link. A Viewer gets "Merged PR · relation · state" with no link or quote. Never shows a line number. |
+
 ## Registry Update Rule
 
 Every new component gets a row here immediately after creation, with the pattern it establishes so the next session reuses it instead of inventing a variant. Run `/imprint` after any new UI component or page.

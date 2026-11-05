@@ -33,6 +33,7 @@ const incoming = (
 ): LedgerIncomingLink => ({
   id,
   itemId: `item-${id}`,
+  evidenceKind: "meeting",
   evidenceMeetingId: "m2",
   relation,
   quote: `new quote ${id}`,
@@ -444,5 +445,38 @@ describe("LedgerTab Live Ledger badges (spec 0002 AC-15)", () => {
     expect(
       screen.queryByText("No earlier promises were mentioned here yet."),
     ).toBeNull();
+  });
+  it("shows a code link as a merged PR with no line number", async () => {
+    const base = incoming("c1", "kept", "suggested");
+    const item: LedgerItemView = {
+      ...base.item,
+      meetingId: "m2",
+      statement: "Fix the login bug",
+      derivedStatus: "open",
+      liveMark: null,
+      links: [
+        {
+          ...base,
+          evidenceKind: "code",
+          evidenceMeetingId: null,
+          lineNumber: null,
+          quote: "Closes NM-1",
+          pr: {
+            repoFullName: "acme/app",
+            prNumber: 7,
+            prUrl: "https://github.com/acme/app/pull/7",
+            reverted: true,
+          },
+        },
+      ],
+    };
+    ledgerResponses = [{ ...response([], 0), items: [item] }];
+    render(<LedgerTab meetingId="m2" />);
+
+    const pr = await screen.findByRole("link", { name: "Closes NM-1" });
+    expect(pr.getAttribute("href")).toBe("https://github.com/acme/app/pull/7");
+    expect(screen.getByText(/Merged PR · acme\/app #7/)).toBeTruthy();
+    expect(screen.getByText(/reverted/)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/line null/);
   });
 });

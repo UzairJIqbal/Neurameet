@@ -3,12 +3,12 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Search } from "lucide-react";
+import { Plus, RefreshCw, Search } from "lucide-react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
-import { listMembers, listTasks, ProjectClientError, updateTask } from "@/lib/project-client";
+import { listMembers, listTasks, ProjectClientError, syncGitHub, updateTask } from "@/lib/project-client";
 import { patchDenial } from "@/lib/task-rules";
 import {
   BOARD_REFETCH_MS,
@@ -21,7 +21,9 @@ import {
 } from "@/lib/tasks";
 import type { ProjectDetail, ProjectMember, ProjectRole } from "@/lib/project-types";
 import type { Task, TasksResponse } from "@/lib/task-types";
+import type { GitHubSyncResult } from "@/lib/github-types";
 import TaskCard from "./TaskCard";
+import TaskDrawer from "./TaskDrawer";
 import CompleteTaskDialog from "./CompleteTaskDialog";
 import NewTaskDialog from "./NewTaskDialog";
 
@@ -32,10 +34,26 @@ const inputClass =
 const primaryButton =
   "inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
+const secondaryButton =
+  "inline-flex items-center gap-2 rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+
 const SEARCH_DEBOUNCE_MS = 300;
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
+
+const syncSummary = (result: GitHubSyncResult): string => {
+  if (result.repos === 0) return "No repositories are linked to this project yet.";
+  const parts = [
+    `Read ${result.prsRead} PR${result.prsRead === 1 ? "" : "s"}`,
+    `${result.linked} linked`,
+    `${result.moved} moved`,
+    `${result.completed} completed`,
+    `${result.reopened} reopened`,
+  ];
+  if (result.failed > 0) parts.push(`${result.failed} failed`);
+  return `${parts.join(", ")}.${result.partial ? " Run it again for the rest." : ""}`;
+};
 
 // The Kanban board (AC-41). Every move is optimistic and sends ifVersion; a
 // 409 puts the card back and refetches. The server checks the same role rules
@@ -55,6 +73,8 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
   const [pending, setPending] = useState<PendingComplete | null>(null);
   const [saving, setSaving] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const busyRef = useRef(false);
   const { timedOut } = useLoadingTimeout(isLoading && !loaded, { timeoutMs: 12000, retryNonce });
@@ -198,12 +218,25 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
 
   const reload = useCallback(() => setRetryNonce((k) => k + 1), []);
 
+  const runSync = async () => {
+    setSyncing(true);
+    try {
+      toast.success(syncSummary(await syncGitHub(project.id)));
+      await fetchBoard();
+    } catch (err) {
+      toast.error(errorText(err, "Failed to sync with GitHub"));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (timedOut) return <LoadError message="We couldn't load the board." onRetry={reload} />;
   if (!loaded && isLoading) return <LoaderOne />;
   if (!loaded) return <LoadError message="We couldn't load the board." onRetry={reload} />;
 
   const canCreate = role !== "viewer";
   const canDrag = role !== "viewer";
+  const canSync = role === "owner" || role === "admin";
 
   return (
     <div className="flex flex-col gap-4">
@@ -233,12 +266,20 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
             </option>
           ))}
         </select>
-        {canCreate && (
-          <button type="button" onClick={() => setShowNew(true)} className={`${primaryButton} ml-auto`}>
-            <Plus className="h-4 w-4" />
-            New task
-          </button>
-        )}
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          {canSync && (
+            <button type="button" disabled={syncing} onClick={runSync} className={secondaryButton}>
+              <RefreshCw className="h-4 w-4" aria-hidden />
+              {syncing ? "Syncing…" : "Sync GitHub"}
+            </button>
+          )}
+          {canCreate && (
+            <button type="button" onClick={() => setShowNew(true)} className={primaryButton}>
+              <Plus className="h-4 w-4" />
+              New task
+            </button>
+          )}
+        </div>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -264,7 +305,21 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
                       {cards.map((task, index) => (
                         <Draggable key={task.id} draggableId={task.id} index={index} isDragDisabled={!canDrag || saving}>
                           {(drag) => (
-                            <div ref={drag.innerRef} {...drag.draggableProps} {...drag.dragHandleProps}>
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              ref={drag.innerRef}
+                              {...drag.draggableProps}
+                              {...drag.dragHandleProps}
+                              aria-label={`Open ${task.key}`}
+                              onClick={(e) => {
+                                // The drag library cancels the click that ends a drag.
+                                if (!e.defaultPrevented) setOpenTaskId(task.id);
+                              }}
+                              onKeyUp={(e) => {
+                                if (e.key === "Enter" && !e.defaultPrevented) setOpenTaskId(task.id);
+                              }}
+                            >
                               <TaskCard task={task} />
                             </div>
                           )}
@@ -293,6 +348,7 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
           onConfirm={confirmComplete}
         />
       )}
+      {openTaskId && <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
       {showNew && (
         <NewTaskDialog
           projectId={project.id}

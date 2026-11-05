@@ -43,7 +43,7 @@ A code `ledger_link` has no evidence meeting and no line. `/api/ledger` (`LINK_C
 | Task for an item | key, status | `tasks.source_action_item_id = ledger_items.action_item_id` |
 | Shipped | PR | `task_links` where `state = 'merged'` and `reverted_at is null`, latest `merged_at` |
 | Kept | state | `ledger_links` for the item, confirmed first, else suggested |
-| Activity actor | name | Clerk users batched per page; `github` shows as "GitHub"; unknown shows "Unknown member" |
+| Activity actor | name | Clerk users batched per page; a null actor with `detail.source = 'github'` shows as "GitHub"; unknown shows "Unknown member" |
 
 ### Critical test scenarios
 

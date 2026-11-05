@@ -406,6 +406,15 @@ create table if not exists github_installations (
   created_at timestamptz not null default now()
 );
 
+-- Who proved access to an installation with their own GitHub token. Stores no GitHub
+-- identity; a claim older than 30 days no longer lets you link repos.
+create table if not exists github_installation_claims (
+  installation_id bigint references github_installations(installation_id) on delete cascade not null,
+  user_id text not null,                    -- Clerk user id
+  claimed_at timestamptz not null default now(),
+  primary key (installation_id, user_id)
+);
+
 create table if not exists github_repos (
   repo_id bigint primary key,               -- one project per repo
   installation_id bigint references github_installations(installation_id) on delete cascade not null,
@@ -437,7 +446,8 @@ create table if not exists task_links (
   pr_title text not null,
   pr_url text not null,
   state text not null check (state in ('draft', 'open', 'closed', 'merged')),
-  closes boolean not null default false,    -- a closing word named this key
+  closes boolean not null default false,    -- a closing word names this key right now
+  from_fork boolean not null default false, -- moves nothing, blocks nothing, completes only once merged
   base_ref text not null,
   merge_sha text,
   merged_at timestamptz,
@@ -450,31 +460,8 @@ create table if not exists task_links (
 );
 create index if not exists task_links_pr on task_links (repo_id, pr_number);
 
--- Merge completion under a row lock, so two closing PRs processed at once never
--- leave the task open, and a later "closed" event can complete it.
-create or replace function apply_merge_completion(p_task uuid)
-returns text language plpgsql as $$
-declare t tasks; done task_links;
-begin
-  select * into t from tasks where id = p_task for update;
-  if t.status = 'completed' then return 'already_completed'; end if;
-  if exists (select 1 from task_links where task_id = p_task and closes
-             and state in ('open', 'draft')) then return 'waiting'; end if;
-  select * into done from task_links where task_id = p_task and closes and state = 'merged'
-    and reverted_at is null and base_ref = (select default_branch from github_repos r
-      where r.repo_id = task_links.repo_id)
-    order by merged_at desc limit 1;
-  if done.id is null then return 'no_qualifying_merge'; end if;
-  update tasks set status = 'completed', completion_kind = 'merge',
-    completion_evidence = done.pr_url, completed_at = now(), completed_by = null,
-    version = version + 1, updated_at = now() where id = p_task;
-  insert into task_events (task_id, project_id, actor_id, kind, to_value, detail)
-    values (p_task, t.project_id, null, 'completed_by_merge', 'completed',
-            jsonb_build_object('taskLinkId', done.id));
-  return 'completed';
-end $$;
-
--- ===== W6. Code evidence on the Promise Ledger, and Activity =====
+-- Code evidence on the Promise Ledger. Ships here because W5 writes the first code
+-- link, and it must come before the functions below that use these columns.
 alter table ledger_links alter column evidence_meeting_id drop not null;
 alter table ledger_links alter column line_number drop not null;
 alter table ledger_links
@@ -490,6 +477,107 @@ alter table ledger_links add constraint ledger_links_evidence_shape check (
 create unique index if not exists ledger_links_code_unique
   on ledger_links (item_id, evidence_task_link_id) where evidence_task_link_id is not null;
 
+-- A "kept" suggestion for each promise behind this task, including proposals merged into it.
+create or replace function add_code_ledger_links(p_task uuid, p_link uuid)
+returns void language sql set search_path = public as $$
+  insert into ledger_links (item_id, evidence_kind, evidence_task_link_id, relation, quote,
+                            confidence, state)
+  select li.id, 'code', l.id, 'kept', l.pr_title, 1, 'suggested'
+  from task_links l
+  join tasks t on t.id = l.task_id
+  join ledger_items li on li.action_item_id = t.source_action_item_id
+    or li.action_item_id in (select ai.id from action_items ai where ai.merged_into_task_id = t.id)
+  where l.id = p_link and l.task_id = p_task
+  on conflict (item_id, evidence_task_link_id) where evidence_task_link_id is not null do nothing;
+$$;
+
+-- Merge completion under a row lock, so two closing PRs processed at once never
+-- leave the task open, and a later "closed" event can complete it. Only links in a
+-- repo linked now under a live installation can block, or the task would wait forever
+-- on a PR Sync can no longer read. Fork PRs never block. A merge older than the latest
+-- reopen is spent, so a person's reopen sticks.
+create or replace function apply_merge_completion(p_task uuid)
+returns text language plpgsql set search_path = public as $$
+declare t tasks; done task_links; v_reopened timestamptz;
+begin
+  select * into t from tasks where id = p_task for update;
+  if not found then return 'not_found'; end if;
+  if t.completion_kind = 'merge' then return 'already_completed'; end if;
+  if t.status <> 'completed' and exists (
+    select 1 from task_links l
+    join github_repos r on r.repo_id = l.repo_id
+    join github_installations i on i.installation_id = r.installation_id
+    where l.task_id = p_task and l.closes and not l.from_fork and l.state in ('open', 'draft')
+      and i.suspended_at is null and i.deleted_at is null
+  ) then return 'waiting'; end if;
+  select max(created_at) into v_reopened from task_events
+    where task_id = p_task and from_value = 'completed'
+      and kind in ('status_changed', 'reopened_by_revert');
+  select l.* into done from task_links l
+    join github_repos r on r.repo_id = l.repo_id and r.default_branch = l.base_ref
+    where l.task_id = p_task and l.closes and l.state = 'merged' and l.reverted_at is null
+      and (v_reopened is null or l.merged_at > v_reopened)
+    order by l.merged_at desc limit 1;
+  if done.id is null then return 'no_qualifying_merge'; end if;
+  -- Completed by hand before the merge: the task stays manual, the promise still gets evidence.
+  if t.status = 'completed' then
+    perform add_code_ledger_links(p_task, done.id);
+    return 'already_completed';
+  end if;
+  update tasks set status = 'completed', completion_kind = 'merge',
+    completion_evidence = done.pr_url, completed_at = now(), completed_by = null,
+    version = version + 1, updated_at = now() where id = p_task;
+  insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+    values (p_task, t.project_id, null, 'completed_by_merge', t.status, 'completed',
+            jsonb_build_object('source', 'github', 'taskLinkId', done.id));
+  perform add_code_ledger_links(p_task, done.id);
+  return 'completed';
+end $$;
+
+-- A board move from GitHub. update_task needs an actor and ifVersion; this needs neither,
+-- but bumps version so an open board gets the normal 409.
+create or replace function apply_github_move(p_task uuid, p_from text[], p_to text, p_link uuid)
+returns text language plpgsql set search_path = public as $$
+declare t tasks;
+begin
+  select * into t from tasks where id = p_task for update;
+  if not found or not (t.status = any(p_from)) then return 'skipped'; end if;
+  update tasks set status = p_to, version = version + 1, updated_at = now() where id = p_task;
+  insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+    values (p_task, t.project_id, null, 'status_changed', t.status, p_to,
+            jsonb_build_object('source', 'github', 'taskLinkId', p_link));
+  return 'moved';
+end $$;
+
+-- A merged revert. Reopens only when this link is the merge that completed the task.
+create or replace function apply_merge_revert(p_link uuid, p_by_pr integer)
+returns text language plpgsql set search_path = public as $$
+declare l task_links; t tasks; r record;
+begin
+  select * into l from task_links where id = p_link;
+  if not found then return 'not_found'; end if;
+  select * into t from tasks where id = l.task_id for update;
+  select * into l from task_links where id = p_link;     -- read again under the lock
+  if l.state <> 'merged' or l.reverted_at is not null then return 'skipped'; end if;
+  update task_links set reverted_at = now(), reverted_by_pr = p_by_pr where id = p_link;
+  delete from ledger_links where evidence_task_link_id = p_link and state = 'suggested';
+  for r in update ledger_links set state = 'rejected', decided_at = now()
+           where evidence_task_link_id = p_link and state = 'confirmed' returning item_id loop
+    perform ledger_recompute_item_status(r.item_id);
+  end loop;
+  if t.completion_kind is distinct from 'merge' or t.completion_evidence is distinct from l.pr_url then
+    return 'reverted';
+  end if;
+  update tasks set status = 'in_progress', completion_kind = null, completion_evidence = null,
+    completed_at = null, completed_by = null, version = version + 1, updated_at = now()
+    where id = t.id;
+  insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+    values (t.id, t.project_id, null, 'reopened_by_revert', 'completed', 'in_progress',
+            jsonb_build_object('source', 'github', 'taskLinkId', p_link));
+  return 'reopened';
+end $$;
+
+-- ===== W6. Activity =====
 create or replace view project_activity with (security_invoker = true) as
   select te.project_id, te.created_at as occurred_at, te.actor_id,
          'task.' || te.kind as kind, 'task' as subject_type, te.task_id::text as subject_id,
@@ -559,6 +647,7 @@ alter table meeting_participants enable row level security;
 alter table tasks enable row level security;
 alter table task_events enable row level security;
 alter table github_installations enable row level security;
+alter table github_installation_claims enable row level security;
 alter table github_repos enable row level security;
 alter table github_deliveries enable row level security;
 alter table task_links enable row level security;
@@ -761,7 +850,7 @@ Security, append to the "Never expose to the browser" list: `GITHUB_APP_PRIVATE_
 - `CRON_SECRET`: Vercel sends it as a Bearer token to `/api/cron/daily`.
 - `vercel.json`: one cron, `{ "path": "/api/cron/daily", "schedule": "0 3 * * *" }` (03:00 UTC is 08:00 PKT; Hobby may run it any time within that hour).
 
-Prerequisite before W5: you create the GitHub App (Metadata read, Pull requests read; events `pull_request`, `installation`, `installation_repositories`; "Request user authorization (OAuth) during installation" on, which makes GitHub skip the Setup URL; Callback URL `/api/github/callback`; Webhook URL `/api/github/webhook`).
+Prerequisite before W5: you create a dev GitHub App (Metadata read, Pull requests read; events `pull_request`, `installation`, `installation_repositories`; "Request user authorization (OAuth) during installation" on, which makes GitHub skip the Setup URL; Callback URL `http://localhost:3000/api/github/callback`; Webhook URL a free smee.io channel forwarded to `/api/github/webhook`, or a free tunnel if smee's forwarding upsets the signature check). At Deploy you create a second App with the production URLs, because an App has one webhook URL. "Redirect on update" is not needed, since the `authorizeUrl` button proves an existing installation.
 
 ### Critical test scenarios
 
@@ -779,7 +868,7 @@ Each W step is one shippable end to end slice: its migration block, its routes, 
 2. **W2, Invitations** ([0004-invitations.md](0004-invitations.md)): W2 SQL block, invite and join request routes, `/invite/[token]` page, copy link UI, optional Resend email, satisfies **AC-13** to **AC-22** (plus AC-13a and AC-21a, added at the W2 `/architect`).
 3. **W3, Project meetings and consent** ([0004-project-meetings.md](0004-project-meetings.md)): W3 SQL block, project picker on New and Schedule Meeting, members only `project` call type, consent notice before join, guest consent, offboarding removal from live calls (move route ships with W4), satisfies **AC-23** to **AC-29**, **AC-30a**, **AC-30b**.
 4. **W4, Review gate and tasks** ([0004-review-gate-tasks.md](0004-review-gate-tasks.md)): W4 SQL block, proposals from `/api/ai/process`, review route, task routes, Kanban with `@hello-pangea/dnd`, satisfies **AC-30** to **AC-42**.
-5. **W5, GitHub** ([0004-github.md](0004-github.md)): W5 SQL block plus the `ledger_links` change, App JWT and installation tokens with Node `crypto` (no Octokit), setup, account link, webhook, linking rules, revert, Sync, satisfies **AC-43** to **AC-56**.
+5. **W5, GitHub** ([0004-github.md](0004-github.md)): W5 SQL block including the `ledger_links` change, App JWT and installation tokens with Node `crypto` (no Octokit), install callback and claims, webhook, linking rules, revert, Sync, task drawer, code links on the Ledger tab, satisfies **AC-43** to **AC-56** (plus AC-43a, AC-48a to AC-48d, AC-52a, and AC-55a, added at the W5 `/architect`).
 6. **W6, Proof Chain surfaces** ([0004-proof-chain.md](0004-proof-chain.md)): `project_activity` view, Decisions and Promises tab, Outcome card, Activity tab, satisfies **AC-57** to **AC-62**.
 7. **W7, Project assistant** ([0004-project-assistant.md](0004-project-assistant.md)): `match_project_chunks`, chat and search extensions, citations, untrusted data wrapping, satisfies **AC-63** to **AC-69**.
 8. **W8, Workspace shell and notifications** ([0004-workspace-shell.md](0004-workspace-shell.md)): W8 SQL block, shell and personal views, notifications, digest cron, Ctrl K with `cmdk`, success and warning tokens, satisfies **AC-70** to **AC-79**.
@@ -809,7 +898,7 @@ Each W step is one shippable end to end slice: its migration block, its routes, 
 
 - [ ] W-pre is not done: commit the Live Ledger and Tasdeeq work, then run LL5 and the Tasdeeq live run before W1.
 - [ ] Apply the AGENTS.md API Contracts and Security lines above before W1 (your OK, or `/sync`).
-- [ ] Agent skills and MCP discovery was deferred: check for skills covering GitHub Apps and webhooks, `@hello-pangea/dnd`, and `cmdk` before W4, W5, and W8.
+- [ ] Agent skills and MCP discovery was deferred: check for skills covering `@hello-pangea/dnd` and `cmdk` before W4 and W8. Checked for W5 on 2026-11-05: no GitHub Apps skill is installed (`clerk-webhooks` covers Clerk only), and the spec uses plain `fetch` and Node `crypto`, so none is needed.
 - [x] Before W3, verify with the `stream-react` skill whether call level permissions can make the consent gate server enforced on the free tier. Settled 2026-11-03: yes, a custom `project` call type without `join-call` for `user` and `guest` (see [0004-project-meetings.md](0004-project-meetings.md)); W3 build step 1 confirms Stream accepts it on this plan.
 - [ ] Turn Clerk email verification back on at Deploy; until then the email invite binding trusts an unverified address in dev (see [0004-invitations.md](0004-invitations.md)).
 - [ ] Fix the existing AGENTS.md line `GET  /api/search`: the route in `src/app/api/search/route.ts` is `POST` with `{ query }`; W7 extends that POST.

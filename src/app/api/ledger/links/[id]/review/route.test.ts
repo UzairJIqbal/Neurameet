@@ -170,3 +170,40 @@ describe("POST /api/ledger/links/[id]/review", () => {
     expect((await call("u1", { decision: "confirm" })).status).toBe(500);
   });
 });
+
+describe("POST /api/ledger/links/[id]/review on a code link", () => {
+  beforeEach(() => {
+    for (const k of Object.keys(queues)) delete queues[k];
+    updates.length = 0;
+    mockRpc.mockReset();
+  });
+
+  const codeLink = (revertedAt: string | null) => {
+    owned();
+    queues.ledger_links[0].data = {
+      id: LINK_ID,
+      item_id: ITEM_ID,
+      evidence_task_link_id: "tl1",
+    };
+    queues.task_links = [{ data: { reverted_at: revertedAt }, error: null }];
+    mockRpc.mockResolvedValue({ data: "open", error: null });
+  };
+
+  it.each(["confirm", "reset"])("refuses %s once the PR was reverted", async (decision) => {
+    codeLink("2026-11-05T10:00:00Z");
+    const res = await call("u1", { decision });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("This PR was reverted");
+    expect(updates).toEqual([]);
+  });
+
+  it("still lets you reject a reverted PR", async () => {
+    codeLink("2026-11-05T10:00:00Z");
+    expect((await call("u1", { decision: "reject" })).status).toBe(200);
+  });
+
+  it("confirms a PR that was not reverted", async () => {
+    codeLink(null);
+    expect((await call("u1", { decision: "confirm" })).status).toBe(200);
+  });
+});

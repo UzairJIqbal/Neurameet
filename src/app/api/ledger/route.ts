@@ -44,15 +44,25 @@ interface LiveMarkRow {
 interface LedgerLinkRow {
   id: string;
   item_id: string;
-  evidence_meeting_id: string;
+  evidence_kind: LedgerLink["evidenceKind"];
+  evidence_meeting_id: string | null;
+  evidence_task_link_id: string | null;
   relation: LedgerLink["relation"];
   quote: string;
   speaker: string | null;
-  line_number: number;
+  line_number: number | null;
   confidence: number;
   state: LedgerLink["state"];
   decided_at: string | null;
   created_at: string;
+}
+
+interface TaskLinkRow {
+  id: string;
+  repo_full_name: string;
+  pr_number: number;
+  pr_url: string;
+  reverted_at: string | null;
 }
 
 interface SourceMeetingRow {
@@ -64,7 +74,7 @@ interface SourceMeetingRow {
 const ITEM_COLUMNS =
   "id, meeting_id, action_item_id, kind, statement, quote, quote_language, speaker, assignee, due_date, line_number, status, created_at, source, agreed_count, total_count";
 const LINK_COLUMNS =
-  "id, item_id, evidence_meeting_id, relation, quote, speaker, line_number, confidence, state, decided_at, created_at";
+  "id, item_id, evidence_kind, evidence_meeting_id, evidence_task_link_id, relation, quote, speaker, line_number, confidence, state, decided_at, created_at";
 
 function isIsoDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -100,6 +110,7 @@ function toLink(row: LedgerLinkRow): LedgerLink {
   return {
     id: row.id,
     itemId: row.item_id,
+    evidenceKind: row.evidence_kind,
     evidenceMeetingId: row.evidence_meeting_id,
     relation: row.relation,
     quote: row.quote,
@@ -110,6 +121,47 @@ function toLink(row: LedgerLinkRow): LedgerLink {
     decidedAt: row.decided_at,
     createdAt: row.created_at,
   };
+}
+
+// Code links read their PR in one batch. A Viewer's copy has no PR title, repo
+// name, or link, and the task_links query is never run for them (AC-55).
+async function toOutgoingLinks(
+  supabase: ReturnType<typeof supabaseServer>,
+  rows: LedgerLinkRow[],
+  isViewer: boolean,
+): Promise<LedgerLink[]> {
+  const links = rows.map(toLink);
+  const taskLinkIds = rows
+    .map((r) => r.evidence_task_link_id)
+    .filter((id): id is string => !!id);
+  if (taskLinkIds.length === 0) return links;
+  if (isViewer) {
+    return links.map((link) =>
+      link.evidenceKind === "code" ? { ...link, quote: "" } : link,
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("task_links")
+    .select("id, repo_full_name, pr_number, pr_url, reverted_at")
+    .in("id", taskLinkIds);
+  if (error) throw error;
+  const prs = new Map(
+    ((data ?? []) as TaskLinkRow[]).map((row) => [row.id, row]),
+  );
+  return links.map((link, index) => {
+    const pr = prs.get(rows[index].evidence_task_link_id ?? "");
+    if (!pr) return link;
+    return {
+      ...link,
+      pr: {
+        repoFullName: pr.repo_full_name,
+        prNumber: pr.pr_number,
+        prUrl: pr.pr_url,
+        reverted: pr.reverted_at !== null,
+      },
+    };
+  });
 }
 
 export async function GET(request: Request) {
@@ -141,7 +193,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
     // Personal meeting: the creator only. Project meeting: any member.
-    const { projectId } = await checkMeetingAccess(
+    const { projectId, role } = await checkMeetingAccess(
       supabase,
       userId,
       meeting,
@@ -168,7 +220,11 @@ export async function GET(request: Request) {
           items.map((i) => i.id),
         );
       if (outErr) throw outErr;
-      outgoing = ((outRows ?? []) as LedgerLinkRow[]).map(toLink);
+      outgoing = await toOutgoingLinks(
+        supabase,
+        (outRows ?? []) as LedgerLinkRow[],
+        role === "viewer",
+      );
 
       // Live marks later calls made on these items (spec 0002 AC-15).
       const { data: markRows, error: markErr } = await supabase

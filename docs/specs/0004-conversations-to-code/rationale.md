@@ -65,6 +65,20 @@ Added 2026-11-03, when W3 settled the two Stream checks the umbrella left owed. 
 
 Option 1 won because the consent notice is the one thing in W3 that protects other people's personal data, and Stream enforcing it is the only version that is true when someone bypasses our UI.
 
+## W5 GitHub
+
+Added 2026-11-05, when `/architect` compared the W5 spec with the W4 code and GitHub's App documentation. W0's choices stay: a GitHub App with no Octokit, one repo to one project, a qualifying merge completes the task, the promise only gets a suggestion. The comparison found gaps in how those rules behave when events repeat, arrive out of order, or are undone, and these choices close them.
+
+- **Proving an installation: a claims table (chosen).** With "Request user authorization during installation" on, GitHub skips the Setup URL (basis: GitHub App installation flow and Setup URL docs). The callback checks the installation id against the user's own installations with their token, then discards the token. `installed_by` alone locked out a second Owner on the same installation, so `github_installation_claims` records each person who proved access, and an `authorizeUrl` button lets them prove an existing one. Runner up: store a GitHub account mapping. W0 ruled that out, and a claim stores no GitHub identity.
+- **Status moves: SQL functions (chosen).** `update_task` needs an actor and `ifVersion`, and a webhook has neither (basis: W4 `update_task`). `apply_github_move` and `apply_merge_revert` lock the row and bump `version`, so an open board gets the normal 409. Runner up: relax `update_task` to accept a system caller, which weakens the rule every person's move relies on.
+- **Reopen and revert: read the event history (chosen).** A merge older than the latest reopen is spent, so a person's reopen sticks and a redelivered event cannot complete the task again. A revert reopens only when that link is the merge that completed the task. Runner up: a `completion_locked` flag, which is one more piece of state that can drift from the events.
+- **Blocking links: only live repos and non forks (chosen).** A link in an unlinked repo or under a removed installation can never change, so it would block completion forever. Anyone can open a fork PR naming a key, so a fork PR moves nothing and blocks nothing, and completes only after a maintainer merges it. Runner up: ignore forks entirely, which would miss real contributions.
+- **Sync: read recent PRs too (chosen).** Refreshing only known links misses a PR opened while webhooks were down, so Sync also reads the 30 most recent PRs per repo, capped at 100 reads and 45 seconds, and reports `partial` when cut short (basis: GitHub List pull requests docs). Runner up: page through every PR, which risks the Vercel time limit.
+- **One App per environment (chosen).** An App has one webhook URL, so development and production each get their own (basis: GitHub callback URL and webhook docs). Runner up: repoint one App at each deploy, which breaks whichever side is not pointed at.
+- **Task drawer and Ledger display inside W5 (chosen).** The first code link has no `meeting` or `line_number`, and the current Ledger tab assumes both. Merged PRs also need somewhere to appear. Shipping both here keeps W5 testable by hand. Runner up: wait for W6, which would leave broken rows on the Ledger tab in between.
+
+The cost is more SQL and a second App at Deploy. In exchange every event, redelivery, and Sync runs through one rule path, and each change happens under a row lock.
+
 ## References
 
 ### Project sources

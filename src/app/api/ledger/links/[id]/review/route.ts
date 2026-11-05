@@ -65,7 +65,7 @@ export async function POST(
 
     const { data: link, error: linkErr } = await supabase
       .from("ledger_links")
-      .select("id, item_id")
+      .select("id, item_id, evidence_task_link_id")
       .eq("id", id)
       .maybeSingle();
     if (linkErr) throw linkErr;
@@ -92,6 +92,24 @@ export async function POST(
     await checkMeetingAccess(supabase, userId, meeting, "manage", {
       notFoundMessage: NOT_FOUND.error,
     });
+
+    // A reverted PR proves nothing, so its code link can only be rejected (AC-52a).
+    const taskLinkId = (link as { evidence_task_link_id?: string | null })
+      .evidence_task_link_id;
+    if (taskLinkId && decision !== "reject") {
+      const { data: taskLink, error: taskLinkErr } = await supabase
+        .from("task_links")
+        .select("reverted_at")
+        .eq("id", taskLinkId)
+        .maybeSingle();
+      if (taskLinkErr) throw taskLinkErr;
+      if ((taskLink as { reverted_at: string | null } | null)?.reverted_at) {
+        return NextResponse.json(
+          { error: "This PR was reverted" },
+          { status: 409 },
+        );
+      }
+    }
 
     const update = nextState(decision);
     const { error: updateErr } = await supabase

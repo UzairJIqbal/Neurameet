@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProjectRole } from "@/lib/project-types";
 import type { Task, TaskEvent, TaskEventKind } from "@/lib/task-types";
+import type { PrState, TaskPrLink } from "@/lib/github-types";
 import { isTaskStatus, taskKey } from "@/lib/tasks";
 import { lookupProfiles } from "@/lib/projects";
 
@@ -110,6 +111,42 @@ export function toTaskEvent(
     createdAt: row.created_at,
   };
   return role === "viewer" ? redactEventForViewer(event) : event;
+}
+
+// A Viewer gets a PR's state only: no repo name, title, or link (AC-55).
+const TASK_LINK_SELECT_VIEWER = "id, state, merged_at, reverted_at";
+const TASK_LINK_SELECT_FULL = `${TASK_LINK_SELECT_VIEWER}, repo_full_name, pr_number, pr_title, pr_url`;
+
+export function taskLinkSelectFor(role: ProjectRole): string {
+  return role === "viewer" ? TASK_LINK_SELECT_VIEWER : TASK_LINK_SELECT_FULL;
+}
+
+export type TaskLinkRow = {
+  id: string;
+  state: PrState;
+  merged_at: string | null;
+  reverted_at: string | null;
+  repo_full_name?: string;
+  pr_number?: number;
+  pr_title?: string;
+  pr_url?: string;
+};
+
+export function toTaskPrLink(row: TaskLinkRow, role: ProjectRole): TaskPrLink {
+  const link: TaskPrLink = {
+    id: row.id,
+    state: row.state,
+    merged: row.merged_at !== null,
+    reverted: row.reverted_at !== null,
+  };
+  // Even if a wider select slipped through, a Viewer never gets these fields.
+  if (role !== "viewer") {
+    link.repoFullName = row.repo_full_name;
+    link.prNumber = row.pr_number;
+    link.prTitle = row.pr_title;
+    link.prUrl = row.pr_url;
+  }
+  return link;
 }
 
 export async function getTaskPrefix(

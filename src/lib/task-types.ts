@@ -1,6 +1,7 @@
 // Task and proposal shapes for the routes and the UI (no server-only imports).
 
 import type { TaskStatus } from "@/lib/tasks";
+import type { TaskPrLink } from "@/lib/github-types";
 
 export interface Task {
   id: string;
@@ -61,7 +62,7 @@ export interface TaskProofChain {
 export interface TaskDetailResponse {
   task: Task;
   events: TaskEvent[];
-  prLinks: never[];
+  prLinks: TaskPrLink[];
   proofChain: TaskProofChain;
 }
 

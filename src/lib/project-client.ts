@@ -25,6 +25,7 @@ import type {
   TaskResponse,
   TasksResponse,
 } from "@/lib/task-types";
+import type { GitHubReposResponse, GitHubSyncResult } from "@/lib/github-types";
 
 export class ProjectClientError extends Error {
   constructor(
@@ -232,4 +233,29 @@ export function moveMeetingToProject(meetingId: string, projectId: string) {
     `/api/meetings/${encodeURIComponent(meetingId)}/project`,
     { method: "POST", body: JSON.stringify({ projectId }) },
   );
+}
+
+// ---- W5: GitHub ----
+
+export function listGitHubRepos(id: string, signal?: AbortSignal) {
+  return request<GitHubReposResponse>(`${base(id)}/github/repos`, { signal });
+}
+
+export function linkGitHubRepo(id: string, repoId: number) {
+  return request<{ ok: true; repoId: number }>(`${base(id)}/github/repos`, {
+    method: "POST",
+    body: JSON.stringify({ repoId }),
+  });
+}
+
+export function unlinkGitHubRepo(id: string, repoId: number) {
+  return request<{ ok: true }>(`${base(id)}/github/repos/${repoId}`, {
+    method: "DELETE",
+  });
+}
+
+export function syncGitHub(id: string) {
+  return request<GitHubSyncResult>(`${base(id)}/github/sync`, {
+    method: "POST",
+  });
 }

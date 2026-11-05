@@ -243,3 +243,73 @@ describe("GET /api/ledger", () => {
     expect(res.status).toBe(500);
   });
 });
+
+describe("GET /api/ledger code links", () => {
+  beforeEach(() => {
+    for (const k of Object.keys(queues)) delete queues[k];
+  });
+
+  const codeLink = linkRow({
+    item_id: "i1",
+    evidence_kind: "code",
+    evidence_meeting_id: null,
+    evidence_task_link_id: "tl1",
+    line_number: null,
+  });
+
+  const queued = (meeting: Record<string, unknown>) => {
+    queues.meetings = [{ data: meeting, error: null }];
+    queues.ledger_items = [{ data: [itemRow()], error: null }];
+    queues.ledger_links = [
+      { data: [codeLink], error: null },
+      { data: [], error: null },
+    ];
+    queues.ledger_live_marks = [
+      { data: [], error: null },
+      { data: [], error: null },
+    ];
+  };
+
+  it("adds the PR for an owner, with no meeting or line", async () => {
+    queued({ id: "m1", user_id: "u1", project_id: null });
+    queues.task_links = [
+      {
+        data: [
+          {
+            id: "tl1",
+            repo_full_name: "acme/app",
+            pr_number: 7,
+            pr_url: "https://github.com/acme/app/pull/7",
+            reverted_at: null,
+          },
+        ],
+        error: null,
+      },
+    ];
+    const res = await call("u1", "meetingId=m1&today=2026-10-30");
+    const link = (await res.json()).items[0].links[0];
+    expect(link).toMatchObject({
+      evidenceKind: "code",
+      evidenceMeetingId: null,
+      lineNumber: null,
+      pr: {
+        repoFullName: "acme/app",
+        prNumber: 7,
+        prUrl: "https://github.com/acme/app/pull/7",
+        reverted: false,
+      },
+    });
+  });
+
+  it("gives a Viewer no PR, a blank quote, and never reads the links", async () => {
+    queued({ id: "m1", user_id: "u0", project_id: "p1" });
+    queues.project_members = [{ data: { role: "viewer" }, error: null }];
+    queues.task_links = [{ data: null, error: { message: "must not be read" } }];
+    const res = await call("u1", "meetingId=m1&today=2026-10-30");
+    expect(res.status).toBe(200);
+    const link = (await res.json()).items[0].links[0];
+    expect(link.pr).toBeUndefined();
+    expect(link.quote).toBe("");
+    expect(queues.task_links).toHaveLength(1);
+  });
+});

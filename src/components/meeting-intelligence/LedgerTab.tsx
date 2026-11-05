@@ -11,6 +11,7 @@ import {
   LedgerDerivedStatus,
   LedgerIncomingLink,
   LedgerItemView,
+  LedgerLink,
   LedgerLinkState,
   LedgerLiveOnlyMark,
   LedgerResponse,
@@ -45,6 +46,32 @@ const itemMeta = (item: LedgerItemView): string =>
   item.source === "live_agreement"
     ? `Agreed live by ${item.agreedCount ?? 0} of ${item.totalCount ?? 0}`
     : `${item.speaker ? `${item.speaker} · ` : ""}line ${item.lineNumber}`;
+
+const quoteMeta = (speaker: string | null, lineNumber: number | null): string =>
+  [speaker, lineNumber === null ? null : `line ${lineNumber}`].filter(Boolean).join(" · ");
+
+// A merged PR as evidence (AC-55a). A Viewer's copy has no `pr` and no title.
+const CodeLinkRow = ({ link }: { link: LedgerLink }) => (
+  <li className="flex flex-col gap-1 text-body-md text-on-surface-variant">
+    <span className="text-label-caps font-medium uppercase tracking-wider">
+      Merged PR{link.pr ? ` · ${link.pr.repoFullName} #${link.pr.prNumber}` : ""} · {link.relation} · {link.state}
+      {link.pr?.reverted ? " · reverted" : ""}
+    </span>
+    {link.pr ? (
+      <a
+        href={link.pr.prUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        dir="auto"
+        className="w-fit break-words text-primary underline"
+      >
+        {link.quote}
+      </a>
+    ) : (
+      link.quote && <span dir="auto">{link.quote}</span>
+    )}
+  </li>
+);
 
 const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
   const status = STATUS_BADGE[item.derivedStatus];
@@ -95,19 +122,21 @@ const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
 
       {item.links.length > 0 && (
         <ul className="flex flex-col gap-2 border-l-2 border-surface-variant pl-4">
-          {item.links.map((link) => (
-            <li key={link.id} className="flex flex-col gap-1 text-body-md text-on-surface-variant">
-              <span className="text-label-caps font-medium uppercase tracking-wider">
-                Later meeting · {link.relation} · {link.state}
-              </span>
-              <span dir="auto" className="italic text-on-surface">
-                {link.quote}
-              </span>
-              <span>
-                {link.speaker ? `${link.speaker} · ` : ""}line {link.lineNumber}
-              </span>
-            </li>
-          ))}
+          {item.links.map((link) =>
+            link.evidenceKind === "code" ? (
+              <CodeLinkRow key={link.id} link={link} />
+            ) : (
+              <li key={link.id} className="flex flex-col gap-1 text-body-md text-on-surface-variant">
+                <span className="text-label-caps font-medium uppercase tracking-wider">
+                  Later meeting · {link.relation} · {link.state}
+                </span>
+                <span dir="auto" className="italic text-on-surface">
+                  {link.quote}
+                </span>
+                <span>{quoteMeta(link.speaker, link.lineNumber)}</span>
+              </li>
+            ),
+          )}
         </ul>
       )}
     </div>
@@ -140,9 +169,6 @@ const QuoteBlock = ({
 
 const earlierLabel = (link: LedgerIncomingLink): string =>
   `Earlier · ${link.sourceMeeting.title} · ${new Date(link.sourceMeeting.startedAt).toLocaleDateString()}`;
-
-const quoteMeta = (speaker: string | null, lineNumber: number): string =>
-  `${speaker ? `${speaker} · ` : ""}line ${lineNumber}`;
 
 const LinkQuotes = ({ link }: { link: LedgerIncomingLink }) => (
   <div className="grid gap-3 md:grid-cols-2">

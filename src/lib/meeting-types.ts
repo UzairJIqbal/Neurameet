@@ -163,18 +163,30 @@ export interface LedgerItem {
   totalCount: number | null;
 }
 
+/** A merged PR behind a code link. Viewers never get it. */
+export interface LedgerLinkPr {
+  repoFullName: string;
+  prNumber: number;
+  prUrl: string;
+  reverted: boolean;
+}
+
 export interface LedgerLink {
   id: string;
   itemId: string;
-  evidenceMeetingId: string;
+  evidenceKind: "meeting" | "code";
+  /** Null on a code link, which has no meeting and no transcript line. */
+  evidenceMeetingId: string | null;
   relation: LedgerRelation;
+  /** On a code link this is the PR title, blank for Viewers. */
   quote: string;
   speaker: string | null;
-  lineNumber: number;
+  lineNumber: number | null;
   confidence: number;
   state: LedgerLinkState;
   decidedAt: string | null;
   createdAt: string;
+  pr?: LedgerLinkPr;
 }
 
 export interface LedgerItemView extends LedgerItem {

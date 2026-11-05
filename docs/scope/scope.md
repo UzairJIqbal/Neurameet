@@ -78,7 +78,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 20 | Project workspaces, members, roles, and invitations (W1, W2) | Project Workspace | in-progress |
 | 21 | Project meetings with a consent notice (W3) | Project Workspace | in-progress |
 | 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | in-progress |
-| 23 | GitHub App integration with strict linking rules (W5) | Project Workspace | planned |
+| 23 | GitHub App integration with strict linking rules (W5) | Project Workspace | in-progress |
 | 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | planned |
 | 25 | Project AI assistant with code built citations (W7) | Project Workspace | planned |
 | 26 | Workspace shell, personal views, notifications, Ctrl K (W8) | Project Workspace | planned |
@@ -622,12 +622,21 @@ Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md
 - [ ] Review it (fresh model): `/check review review gate and tasks`
 - [ ] Document it: `/document review gate and tasks`
 
-### 23. GitHub App integration with strict linking rules · planned · GA
-A free GitHub App (not an OAuth App or token) installed per project repo. Webhooks verify the `X-Hub-Signature-256` HMAC over the raw body, dedupe on `X-GitHub-Delivery`, reply fast and process in `after()`. A task completes only on a closing reference plus `merged == true` plus a merge into the default branch plus all linked PRs done; drafts stay In Progress, closed unmerged PRs do nothing, a revert reopens. A Sync GitHub action reconciles missed deliveries. Optional "also create GitHub issue" on confirm. GitHub never assigns tasks, so no GitHub account mapping is stored (decided in the W0 spec).
+### 23. GitHub App integration with strict linking rules · in-progress · GA
+A free GitHub App (not an OAuth App or token) installed per project repo. Webhooks verify the `X-Hub-Signature-256` HMAC over the raw body, dedupe on `X-GitHub-Delivery`, reply fast and process in `after()`. A task completes only on a closing reference plus `merged == true` plus a merge into the default branch plus all linked PRs done; drafts stay In Progress, closed unmerged PRs do nothing, a revert reopens. A Sync GitHub action reconciles missed deliveries. GitHub never assigns tasks, so no GitHub account mapping is stored (decided in the W0 spec).
 **Done when:** a forged webhook is rejected, and partial, draft, unmerged, non default branch, and revert PRs each behave correctly.
 Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [x] Design it (spec): `/architect Step W5` (2026-11-05, [W5 child spec](../specs/0004-conversations-to-code/0004-github.md))
 - [ ] Build it: `/develop github integration`
-  - [ ] W5 App install callback, webhook, linking, merge completion, revert, Sync (AC-43 to AC-56)
+  - [ ] W5a SQL block with the `ledger_links` change, GitHub client and key parsing (AC-45, AC-48b, AC-50, AC-51) (code done, SQL in `supabase/schema.sql`, applied live 2026-11-05 except `apply_merge_revert`, which goes through the SQL editor)
+  - [x] W5b Install callback, claims, repo linking, GitHub tab (AC-43, AC-43a, AC-46, AC-47)
+  - [x] W5c Webhook and shared rules: linking, moves, merge completion, revert, installation events (AC-44, AC-45, AC-48 to AC-53)
+  - [x] W5d Sync, task drawer, viewer safe PR data (AC-54, AC-55, AC-56)
+  - [x] W5e Code links on the Ledger tab and the reverted PR guard (AC-52a, AC-55a)
+- [ ] Verify it: `/check verify github integration`
+- [ ] Test it: `/test github integration`
+- [ ] Review it (fresh model): `/check review github integration`
+- [ ] Document it: `/document github integration`
 
 ### 24. Proof Chain: a promise traced from meeting quote to merged PR · planned · GA
 The project Decisions and Promises tab built on `ledger_items`; a qualifying merge adds code evidence to the linked promise (owner confirms, same flow as ledger links); the meeting gets an Outcome card showing the chain; an Activity timeline joins meetings, decisions, tasks, and PRs; Live Ledger check in is scoped to the project.

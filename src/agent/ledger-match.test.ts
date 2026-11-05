@@ -44,6 +44,7 @@ const makeSupabase = (state: {
     embeddedIds: [] as string[],
     recomputed: [] as string[],
     meetingFilters: [] as Array<[string, unknown]>,
+    linkFilters: [] as Array<{ op: string; col: string; val: unknown }>,
   };
   const from = (table: string) => {
     const builder: Record<string, unknown> = {};
@@ -76,6 +77,7 @@ const makeSupabase = (state: {
     };
     builder.eq = (col: string, val: string) => {
       if (table === "meetings") writes.meetingFilters.push([col, val]);
+      if (table === "ledger_links") writes.linkFilters.push({ op, col, val });
       if (col === "id") updateId = val;
       return builder;
     };
@@ -177,6 +179,21 @@ describe("runLedgerMatch", () => {
     await runLedgerMatch(client, args);
     expect(writes.deletedItemIds).toEqual(["c2"]);
     expect(writes.upserted.map((r) => r.item_id)).toEqual(["c1"]);
+  });
+
+  it("reads and deletes only this meeting's links, so code links stay", async () => {
+    mockJudge.mockResolvedValue([verdict("c1", "we moved to AWS")]);
+    const { client, writes } = makeSupabase({
+      candidates: [candidate("c1"), candidate("c2")],
+      existingLinks: [{ item_id: "c2", state: "suggested" }],
+    });
+    await runLedgerMatch(client, args);
+    const scoped = (op: string) =>
+      writes.linkFilters.filter(
+        (f) => f.op === op && f.col === "evidence_meeting_id" && f.val === "m1",
+      );
+    expect(scoped("select")).toHaveLength(1);
+    expect(scoped("delete")).toHaveLength(1);
   });
 
   it("writes nothing when the judge fails", async () => {
