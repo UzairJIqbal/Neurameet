@@ -725,7 +725,7 @@ begin
     values (p_project, p_from, 'project.ownership_transferred', 'member', p_to);
 end $$;
 
--- W1 body: tasks do not exist yet. W4 replaces this with the full body that also
+-- W1 body: tasks do not exist yet. The W4 block below replaces this with the full body that also
 -- unassigns the member's unfinished tasks (see the umbrella spec).
 create or replace function remove_project_member(p_project uuid, p_user text, p_actor text,
   p_actor_role text)
@@ -1003,3 +1003,352 @@ alter table meetings add column if not exists stream_call_type text not null def
 alter table meeting_participants enable row level security;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON meeting_participants TO service_role;
+
+-- ===== W4. Proposals, tasks, board (spec 0004, child 0004-review-gate-tasks) =====
+alter table action_items
+  add column if not exists review_state text not null default 'auto'
+    check (review_state in ('auto', 'proposed', 'confirmed', 'rejected')),
+  add column if not exists quote text,
+  add column if not exists quote_speaker text,
+  add column if not exists quote_line integer,
+  add column if not exists quote_verified boolean not null default false,
+  add column if not exists proposed_assignee_id text,   -- set only by the own track rule
+  add column if not exists duplicate_of_task_id uuid,   -- FK added after tasks exists
+  add column if not exists duplicate_score real,
+  add column if not exists embedding vector(768),        -- title, copied to the task on confirm
+  add column if not exists merged_into_task_id uuid,     -- set by a merge decision; FK below
+  add column if not exists reviewed_by text,
+  add column if not exists reviewed_at timestamptz;
+
+create table if not exists tasks (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references projects(id) on delete cascade not null,
+  number integer not null,                               -- key = projects.task_prefix || '-' || number
+  title text not null check (char_length(title) between 1 and 200),
+  description text,
+  status text not null default 'todo'
+    check (status in ('todo', 'in_progress', 'in_review', 'completed', 'blocked')),
+  position double precision not null default 0,          -- order inside a column
+  assignee_id text,                                      -- null = Unassigned
+  due_date date,
+  source_action_item_id uuid unique references action_items(id) on delete set null,
+  source_meeting_id uuid references meetings(id) on delete set null,
+  quote text,                                            -- snapshot, survives meeting delete
+  quote_speaker text,
+  quote_line integer,
+  completion_kind text check (completion_kind in ('manual', 'merge')),
+  completion_evidence text,                              -- required note for manual
+  completed_at timestamptz,
+  completed_by text,                                     -- null when completed by merge
+  embedding vector(768),                                 -- title, for the duplicate check
+  version integer not null default 1,                    -- optimistic concurrency (ifVersion)
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_id, number),
+  check ((status = 'completed') = (completion_kind is not null)),
+  check (completion_kind is distinct from 'manual' or completion_evidence is not null)
+);
+create index if not exists tasks_board on tasks (project_id, status, position);
+create index if not exists tasks_assignee on tasks (assignee_id) where assignee_id is not null;
+create index if not exists action_items_review on action_items (meeting_id, review_state);
+alter table action_items drop constraint if exists action_items_duplicate_of_task_fk;
+alter table action_items add constraint action_items_duplicate_of_task_fk
+  foreign key (duplicate_of_task_id) references tasks(id) on delete set null;
+alter table action_items drop constraint if exists action_items_merged_into_task_fk;
+alter table action_items add constraint action_items_merged_into_task_fk
+  foreign key (merged_into_task_id) references tasks(id) on delete set null;
+
+create table if not exists task_events (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid references tasks(id) on delete cascade not null,
+  project_id uuid references projects(id) on delete cascade not null,
+  actor_id text,                                          -- null = GitHub or system
+  kind text not null check (kind in ('created', 'edited', 'status_changed', 'assigned',
+    'unassigned', 'completed_manual', 'completed_by_merge', 'reopened_by_revert',
+    'pr_linked', 'pr_state_changed', 'proposal_merged')),
+  from_value text,
+  to_value text,
+  detail jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists task_events_task on task_events (task_id, created_at);
+
+-- Key counter with a row lock, so two creators never get the same number.
+create or replace function create_project_task(
+  p_project uuid, p_title text, p_description text, p_assignee text, p_due date,
+  p_source_action_item uuid, p_source_meeting uuid, p_quote text, p_quote_speaker text,
+  p_quote_line integer, p_embedding vector(768), p_actor text
+) returns tasks language plpgsql set search_path = public as $$
+declare n integer; t tasks;
+begin
+  update projects set next_task_number = next_task_number + 1, updated_at = now()
+    where id = p_project returning next_task_number - 1 into n;
+  if n is null then raise exception 'project_not_found'; end if;
+  insert into tasks (project_id, number, title, description, assignee_id, due_date,
+    source_action_item_id, source_meeting_id, quote, quote_speaker, quote_line, embedding, created_by,
+    position)
+  values (p_project, n, p_title, p_description, p_assignee, p_due, p_source_action_item,
+    p_source_meeting, p_quote, p_quote_speaker, p_quote_line, p_embedding, p_actor,
+    coalesce((select max(position) from tasks where project_id = p_project and status = 'todo'), 0) + 1)
+  returning * into t;
+  insert into task_events (task_id, project_id, actor_id, kind, to_value)
+    values (t.id, p_project, p_actor, 'created', t.status);
+  return t;
+end $$;
+
+create or replace function match_project_tasks(p_project uuid, p_embedding vector(768), p_threshold real)
+returns table (id uuid, number integer, title text, similarity real)
+language sql stable set search_path = public as $$
+  select t.id, t.number, t.title, (1 - (t.embedding <=> p_embedding))::real
+  from tasks t
+  where t.project_id = p_project and t.status <> 'completed' and t.embedding is not null
+    and 1 - (t.embedding <=> p_embedding) >= p_threshold
+  order by t.embedding <=> p_embedding limit 3;
+$$;
+
+-- Offboarding: removal and unassignment in one step (replaces the W1 body).
+create or replace function remove_project_member(p_project uuid, p_user text, p_actor text,
+  p_actor_role text)
+returns void language plpgsql set search_path = public as $$
+begin
+  -- An Admin removes only Developers and Viewers (or leaves); the role is checked here,
+  -- in the same statement, so a role change cannot race the removal.
+  update project_members set removed_at = now(), removed_by = p_actor
+    where project_id = p_project and user_id = p_user and removed_at is null and role <> 'owner'
+      and (p_actor = p_user or p_actor_role = 'owner' or role in ('developer', 'viewer'));
+  if not found then raise exception 'not_removable'; end if;
+  insert into task_events (task_id, project_id, actor_id, kind, from_value)
+    select id, project_id, p_actor, 'unassigned', p_user from tasks
+    where project_id = p_project and assignee_id = p_user and status <> 'completed';
+  update tasks set assignee_id = null, updated_at = now()
+    where project_id = p_project and assignee_id = p_user and status <> 'completed';
+  insert into audit_log (project_id, actor_id, action, target_type, target_id)
+    values (p_project, p_actor, case when p_actor = p_user then 'member.left' else 'member.removed' end, 'member', p_user);
+end $$;
+
+-- Reprocess a project meeting: refuse once anything was reviewed, otherwise swap
+-- the unreviewed rows for the new proposals. The meeting row lock makes a confirm
+-- that lands during the AI call win (AC-34). 'auto' rows on a project meeting are
+-- from before W4 and go too, with their follow ups.
+create or replace function replace_meeting_proposals(p_meeting uuid, p_items jsonb, p_actor text)
+returns setof uuid language plpgsql set search_path = public as $$
+begin
+  perform 1 from meetings where id = p_meeting for update;
+  if not found then raise exception 'meeting_not_found'; end if;
+  if exists (
+    select 1 from action_items ai
+    where ai.meeting_id = p_meeting
+      and (ai.review_state in ('confirmed', 'rejected')
+           or exists (select 1 from tasks t where t.source_action_item_id = ai.id))
+  ) then
+    raise exception 'proposals_reviewed';
+  end if;
+  delete from action_items where meeting_id = p_meeting and review_state in ('proposed', 'auto');
+  insert into action_items (id, meeting_id, title, assignee, due_date, review_state, quote,
+    quote_speaker, quote_line, quote_verified, proposed_assignee_id, duplicate_of_task_id,
+    duplicate_score, embedding)
+  select x.id, p_meeting, x.title, x.assignee, x.due_date, 'proposed', x.quote,
+    x.quote_speaker, x.quote_line, coalesce(x.quote_verified, false), x.proposed_assignee_id,
+    x.duplicate_of_task_id, x.duplicate_score, x.embedding::vector(768)
+  from jsonb_to_recordset(p_items) as x(id uuid, title text, assignee text, due_date date,
+    quote text, quote_speaker text, quote_line integer, quote_verified boolean,
+    proposed_assignee_id text, duplicate_of_task_id uuid, duplicate_score real, embedding text);
+  return query
+    select (e.value->>'id')::uuid from jsonb_array_elements(p_items) with ordinality as e(value, n)
+    order by e.n;
+end $$;
+
+-- Every proposal decision. The meeting lock plus the review_state guard mean a
+-- double click or two reviewers never make two tasks (AC-35, AC-36).
+create or replace function review_proposal(p_item uuid, p_decision text, p_title text,
+  p_assignee text, p_assignee_given boolean, p_due date, p_merge_task uuid,
+  p_embedding vector(768), p_actor text, p_confirm_without_quote boolean)
+returns jsonb language plpgsql set search_path = public as $$
+declare ai action_items; v_meeting uuid; v_project uuid; v_assignee text; v_title text;
+  t tasks; target tasks;
+begin
+  select meeting_id into v_meeting from action_items where id = p_item;
+  if v_meeting is null then raise exception 'not_found'; end if;
+  select project_id into v_project from meetings where id = v_meeting for update;
+  if v_project is null then raise exception 'not_found'; end if;
+  select * into ai from action_items where id = p_item;
+  if ai.review_state <> 'proposed' then raise exception 'already_decided'; end if;
+
+  if p_decision = 'confirm' then
+    if not ai.quote_verified and not coalesce(p_confirm_without_quote, false) then
+      raise exception 'quote_unverified';
+    end if;
+    v_assignee := case when p_assignee_given then p_assignee else ai.proposed_assignee_id end;
+    if v_assignee is not null and not exists (
+      select 1 from project_members
+      where project_id = v_project and user_id = v_assignee and removed_at is null
+    ) then
+      raise exception 'assignee_not_member';
+    end if;
+    v_title := coalesce(p_title, ai.title);
+    update action_items set review_state = 'confirmed', reviewed_by = p_actor, reviewed_at = now()
+      where id = p_item and review_state = 'proposed';
+    if not found then raise exception 'already_decided'; end if;
+    t := create_project_task(v_project, v_title, null, v_assignee, p_due, ai.id, ai.meeting_id,
+      case when ai.quote_verified then ai.quote end,
+      case when ai.quote_verified then ai.quote_speaker end,
+      case when ai.quote_verified then ai.quote_line end,
+      coalesce(p_embedding, case when v_title = ai.title then ai.embedding end), p_actor);
+    return jsonb_build_object('taskId', t.id);
+  elsif p_decision = 'merge' then
+    select * into target from tasks where id = p_merge_task for update;
+    if not found or target.project_id <> v_project or target.status = 'completed' then
+      raise exception 'task_closed';
+    end if;
+    update action_items set review_state = 'rejected', merged_into_task_id = target.id,
+      reviewed_by = p_actor, reviewed_at = now()
+      where id = p_item and review_state = 'proposed';
+    if not found then raise exception 'already_decided'; end if;
+    insert into task_events (task_id, project_id, actor_id, kind, detail)
+      values (target.id, v_project, p_actor, 'proposal_merged',
+        jsonb_build_object('quote', case when ai.quote_verified then ai.quote end,
+          'actionItemId', ai.id, 'title', ai.title, 'meetingId', ai.meeting_id));
+    return jsonb_build_object('taskId', target.id);
+  elsif p_decision = 'reject' then
+    update action_items set review_state = 'rejected', reviewed_by = p_actor, reviewed_at = now()
+      where id = p_item and review_state = 'proposed';
+    if not found then raise exception 'already_decided'; end if;
+    return jsonb_build_object('itemId', ai.id);
+  end if;
+  raise exception 'bad_decision';
+end $$;
+
+-- Board edits. The row lock plus the version check give ifVersion semantics;
+-- the route checks the role matrix against the same version first (AC-39, AC-40).
+create or replace function update_task(p_task uuid, p_actor text, p_patch jsonb,
+  p_if_version integer)
+returns jsonb language plpgsql set search_path = public as $$
+declare o tasks; n tasks; v_status text; v_assignee text; v_completing boolean;
+begin
+  select * into o from tasks where id = p_task for update;
+  if not found then raise exception 'not_found'; end if;
+  if o.version <> p_if_version then raise exception 'stale'; end if;
+  v_status := coalesce(p_patch->>'status', o.status);
+  v_assignee := case when p_patch ? 'assigneeId' then p_patch->>'assigneeId' else o.assignee_id end;
+  v_completing := v_status = 'completed' and o.status <> 'completed';
+  if v_assignee is distinct from o.assignee_id and v_assignee is not null and not exists (
+    select 1 from project_members
+    where project_id = o.project_id and user_id = v_assignee and removed_at is null
+  ) then
+    raise exception 'assignee_not_member';
+  end if;
+  if v_completing and coalesce(btrim(p_patch->>'completionEvidence'), '') = '' then
+    raise exception 'evidence_required';
+  end if;
+  update tasks set
+    status = v_status,
+    position = coalesce((p_patch->>'position')::double precision, o.position),
+    assignee_id = v_assignee,
+    title = coalesce(p_patch->>'title', o.title),
+    description = case when p_patch ? 'description' then p_patch->>'description' else o.description end,
+    due_date = case when p_patch ? 'dueDate' then (p_patch->>'dueDate')::date else o.due_date end,
+    completion_kind = case when v_completing then 'manual'
+      when v_status <> 'completed' then null else o.completion_kind end,
+    completion_evidence = case when v_completing then btrim(p_patch->>'completionEvidence')
+      when v_status <> 'completed' then null else o.completion_evidence end,
+    completed_at = case when v_completing then now()
+      when v_status <> 'completed' then null else o.completed_at end,
+    completed_by = case when v_completing then p_actor
+      when v_status <> 'completed' then null else o.completed_by end,
+    version = o.version + 1,
+    updated_at = now()
+  where id = p_task returning * into n;
+
+  if n.status <> o.status then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+      values (n.id, n.project_id, p_actor,
+        case when v_completing then 'completed_manual' else 'status_changed' end,
+        o.status, n.status,
+        case when v_completing then jsonb_build_object('evidence', n.completion_evidence)
+          else '{}'::jsonb end);
+  end if;
+  if n.assignee_id is distinct from o.assignee_id then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value)
+      values (n.id, n.project_id, p_actor,
+        case when n.assignee_id is null then 'unassigned' else 'assigned' end,
+        o.assignee_id, n.assignee_id);
+  end if;
+  if n.title <> o.title then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+      values (n.id, n.project_id, p_actor, 'edited', o.title, n.title, '{"field":"title"}');
+  end if;
+  if n.description is distinct from o.description then
+    insert into task_events (task_id, project_id, actor_id, kind, detail)
+      values (n.id, n.project_id, p_actor, 'edited', '{"field":"description"}');
+  end if;
+  if n.due_date is distinct from o.due_date then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+      values (n.id, n.project_id, p_actor, 'edited', o.due_date::text, n.due_date::text,
+        '{"field":"dueDate"}');
+  end if;
+  return jsonb_build_object('taskId', n.id);
+end $$;
+
+-- Tight gaps after many drops: reset one column to 1, 2, 3. No version bump and
+-- no events, so it never turns someone else's drag into a 409.
+create or replace function renumber_task_column(p_project uuid, p_status text)
+returns void language plpgsql set search_path = public as $$
+begin
+  perform 1 from tasks where project_id = p_project and status = p_status for update;
+  update tasks t set position = r.rn
+    from (select id, row_number() over (order by position, number) as rn
+          from tasks where project_id = p_project and status = p_status) r
+    where t.id = r.id;
+end $$;
+
+-- Move a personal meeting into a project (W3 AC-24, AC-25).
+create or replace function move_meeting_to_project(p_meeting uuid, p_project uuid, p_actor text)
+returns void language plpgsql set search_path = public as $$
+declare r action_items; t tasks;
+begin
+  update meetings set project_id = p_project
+    where id = p_meeting and project_id is null and user_id = p_actor;
+  if not found then raise exception 'not_movable'; end if;
+  if exists (select 1 from minutes_reviews where meeting_id = p_meeting) then
+    raise exception 'minutes_review';
+  end if;
+  update action_items ai set review_state = 'proposed'
+    from follow_ups f where f.action_item_id = ai.id and f.meeting_id = p_meeting
+    and f.status <> 'completed';
+  for r in select ai.* from action_items ai join follow_ups f on f.action_item_id = ai.id
+           where f.meeting_id = p_meeting and f.status = 'completed' loop
+    t := create_project_task(p_project, r.title, null, null, r.due_date, r.id, p_meeting,
+                             null, null, null, null, p_actor);
+    update tasks set status = 'completed', completion_kind = 'manual',
+      completion_evidence = 'Completed as a follow up before the move',
+      completed_at = now(), completed_by = p_actor where id = t.id;
+    update action_items set review_state = 'confirmed', reviewed_by = p_actor, reviewed_at = now()
+      where id = r.id;
+  end loop;
+  delete from follow_ups where meeting_id = p_meeting;
+  insert into audit_log (project_id, actor_id, action, target_type, target_id)
+    values (p_project, p_actor, 'meeting.moved', 'meeting', p_meeting::text);
+end $$;
+
+alter table tasks enable row level security;
+alter table task_events enable row level security;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON tasks, task_events TO service_role;
+
+revoke execute on function create_project_task(uuid, text, text, text, date, uuid, uuid, text, text, integer, vector, text) from public, anon, authenticated;
+revoke execute on function match_project_tasks(uuid, vector, real) from public, anon, authenticated;
+revoke execute on function remove_project_member(uuid, text, text, text) from public, anon, authenticated;
+revoke execute on function replace_meeting_proposals(uuid, jsonb, text) from public, anon, authenticated;
+revoke execute on function review_proposal(uuid, text, text, text, boolean, date, uuid, vector, text, boolean) from public, anon, authenticated;
+revoke execute on function update_task(uuid, text, jsonb, integer) from public, anon, authenticated;
+revoke execute on function renumber_task_column(uuid, text) from public, anon, authenticated;
+revoke execute on function move_meeting_to_project(uuid, uuid, text) from public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION create_project_task(uuid, text, text, text, date, uuid, uuid, text, text, integer, vector, text) TO service_role;
+GRANT EXECUTE ON FUNCTION match_project_tasks(uuid, vector, real) TO service_role;
+GRANT EXECUTE ON FUNCTION remove_project_member(uuid, text, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION replace_meeting_proposals(uuid, jsonb, text) TO service_role;
+GRANT EXECUTE ON FUNCTION review_proposal(uuid, text, text, text, boolean, date, uuid, vector, text, boolean) TO service_role;
+GRANT EXECUTE ON FUNCTION update_task(uuid, text, jsonb, integer) TO service_role;
+GRANT EXECUTE ON FUNCTION renumber_task_column(uuid, text) TO service_role;
+GRANT EXECUTE ON FUNCTION move_meeting_to_project(uuid, uuid, text) TO service_role;

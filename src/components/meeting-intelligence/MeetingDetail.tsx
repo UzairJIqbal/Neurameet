@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -220,6 +219,7 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         attendanceCount={attendanceCount}
         isOwner={isOwner}
         onRetry={retrySummary}
+        onMoved={data.projectId ? undefined : () => setRetryNonce((k) => k + 1)}
         ledgerVersion={ledgerVersion}
       />
     </section>

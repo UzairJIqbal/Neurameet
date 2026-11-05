@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Calendar, CheckSquare, Tag, CircleDot, Download } from "lucide-react";
+import { Calendar, CheckSquare, Tag, CircleDot, Download, FolderInput } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
   ActionItem,
@@ -11,6 +11,7 @@ import {
   type GuestAdmissionMode,
 } from "@/lib/meeting-types";
 import { updateMeetingGuestAdmissionMode } from "@/actions/meetings";
+import MoveToProjectDialog from "@/components/projects/MoveToProjectDialog";
 
 const StatCard = ({
   icon,
@@ -36,13 +37,19 @@ const OverviewTab = ({
   actionItems,
   attendanceCount,
   isOwner,
+  onMoved,
 }: {
   meeting: MeetingDetailData;
   insights: MeetingInsights | null;
   actionItems: ActionItem[];
   attendanceCount: number;
   isOwner: boolean;
+  onMoved?: () => void;
 }) => {
+  const [showMove, setShowMove] = useState(false);
+  // AC-24: only the creator of a personal meeting can move it into a project.
+  // The parent passes onMoved only for a personal meeting.
+  const canMove = isOwner && !!onMoved;
   const [admissionMode, setAdmissionMode] = useState<GuestAdmissionMode>(
     meeting.guestAdmissionMode ?? "approval",
   );
@@ -174,6 +181,34 @@ const OverviewTab = ({
             </button>
           </div>
         </div>
+      )}
+
+      {canMove && (
+        <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1">
+            <span className="text-body-md font-medium text-on-surface">Project</span>
+            <span className="text-body-md text-on-surface-variant">
+              This is a personal meeting. Move it into a project to share it with the team.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowMove(true)}
+            className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-medium text-on-primary transition-colors hover:bg-primary"
+          >
+            <FolderInput className="h-4 w-4" /> Move to project
+          </button>
+        </div>
+      )}
+      {showMove && onMoved && (
+        <MoveToProjectDialog
+          meetingId={meeting.id}
+          onClose={() => setShowMove(false)}
+          onMoved={() => {
+            setShowMove(false);
+            onMoved();
+          }}
+        />
       )}
 
       {summaryPreview ? (

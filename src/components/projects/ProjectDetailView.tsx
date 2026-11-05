@@ -3,6 +3,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 import { LoaderOne } from "@/components/ui/loader";
@@ -11,10 +12,26 @@ import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { getProject, ProjectClientError } from "@/lib/project-client";
 import { ROLE_LABELS, type ProjectDetail } from "@/lib/project-types";
 import MembersTab from "./MembersTab";
+import TasksBoard from "./TasksBoard";
+import ProposalsPanel from "./ProposalsPanel";
 
-// Page shell: header plus tabs. Only Members exists in W1; the other tabs
-// arrive with their steps.
+type TabKey = "members" | "tasks" | "proposals";
+
+const TAB_LABELS: Record<TabKey, string> = {
+  members: "Members",
+  tasks: "Tasks",
+  proposals: "Proposals",
+};
+
+// Proposals are hidden for Viewers (AC-37).
+const tabsFor = (project: ProjectDetail): TabKey[] =>
+  project.role === "viewer" ? ["members", "tasks"] : ["members", "tasks", "proposals"];
+
+// Page shell: header plus tabs, the selected tab kept in ?tab=.
 const ProjectDetailView = ({ id }: { id: string }) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +97,15 @@ const ProjectDetailView = ({ id }: { id: string }) => {
     );
   }
 
+  const tabs = tabsFor(project);
+  const requested = searchParams.get("tab") as TabKey | null;
+  const tab: TabKey = requested && tabs.includes(requested) ? requested : "members";
+  const selectTab = (key: TabKey) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", key);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   return (
     <section className="flex w-full flex-col gap-6 px-6 py-8">
       <Link
@@ -109,16 +135,27 @@ const ProjectDetailView = ({ id }: { id: string }) => {
       </header>
 
       <nav role="tablist" className="flex gap-2 border-b border-surface-variant">
-        <span
-          role="tab"
-          aria-selected="true"
-          className="border-b-2 border-primary px-3 py-2 text-body-md font-medium text-primary"
-        >
-          Members
-        </span>
+        {tabs.map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={key === tab}
+            onClick={() => selectTab(key)}
+            className={
+              key === tab
+                ? "border-b-2 border-primary px-3 py-2 text-body-md font-medium text-primary"
+                : "border-b-2 border-transparent px-3 py-2 text-body-md text-on-surface-variant hover:text-on-surface"
+            }
+          >
+            {TAB_LABELS[key]}
+          </button>
+        ))}
       </nav>
 
-      <MembersTab project={project} onProjectChanged={reload} />
+      {tab === "members" && <MembersTab project={project} onProjectChanged={reload} />}
+      {tab === "tasks" && <TasksBoard project={project} />}
+      {tab === "proposals" && <ProposalsPanel project={project} />}
     </section>
   );
 };

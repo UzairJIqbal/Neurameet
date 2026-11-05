@@ -12,6 +12,9 @@ import { setTranscriptState } from "@/lib/transcript-state";
 import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 import { buildMinutesDraft, cutMinutes } from "@/agent/minutes";
+import { buildProposalRows, hasReviewedProposals } from "@/agent/proposals";
+import { rpcErrorCode } from "@/lib/projects";
+import { MAX_PROPOSALS_PER_MEETING } from "@/lib/tasks";
 import {
   DISSENT_SUGGESTIONS_MAX,
   MINUTES_MAX_DECISIONS,
@@ -48,6 +51,8 @@ function meetingDateFor(row: {
   console.warn("[ledger] meeting has no usable date, using today");
   return new Date().toISOString().slice(0, 10);
 }
+
+const PROPOSALS_REVIEWED = { error: "Proposals were already reviewed" };
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -93,6 +98,13 @@ export async function POST(request: Request) {
       throw accessErr;
     }
 
+    // W4: a project meeting's action items are proposals. Once any was
+    // reviewed, a reprocess changes nothing (AC-34); fail before the AI call.
+    const projectId = owned.project_id ?? null;
+    if (projectId && (await hasReviewedProposals(supabase, meetingId))) {
+      return NextResponse.json(PROPOSALS_REVIEWED, { status: 409 });
+    }
+
     // Tasdeeq AC-7: a meeting with a minutes review keeps its insights frozen.
     const locked = await assertMinutesUnlocked(supabase, meetingId);
     if (locked) return locked;
@@ -129,7 +141,7 @@ export async function POST(request: Request) {
     // default json_schema structured-outputs mode, so the schema must avoid
     // `.optional()` fields (use `.nullable()`) — see generateStructuredWithFallback.
     const meetingDate = meetingDateFor(owned);
-    const { object: result } = await generateStructuredWithFallback({
+    const { object: extracted } = await generateStructuredWithFallback({
       schema: extractionResultSchema,
       prompt: `Analyze the following meeting transcript and extract structured insights.
 
@@ -179,6 +191,18 @@ Extraction rules:
 - Dissent suggestions: at most ${DISSENT_SUGGESTIONS_MAX}, only where a person clearly objected to or disagreed with something. speakerLabel is their name exactly as in the transcript, quote is their own words copied word for word from one line they said (no "Speaker:" label), relatedDecisionIndex is the zero based index into minutes.decisions the objection is about, or null. Return null or an empty array when nobody objected.`,
     });
 
+    // W4 AC-30: at most 50 proposals per run, the first in model order. The
+    // minutes draft uses the same capped list so its rows exist.
+    const result = projectId
+      ? {
+          ...extracted,
+          actionItems: extracted.actionItems.slice(
+            0,
+            MAX_PROPOSALS_PER_MEETING,
+          ),
+        }
+      : extracted;
+
     // Tasdeeq (spec 0003): action item ids are generated up front so the
     // minutes draft, written with the insights, can name each action line's row.
     const actionItemIds = result.actionItems.map(() => randomUUID());
@@ -206,6 +230,28 @@ Extraction rules:
     const lockedNow = await assertMinutesUnlocked(supabase, meetingId);
     if (lockedNow) return lockedNow;
 
+    // W4: proposals are swapped first, inside one locked SQL call, so a review
+    // that landed during the AI call wins and nothing below runs (AC-34).
+    if (projectId) {
+      const rows = await buildProposalRows(supabase, {
+        meetingId,
+        projectId,
+        rawText,
+        items: result.actionItems,
+        ids: actionItemIds,
+      });
+      const { error: replaceErr } = await supabase.rpc(
+        "replace_meeting_proposals",
+        { p_meeting: meetingId, p_items: rows, p_actor: userId },
+      );
+      if (replaceErr) {
+        if (rpcErrorCode(replaceErr) === "proposals_reviewed") {
+          return NextResponse.json(PROPOSALS_REVIEWED, { status: 409 });
+        }
+        throw replaceErr;
+      }
+    }
+
     // Idempotent retry: clear any prior insights, action items, and their
     // follow-ups for this meeting before writing the new ones. This runs only
     // after extraction succeeded, so a failed AI call keeps the old results. A retry (or any re-run
@@ -219,17 +265,20 @@ Extraction rules:
       if (delInsightsErr)
         console.error("Failed to clear prior insights:", delInsightsErr);
 
-      const { data: priorItems } = await supabase
-        .from("action_items")
-        .select("id")
-        .eq("meeting_id", meetingId);
-      if (priorItems && priorItems.length > 0) {
-        const priorIds = priorItems.map((i) => i.id);
-        await supabase
-          .from("follow_ups")
-          .delete()
-          .in("action_item_id", priorIds);
-        await supabase.from("action_items").delete().in("id", priorIds);
+      // A project meeting's items were already swapped by the RPC above.
+      if (!projectId) {
+        const { data: priorItems } = await supabase
+          .from("action_items")
+          .select("id")
+          .eq("meeting_id", meetingId);
+        if (priorItems && priorItems.length > 0) {
+          const priorIds = priorItems.map((i) => i.id);
+          await supabase
+            .from("follow_ups")
+            .delete()
+            .in("action_item_id", priorIds);
+          await supabase.from("action_items").delete().in("id", priorIds);
+        }
       }
     }
 
@@ -256,8 +305,8 @@ Extraction rules:
     }
 
     // Write action items (ids kept in insert order for ledger linking)
-    let insertedActionItemIds: string[] = [];
-    if (result.actionItems.length > 0) {
+    let insertedActionItemIds: string[] = projectId ? actionItemIds : [];
+    if (!projectId && result.actionItems.length > 0) {
       const { data: insertedItems, error: actionItemsError } = await supabase
         .from("action_items")
         .insert(
@@ -361,6 +410,7 @@ Extraction rules:
       insights: result.insights,
       actionItemCount: result.actionItems.length,
       emailSent,
+      ...(projectId ? { proposalCount: result.actionItems.length } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Processing failed";

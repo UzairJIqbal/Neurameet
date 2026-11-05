@@ -637,6 +637,19 @@ Fonts: **Hanken Grotesk** (UI, `--font-hanken-grotesk`) + **JetBrains Mono** (mo
 | `ConsentNotice` | `components/ConsentNotice.tsx` | Recording notice before joining a project meeting, shared by the member join screen and the guest join modal. Card `rounded-xl border border-outline-variant bg-surface-container-low p-4`, `ShieldCheck` icon `text-primary`, text from `consentNoticeText(projectName)` (guests see "this project"), checkbox "I understand and want to join". The parent owns the tick, so it resets every visit and keeps Join disabled until ticked. |
 | `DeviceSetup` props | `components/DeviceSetup.tsx` | New optional `beforeJoin` (rendered full width above the Join row) and `joinDisabled` (Join gets `disabled:cursor-not-allowed disabled:opacity-60`). `MeetingSetup` uses them for the "Checking this meeting…" line, the `LoadError` retry, and `ConsentNotice`. |
 
+## New Components — Review Gate and Tasks (built Step W4, 2026-11-03)
+
+| Component | File | Notes |
+|---|---|---|
+| `TasksBoard` | `components/projects/TasksBoard.tsx` | Kanban with five columns (To Do, In Progress, In Review, Completed, Blocked) on `@hello-pangea/dnd`. Optimistic move with `ifVersion`; a 409 reverts the card, toasts, and refetches. A drop on Completed opens `CompleteTaskDialog` (Cancel reverts). A Developer cannot drag someone else's task (refused before any request). Search by title or key, "New task" for Developer and higher. Own `useLoadingTimeout` + `LoadError`. |
+| `TaskCard` | `components/projects/TaskCard.tsx` | Card `flex flex-col gap-2 rounded-lg border border-surface-variant bg-surface-container-lowest p-3`, key (`NM-42`) `font-mono text-label-mono text-on-surface-variant`, title `text-body-md text-on-surface`, assignee and due date line `text-body-md text-on-surface-variant` with small lucide icons. |
+| `CompleteTaskDialog` | `components/projects/CompleteTaskDialog.tsx` | Required evidence (a comment or a link) before a manual completion; same modal shell as `InviteDialog`. |
+| `NewTaskDialog` | `components/projects/NewTaskDialog.tsx` | Title, description, assignee (active members), due date; same modal shell. |
+| `ProposalsPanel` | `components/projects/ProposalsPanel.tsx` | One card per AI proposal with the verified quote (speaker, line), "Quote not found" warning, duplicate warning linking the open task. Owner and Admin get Confirm (editable title, assignee, due date), Reject, Merge; an unverified quote needs "Confirm without a quote". Developers see it read only. Confirm toasts the new key. |
+| `MoveToProjectDialog` | `components/projects/MoveToProjectDialog.tsx` | Picks a project where you are Developer or higher; one way move, warns follow ups become proposals. |
+| `ProjectDetailView` tabs | `components/projects/ProjectDetailView.tsx` | Tabs Members, Tasks, Proposals (hidden for a Viewer), kept in `?tab=`. |
+| `OverviewTab` "Project" card | `components/meeting-intelligence/OverviewTab.tsx` | Shows the project name on a project meeting, or "Move to project" for the creator of a personal meeting. |
+
 ## Registry Update Rule
 
 Every new component gets a row here immediately after creation, with the pattern it establishes so the next session reuses it instead of inventing a variant. Run `/imprint` after any new UI component or page.

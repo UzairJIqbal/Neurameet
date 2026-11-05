@@ -205,6 +205,25 @@ describe("POST /api/ai/process (Promise Ledger extraction)", () => {
     },
   );
 
+  it("returns 409 and runs no AI once a project proposal was reviewed (W4 AC-34)", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "owner", project_id: "p1" }, error: null },
+    ];
+    queues.project_members = [{ data: { role: "admin" }, error: null }];
+    queues.action_items = [
+      {
+        data: [
+          { id: "ai-1", review_state: "proposed" },
+          { id: "ai-2", review_state: "confirmed" },
+        ],
+        error: null,
+      },
+    ];
+
+    expect((await call("admin")).status).toBe(409);
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
   it("returns 404 for a non creator on a personal meeting", async () => {
     queues.meetings = [
       { data: { id: "m1", user_id: "owner", project_id: null }, error: null },

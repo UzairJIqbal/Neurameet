@@ -46,6 +46,7 @@ const MeetingTabs = ({
   attendanceCount,
   isOwner,
   onRetry,
+  onMoved,
   ledgerVersion = 0,
 }: {
   meeting: MeetingDetailData;
@@ -55,6 +56,7 @@ const MeetingTabs = ({
   attendanceCount: number;
   isOwner: boolean;
   onRetry?: () => void;
+  onMoved?: () => void;
   ledgerVersion?: number;
 }) => {
   const [active, setActive] = useState<TabKey>("Overview");
@@ -109,6 +111,7 @@ const MeetingTabs = ({
             actionItems={actionItems}
             attendanceCount={attendanceCount}
             isOwner={isOwner}
+            onMoved={onMoved}
           />
         )}
         {active === "Summary" && (

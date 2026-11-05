@@ -103,10 +103,12 @@ export async function GET(
     const canManage = access.projectId
       ? access.role !== null && NEED_ROLES.manage.includes(access.role)
       : access.isCreator;
-    // A Viewer on a project meeting sees only confirmed action items. The
-    // review_state column arrives in W4, which switches this on; until then a
-    // Viewer gets an empty list (review_state is not selected here).
-    const hideActionItems = access.role === "viewer";
+    // A Viewer on a project meeting sees only confirmed action items (W4).
+    const confirmedOnly = access.role === "viewer";
+    const actionItemsQuery = supabase
+      .from("action_items")
+      .select("id, title, assignee, due_date")
+      .eq("meeting_id", id);
 
     const [
       { data: insights },
@@ -119,12 +121,9 @@ export async function GET(
         .select("summary, key_points, decisions, category, detected_topics")
         .eq("meeting_id", id)
         .single(),
-      hideActionItems
-        ? Promise.resolve({ data: [] as ActionItemRow[] })
-        : supabase
-          .from("action_items")
-          .select("id, title, assignee, due_date")
-          .eq("meeting_id", id),
+      confirmedOnly
+        ? actionItemsQuery.eq("review_state", "confirmed")
+        : actionItemsQuery,
       supabase
         .from("attendance_events")
         .select("*", { count: "exact", head: true })

@@ -77,7 +77,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 19 | Tasdeeq, Verified Minutes: every attendee confirms, corrects, or records a dissent on the AI minutes attributed to them, then the confirmed minutes are sealed so any later change is detectable | Signature Feature | in-progress |
 | 20 | Project workspaces, members, roles, and invitations (W1, W2) | Project Workspace | in-progress |
 | 21 | Project meetings with a consent notice (W3) | Project Workspace | in-progress |
-| 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | planned |
+| 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | in-progress |
 | 23 | GitHub App integration with strict linking rules (W5) | Project Workspace | planned |
 | 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | planned |
 | 25 | Project AI assistant with code built citations (W7) | Project Workspace | planned |
@@ -600,18 +600,27 @@ Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md
   - [x] W3b SQL, call type threaded through server and browser, project picker with server first create (AC-23, AC-28)
   - [x] W3c Consent notice, consent route, fresh consent check in `/members`, guest consent and admit as call member (AC-26 to AC-30a)
   - [x] W3d Offboarding removal from open project calls (AC-30b)
-  - [ ] W3e With W4: move a meeting into a project (AC-24, AC-25)
+  - [x] W3e With W4: move a meeting into a project (AC-24, AC-25)
 - [ ] Verify it: `/check verify project meetings`
 - [ ] Test it: `/test project meetings`
 - [ ] Review it (fresh model): `/check review project meetings`
 - [ ] Document it: `/document project meetings`
 
-### 22. Review gate plus project tasks on a Kanban board · planned · GA
+### 22. Review gate plus project tasks on a Kanban board · in-progress · GA
 AI proposed tasks and decisions wait for human review (no more auto created follow ups). Each proposal carries a code verified quote, a suggested assignee only when that person's own audio track holds the acceptance, and a pgvector duplicate check against open tasks. Confirmed proposals become keyed tasks (To Do, In Progress, In Review, Completed, Blocked) on a Kanban board. Tasks without GitHub complete manually with a comment or link as evidence. Follow ups migrate into tasks.
-**Done when:** a planted hallucinated item is dropped, a duplicate is flagged, nothing becomes a task without review, and a task moves across the board.
+**Done when:** a planted hallucinated item is flagged and cannot become a task without an explicit override, a duplicate is flagged, nothing becomes a task without review, and a task moves across the board.
 Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [x] Design it (spec): `/architect Step W4` (2026-11-03, [W4 child spec](../specs/0004-conversations-to-code/0004-review-gate-tasks.md))
 - [ ] Build it: `/develop review gate and tasks`
-  - [ ] W4 Proposals, review, keyed tasks, board (AC-30 to AC-42)
+  - [x] W4a SQL block plus `replace_meeting_proposals`, `review_proposal`, `renumber_task_column` (AC-34 to AC-36, AC-38, AC-39) (in `supabase/schema.sql`, applied live 2026-11-05)
+  - [x] W4b Proposals from `/api/ai/process`: quotes, own track assignee, duplicate check, reprocess guard (AC-30 to AC-34)
+  - [x] W4c Proposal and task routes with Viewer redaction (AC-35 to AC-40)
+  - [x] W4d Tasks and Proposals tabs, Kanban board (AC-41, AC-42)
+  - [x] W4e W3's move route and button (AC-24, AC-25)
+- [ ] Verify it: `/check verify review gate and tasks`
+- [ ] Test it: `/test review gate and tasks`
+- [ ] Review it (fresh model): `/check review review gate and tasks`
+- [ ] Document it: `/document review gate and tasks`
 
 ### 23. GitHub App integration with strict linking rules · planned · GA
 A free GitHub App (not an OAuth App or token) installed per project repo. Webhooks verify the `X-Hub-Signature-256` HMAC over the raw body, dedupe on `X-GitHub-Delivery`, reply fast and process in `after()`. A task completes only on a closing reference plus `merged == true` plus a merge into the default branch plus all linked PRs done; drafts stay In Progress, closed unmerged PRs do nothing, a revert reopens. A Sync GitHub action reconciles missed deliveries. Optional "also create GitHub issue" on confirm. GitHub never assigns tasks, so no GitHub account mapping is stored (decided in the W0 spec).

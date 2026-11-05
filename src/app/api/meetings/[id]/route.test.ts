@@ -52,8 +52,17 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
           Promise.resolve(
             table === "attendance_events" ? attendance() : result,
           ),
-        // Awaiting the chain directly (action items list) yields the result.
-        then: (resolve: (v: unknown) => unknown) => resolve(result),
+        // Awaiting the chain directly (action items list) yields the result,
+        // with the W4 review_state filter applied when the route adds one.
+        then: (resolve: (v: unknown) => unknown) => {
+          const state = filters.find(([col]) => col === "review_state");
+          if (table !== "action_items" || !state) return resolve(result);
+          const rows = (result.data ?? []) as Array<Record<string, unknown>>;
+          return resolve({
+            data: rows.filter((r) => r.review_state === state[1]),
+            error: null,
+          });
+        },
       };
       return { select: () => builder };
     },
@@ -197,8 +206,27 @@ describe("GET /api/meetings/[id] on a project meeting", () => {
     expect((await call("u2", "m1")).status).toBe(404);
   });
 
-  it("gives a Viewer read access, canManage false, and no action items", async () => {
+  it("gives a Viewer read access, canManage false, and only confirmed action items", async () => {
     asMember("viewer");
+    store.actionItems = {
+      data: [
+        {
+          id: "a1",
+          title: "Proposed",
+          assignee: null,
+          due_date: null,
+          review_state: "proposed",
+        },
+        {
+          id: "a2",
+          title: "Confirmed",
+          assignee: null,
+          due_date: null,
+          review_state: "confirmed",
+        },
+      ],
+      error: null,
+    };
     const res = await call("u2", "m1");
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -207,7 +235,7 @@ describe("GET /api/meetings/[id] on a project meeting", () => {
       role: "viewer",
       canManage: false,
     });
-    expect(body.actionItems).toEqual([]);
+    expect(body.actionItems.map((i: { id: string }) => i.id)).toEqual(["a2"]);
   });
 
   it("gives a Developer the action items but canManage false", async () => {

@@ -16,11 +16,22 @@ import type {
   ProjectRole,
   ProjectSummary,
 } from "@/lib/project-types";
+import type {
+  ProposalsResponse,
+  ReviewProposalInput,
+  ReviewProposalResponse,
+  TaskDetailResponse,
+  TaskPatchInput,
+  TaskResponse,
+  TasksResponse,
+} from "@/lib/task-types";
 
 export class ProjectClientError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** The parsed error body, e.g. the fresh task a 409 carries. */
+    public data: unknown = null,
   ) {
     super(message);
     this.name = "ProjectClientError";
@@ -39,6 +50,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     throw new ProjectClientError(
       res.status,
       data.error ?? `Request failed (${res.status})`,
+      data,
     );
   }
   return data as T;
@@ -156,4 +168,68 @@ export function acceptInvitation(token: string) {
     method: "POST",
     body: JSON.stringify({ token }),
   });
+}
+
+// ---- W4: proposals, tasks, moving a meeting in ----
+
+export function listProposals(id: string, signal?: AbortSignal) {
+  return request<ProposalsResponse>(`${base(id)}/proposals`, { signal });
+}
+
+export function reviewProposal(proposalId: string, input: ReviewProposalInput) {
+  return request<ReviewProposalResponse>(
+    `/api/proposals/${encodeURIComponent(proposalId)}/review`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export type TaskFilters = { status?: string; assigneeId?: string; q?: string };
+
+export function listTasks(
+  id: string,
+  filters: TaskFilters = {},
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) if (v) params.set(k, v);
+  const qs = params.toString();
+  return request<TasksResponse>(`${base(id)}/tasks${qs ? `?${qs}` : ""}`, {
+    signal,
+  });
+}
+
+export function createTask(
+  id: string,
+  input: {
+    title: string;
+    description?: string | null;
+    assigneeId?: string | null;
+    dueDate?: string | null;
+  },
+) {
+  return request<TaskResponse>(`${base(id)}/tasks`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getTask(taskId: string, signal?: AbortSignal) {
+  return request<TaskDetailResponse>(
+    `/api/tasks/${encodeURIComponent(taskId)}`,
+    { signal },
+  );
+}
+
+export function updateTask(taskId: string, input: TaskPatchInput) {
+  return request<TaskResponse>(`/api/tasks/${encodeURIComponent(taskId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function moveMeetingToProject(meetingId: string, projectId: string) {
+  return request<{ meetingId: string; projectId: string }>(
+    `/api/meetings/${encodeURIComponent(meetingId)}/project`,
+    { method: "POST", body: JSON.stringify({ projectId }) },
+  );
 }

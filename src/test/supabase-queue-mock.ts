@@ -31,6 +31,7 @@ const CHAIN = [
   "gte",
   "lt",
   "lte",
+  "ilike",
   "order",
   "limit",
   "insert",

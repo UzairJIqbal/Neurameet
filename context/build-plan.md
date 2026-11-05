@@ -705,7 +705,7 @@ Hashed 256 bit single use tokens, expiry, email binding, owner approval on by de
 ### Step W3 — Project meetings + consent notice ✅ (built 2026-11-03, gate passed, SQL applied; move a meeting in ships with W4; live test pending)
 Project and participant picker in the schedule dialog, `meeting_participants`, project meeting lists, pre join recording consent notice for members and guests. Exit: a project member sees project meetings; an outsider does not.
 
-### Step W4 — Review gate + tasks + Kanban ⬜
+### Step W4 — Review gate + tasks + Kanban 🟡 (built 2026-11-03, includes W3's move a meeting in; SQL applied 2026-11-05; live test pending)
 `action_items.review_state`; stop auto created follow ups; quote validation through the ledger validator; assignee suggested only from that person's own audio track (or a Tasdeeq speaker claim); pgvector duplicate check; keyed `tasks` (To Do, In Progress, In Review, Completed, Blocked); follow ups migrated; Kanban with a free drag and drop library chosen at W0 (`@hello-pangea/dnd` recommended); manual completion with evidence. Exit: a planted hallucinated item is dropped, a duplicate is flagged.
 
 ### Step W5 — GitHub App ⬜
