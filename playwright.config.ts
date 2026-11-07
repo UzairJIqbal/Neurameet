@@ -59,6 +59,18 @@ export default defineConfig({
   projects: [
     // One-time signed-in Clerk test session → saved to storageState.
     {
+      // Owed manual test scripts (W2, W3, W4, LL5, Tasdeeq). Each signs in its
+      // own test users, so no shared session from setup.
+      name: "w-test",
+      testMatch: /w-test\/.*\.spec\.ts/,
+      use: {
+        browserName: "chromium",
+        launchOptions: {
+          args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+        },
+      },
+    },
+    {
       name: "setup",
       testMatch: /auth\.setup\.ts/,
     },
