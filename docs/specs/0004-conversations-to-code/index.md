@@ -578,27 +578,37 @@ begin
 end $$;
 
 -- ===== W6. Activity =====
+alter table ledger_links add column if not exists decided_by text;   -- null on old rows and live mark confirms
+create index if not exists task_events_project on task_events (project_id, created_at desc);
+create index if not exists ledger_links_confirmed on ledger_links (decided_at desc) where state = 'confirmed';
+
+-- row_id breaks ties for the cursor. Keys that hold a quote, evidence, title, or invite ref
+-- are dropped here, and the route allowlists again per kind.
 create or replace view project_activity with (security_invoker = true) as
-  select te.project_id, te.created_at as occurred_at, te.actor_id,
+  select 'te:' || te.id::text as row_id, te.project_id, te.created_at as occurred_at, te.actor_id,
          'task.' || te.kind as kind, 'task' as subject_type, te.task_id::text as subject_id,
-         jsonb_build_object('from', te.from_value, 'to', te.to_value) || te.detail as detail
+         jsonb_build_object('from', te.from_value, 'to', te.to_value)
+           || (te.detail - 'quote' - 'evidence' - 'title' - 'actionItemId') as detail
     from task_events te
   union all
-  select m.project_id, m.created_at, m.user_id, 'meeting.created', 'meeting', m.id::text,
+  select 'mt:' || m.id::text, m.project_id, m.created_at, m.user_id, 'meeting.created', 'meeting', m.id::text,
          jsonb_build_object('title', m.title)
     from meetings m where m.project_id is not null
   union all
-  select m.project_id, ll.decided_at, null, 'ledger.' || ll.relation || '_confirmed', 'ledger_item',
+  select 'll:' || ll.id::text, m.project_id, ll.decided_at, ll.decided_by,
+         'ledger.' || ll.relation || '_confirmed', 'ledger_item',
          ll.item_id::text, jsonb_build_object('evidence', ll.evidence_kind)
     from ledger_links ll join ledger_items li on li.id = ll.item_id
     join meetings m on m.id = li.meeting_id
     where m.project_id is not null and ll.state = 'confirmed' and ll.decided_at is not null
   union all
-  select a.project_id, a.created_at, a.actor_id, a.action, a.target_type, a.target_id, a.detail
+  select 'au:' || a.id::text, a.project_id, a.created_at, a.actor_id, a.action, a.target_type, a.target_id,
+         a.detail - 'ref'
     from audit_log a where a.project_id is not null
       and a.action in ('project.created', 'project.ownership_transferred', 'member.joined',
-        'member.removed', 'member.left', 'member.role_changed', 'repo.linked', 'repo.unlinked',
-        'meeting.moved');   -- allowlist: invite and join request rows (emails) never show
+        'member.removed', 'member.left', 'member.restored', 'member.role_changed', 'repo.linked',
+        'repo.unlinked', 'meeting.moved');   -- allowlist: invite and join request rows (emails) never show
+grant select on project_activity to service_role;
 
 -- ===== W7. Project assistant retrieval (filter by project inside SQL) =====
 create or replace function match_project_chunks(

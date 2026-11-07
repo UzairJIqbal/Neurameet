@@ -79,7 +79,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 21 | Project meetings with a consent notice (W3) | Project Workspace | in-progress |
 | 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | in-progress |
 | 23 | GitHub App integration with strict linking rules (W5) | Project Workspace | in-progress |
-| 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | planned |
+| 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | in-progress |
 | 25 | Project AI assistant with code built citations (W7) | Project Workspace | planned |
 | 26 | Workspace shell, personal views, notifications, Ctrl K (W8) | Project Workspace | planned |
 | 27 | Workspace verify and security suite (W9) | Project Workspace | planned |
@@ -639,12 +639,20 @@ Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md
 - [ ] Review it (fresh model): `/check review github integration`
 - [ ] Document it: `/document github integration`
 
-### 24. Proof Chain: a promise traced from meeting quote to merged PR · planned · GA
+### 24. Proof Chain: a promise traced from meeting quote to merged PR · in-progress · GA
 The project Decisions and Promises tab built on `ledger_items`; a qualifying merge adds code evidence to the linked promise (owner confirms, same flow as ledger links); the meeting gets an Outcome card showing the chain; an Activity timeline joins meetings, decisions, tasks, and PRs; Live Ledger check in is scoped to the project.
 **Done when:** one demo promise from a real Urdu English meeting is traced in the UI from quote to reviewed task to merged PR to kept.
-Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+Spec: [0004-proof-chain](../specs/0004-conversations-to-code/0004-proof-chain.md), under [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [x] Design it (spec)
 - [ ] Build it: `/develop proof chain`
-  - [ ] W6 Decisions and Promises tab, Outcome card, Activity, Viewer redaction (AC-57 to AC-62)
+  - [ ] Schema, cursor helper, and Decisions and Promises tab with its review group (AC-57 to AC-59a)
+  - [ ] Outcome card and `proof-chain.ts` on the project tab and task drawer (AC-60 to AC-60c)
+  - [ ] Viewer redaction and the meeting Ledger tab opened to members (AC-58b, AC-62 to AC-62b)
+  - [ ] Activity route and tab with the kind allowlist (AC-61 to AC-61b)
+- [ ] Verify it: `/check verify proof chain`
+- [ ] Test it: `/test proof chain`
+- [ ] Review it (fresh model): `/check review proof chain`
+- [ ] Document it: `/document proof chain`
 
 ### 25. Project AI assistant with code built citations · planned · GA
 Extend `/api/ai/chat` and `/api/search` with a project scope rather than new routes. Retrieval filters by project inside SQL, covers meetings, ledger items, and task titles, treats transcripts, PR text, and commits as untrusted data, stays read only, and builds citations in code from retrieved record ids, answering "not found in this project's records" when nothing matches.
