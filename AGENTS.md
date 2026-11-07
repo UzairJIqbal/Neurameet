@@ -194,11 +194,6 @@ POST /api/ledger/links/[id]/review → (extended) 409 "This PR was reverted" on 
 GET  /api/projects/[id]/ledger     → member: Decisions and Promises across the project's meetings (?kind=&status=&cursor=), redacted for viewers
 POST /api/ledger/links/[id]/review → (extended) accepts code links; on a project meeting owner or admin
 GET  /api/projects/[id]/activity   → member: Activity timeline (?before=)
-GET  /api/projects/search          → signed in: Ctrl K palette (?q=), title and key match across your active projects only
-GET  /api/notifications            → signed in: your notifications (?cursor=), unread count
-POST /api/notifications/read       → signed in: { ids } or { all: true }
-POST /api/settings/notifications   → signed in: { emailNotifications }, the server copy of the email toggle
-GET  /api/cron/daily               → Vercel cron only (Bearer CRON_SECRET): digest, delivery purge, GitHub sync
 POST /api/ai/chat                  → (extended) { projectId } project assistant, developer or higher, project filtered in SQL, citations built in code
 POST /api/ai/process               → (extended) on a project meeting writes proposals, never follow ups; 409 once any proposal was reviewed
 GET  /api/meetings                 → (extended) adds project meetings from your active projects, with projectId and role (?projectId= for one project)
@@ -210,6 +205,39 @@ GET  /api/projects/[id]/activity   → (extended) ?before= is a timestamp|id cur
 GET  /api/tasks/[id]               → (extended) adds outcome
 GET  /api/ledger                   → (extended) adds outcome on project meetings; a Viewer's items and links omit quote, speaker, and line
 POST /api/ledger/links/[id]/review → (extended) records decided_by
+GET  /api/projects/search          → signed in: Ctrl K palette (?q=), title and key match across your active projects and your personal meetings, plus decision statements, no embeddings
+POST /api/projects                 → (extended) adds description?, projectType?, icon?, color?
+GET  /api/projects                 → (extended) adds the My Projects card fields, private repos hidden from Viewers
+GET  /api/projects/[id]            → (extended) adds project details, task totals, openTaskCount, overdueTaskCount, upcomingMeetingCount, decisionCount, linkedPrCount, github { connected, repos, lastSyncedAt } (public repos only for Viewers)
+PATCH /api/projects/[id]           → (extended) owner only: { name?, description?, status?, projectType?, icon?, color? }
+GET  /api/projects/[id]/members    → (extended) adds imageUrl, githubLogin, openTaskCount
+GET  /api/projects/[id]/github/summary → developer or higher: linked repos, last sync, linked PR counts and rows
+GET  /api/projects/[id]/tasks      → (extended) ?priority=; adds priority, commentCount, meeting title, PR refs (Viewers get no comment count or PR refs)
+POST /api/projects/[id]/tasks      → (extended) adds priority?
+GET  /api/tasks/[id]               → (extended) adds priority, comments (never for a Viewer)
+PATCH /api/tasks/[id]              → (extended) adds priority?
+POST /api/tasks/[id]/comments      → developer or higher: { body }, plain text, writes a commented event with no text
+DELETE /api/tasks/[id]/comments/[commentId] → the author, or owner or admin
+GET  /api/tasks/[id]/commits       → developer or higher: PR linked commits read from GitHub on click, never stored
+POST /api/proposals/[id]/review    → (extended) adds priority?, set by the reviewer
+POST /api/projects/[id]/invitations/[invitationId]/resend → owner or admin: new token on an email invite, new expiry, returns the link once
+GET  /api/invitations/preview      → (extended) adds inviter, project details, counts, dates; team names and invitationId only on a matching email invite; repo name only when public
+GET  /api/invitations/mine         → signed in: active email invites for your verified email, never a token
+POST /api/invitations/mine/[id]    → signed in, matching email: { decision: "accept" | "decline" }
+GET  /api/projects/[id]/ledger     → (extended) ?meetingId=&q=&tag=; q matches statement only; items add tag, participants
+GET  /api/projects/[id]/activity   → (extended) ?category=&actorId=; adds categoryCounts
+GET  /api/my-tasks                 → signed in: your open tasks across active projects capped at 200, your latest 50 completed, with truncated
+GET  /api/my-counts                → signed in: openTasks, upcomingMeetings, unread, prReviews for the sidebar
+GET  /api/notifications            → signed in: your notifications in active projects, project invitations included (?cursor=&unread=1&category=), unread count, category counts
+POST /api/notifications/read       → signed in: { ids } or { all: true }; { ids, unread: true } marks rows unread
+GET  /api/settings/notifications   → signed in: the stored email and digest toggles, true for a missing row
+POST /api/settings/notifications   → signed in: { emailNotifications?, digestEmails? }, the server copy of the toggles
+GET  /api/settings/github          → signed in: your connected GitHub account and the authorize URL
+DELETE /api/settings/github        → signed in: clears your GitHub account link, touches no installation
+GET  /api/cron/daily               → Vercel cron only (Bearer CRON_SECRET): delivery purge, due task notices, digest, GitHub sync
+GET  /api/github/callback          → (extended) also the account connect path, told apart by a separately signed state; stores login and id, discards the token
+GET  /api/meetings/[id]            → (extended) adds description, scheduledEndAt, meetingType, organizerName, invitedUserIds, transcriptText (never for a Viewer)
+GET  /api/meetings                 → (extended) adds the same meeting fields; a project list adds summaryExcerpt and counts
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 

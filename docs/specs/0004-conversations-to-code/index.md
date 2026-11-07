@@ -21,7 +21,7 @@ This is an umbrella spec. This file holds the shared contract every step builds 
 | [0004-github.md](0004-github.md) | W5. GitHub App, webhooks, linking rules, revert, Sync | GitHub | AC-43 to AC-56 |
 | [0004-proof-chain.md](0004-proof-chain.md) | W6. Decisions and Promises tab, code evidence, Outcome card, Activity | Proof Chain surfaces | AC-57 to AC-62 |
 | [0004-project-assistant.md](0004-project-assistant.md) | W7. Project scoped chat and search | Project assistant | AC-63 to AC-69 |
-| [0004-workspace-shell.md](0004-workspace-shell.md) | W8. Workspace shell, personal views, notifications, daily digest, Ctrl K | Notifications, digest, shell | AC-70 to AC-79 |
+| [0004-workspace-shell.md](0004-workspace-shell.md) | W8. Workspace shell, personal views, notifications, daily digest, Ctrl K, and the PDF's screens | Notifications, digest, shell | AC-70 to AC-79 (plus AC-70a to AC-70y, AC-71a to AC-71c, AC-72a, AC-76a, AC-77a to AC-77g, AC-78a, AC-78b, AC-79a, added at the W8 `/architect`) |
 | [0004-security-e2e.md](0004-security-e2e.md) | W9. Security suite and the bilingual end to end run | Verification | AC-80 to AC-84 |
 
 Reasoning and options: see [rationale.md](rationale.md).
@@ -82,13 +82,18 @@ Projects, members, roles, invitations, tasks, and GitHub links live in new Supab
 | Create a task | yes | yes | yes | no |
 | Move, edit, assign a task | any task | any task | own or unassigned (may assign an unassigned task to self) | no |
 | Complete a task by hand (evidence note required) | any | any | own | no |
+| Comment on a task, see comments | yes | yes | yes | no |
+| Delete a comment | any | any | own | no |
 | Invite by email or link, approve join requests, revoke invites | yes | yes | no | no |
 | Change a role | any role except own | Developer and Viewer only, never own, never Admin | no | no |
 | Remove a member | anyone but self | Developers and Viewers (checked inside `remove_project_member`) | no | no |
 | Leave the project | after transferring | yes | yes | yes |
 | Transfer ownership (to an active Admin) | yes | no | no | no |
 | Connect GitHub, link and unlink repos | yes | no | no | no |
+| See the GitHub tab | yes | yes | read only | no |
+| See a task's PR linked commits, on click | yes | yes | yes | no |
 | Run GitHub Sync | yes | yes | no | no |
+| Edit project details (name, description, status, type, icon, color) | yes | no | no | no |
 | Delete a project meeting | yes | no | no | no |
 | Delete the project (typed confirm, deletes its meetings too; 409 while any of them has sealed minutes) | yes | no | no | no |
 
@@ -614,9 +619,12 @@ grant select on project_activity to service_role;
 create or replace function match_project_chunks(
   p_project uuid, query_embedding vector(768), match_count integer, min_similarity real
 ) returns table (chunk_id uuid, meeting_id uuid, meeting_title text, started_at timestamptz,
-                 content text, similarity real)
-language sql stable as $$
-  select c.id, m.id, m.title, m.started_at, c.content, (1 - (c.embedding <=> query_embedding))::real
+                 content text, chunk_index integer, similarity real)
+language sql stable
+set search_path = public
+as $$
+  select c.id, m.id, m.title, m.started_at, c.chunk_text, c.chunk_index,
+         (1 - (c.embedding <=> query_embedding))::real
   from meeting_chunks c join meetings m on m.id = c.meeting_id
   where m.project_id = p_project
     and 1 - (c.embedding <=> query_embedding) >= min_similarity
@@ -624,20 +632,26 @@ language sql stable as $$
   limit match_count;
 $$;
 
+revoke execute on function match_project_chunks(uuid, vector, integer, real) from public, anon, authenticated;
+grant execute on function match_project_chunks(uuid, vector, integer, real) to service_role;
+
 -- ===== W8. Notifications and the server copy of the email toggle =====
 create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
   project_id uuid references projects(id) on delete cascade,
   kind text not null check (kind in ('task_assigned', 'proposals_ready', 'join_request',
-    'join_approved', 'task_completed_by_merge', 'task_reopened_by_revert', 'kept_suggestion')),
+    'join_approved', 'task_completed_by_merge', 'task_reopened_by_revert', 'kept_suggestion',
+    'meeting_scheduled', 'task_due', 'project_invitation', 'member_role_changed',
+    'member_joined', 'pr_review_requested')),
   title text not null,
   body text not null,
   link text not null,                    -- app path only, never an outside URL
-  dedupe_key text not null unique,       -- e.g. 'task_assigned:<taskId>:<userId>:<eventId>'
+  dedupe_key text not null,              -- e.g. 'task_assigned:<taskId>:<version>'
   read_at timestamptz,
   emailed_at timestamptz,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, dedupe_key)           -- one event can reach several people
 );
 create index if not exists notifications_user on notifications (user_id, created_at desc);
 
@@ -645,8 +659,93 @@ create table if not exists user_settings (
   user_id text primary key,
   email_notifications boolean not null default true,  -- missing row = true, same as DEFAULT_PREFS
   digest_sent_on date,                                 -- PKT day of the last digest (budget and once a day)
+  digest_emails boolean not null default true,         -- the Account tab's digest toggle
+  github_user_id bigint,                               -- from GET /user, no token is ever stored
+  github_login text,
   updated_at timestamptz not null default now()
 );
+create unique index if not exists user_settings_github_user
+  on user_settings (github_user_id) where github_user_id is not null;
+
+-- ===== W8. Fields the PDF shows that nothing stores today =====
+alter table projects
+  add column if not exists description text check (char_length(description) <= 500),
+  add column if not exists status text not null default 'active'
+    check (status in ('active', 'planning', 'on_hold', 'completed')),
+  add column if not exists project_type text not null default 'other'
+    check (project_type in ('web', 'mobile', 'ai_ml', 'backend', 'other')),
+  add column if not exists icon text not null default 'folder'
+    check (icon in ('folder', 'code', 'smartphone', 'brain', 'server', 'globe', 'rocket', 'database')),
+  add column if not exists color text not null default 'primary'
+    check (color in ('primary', 'secondary', 'tertiary', 'success', 'warning'));  -- token keys, never raw values
+
+alter table tasks
+  add column if not exists priority text not null default 'medium'
+    check (priority in ('low', 'medium', 'high', 'urgent'));
+
+alter table task_links add column if not exists pr_author_login text;
+
+alter table meetings
+  add column if not exists description text check (char_length(description) <= 1000),
+  add column if not exists scheduled_end_at timestamptz,
+  add column if not exists meeting_type text
+    check (meeting_type in ('code_review', 'sprint_planning', 'architecture', 'standup', 'other')),
+  add column if not exists invited_user_ids text[] not null default '{}';  -- display and notice only, never access
+
+alter table project_invitations add column if not exists declined_at timestamptz;
+
+create table if not exists task_comments (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid references tasks(id) on delete cascade not null,
+  project_id uuid references projects(id) on delete cascade not null,
+  author_id text not null,
+  body text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists task_comments_task on task_comments (task_id, created_at desc);
+
+alter table task_events drop constraint if exists task_events_kind_check;
+alter table task_events add constraint task_events_kind_check check (kind in ('created', 'edited',
+  'status_changed', 'assigned', 'unassigned', 'completed_manual', 'completed_by_merge',
+  'reopened_by_revert', 'pr_linked', 'pr_state_changed', 'proposal_merged', 'commented'));
+
+-- The comment and its event commit together. The event never holds the comment's text.
+create or replace function add_task_comment(p_task uuid, p_actor text, p_body text)
+returns task_comments language plpgsql as $$
+declare
+  v_project uuid;
+  c task_comments;
+begin
+  select project_id into v_project from tasks where id = p_task;
+  if v_project is null then raise exception 'task_not_found'; end if;
+  insert into task_comments (task_id, project_id, author_id, body)
+    values (p_task, v_project, p_actor, p_body) returning * into c;
+  insert into task_events (task_id, project_id, actor_id, kind, detail)
+    values (p_task, v_project, p_actor, 'commented', jsonb_build_object('commentId', c.id));
+  return c;
+end;
+$$;
+
+-- One grouped read for project lists, so a page never runs one query per project.
+create or replace function project_task_counts(p_projects uuid[], p_today date)
+returns table (project_id uuid, status text, total bigint, overdue bigint)
+language sql stable as $$
+  select t.project_id, t.status, count(*),
+    count(*) filter (where t.due_date < p_today and t.status <> 'completed')
+  from tasks t where t.project_id = any(p_projects)
+  group by t.project_id, t.status;
+$$;
+
+revoke execute on function add_task_comment(uuid, text, text) from public, anon, authenticated;
+revoke execute on function project_task_counts(uuid[], date) from public, anon, authenticated;
+grant execute on function add_task_comment(uuid, text, text) to service_role;
+grant execute on function project_task_counts(uuid[], date) to service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON task_comments TO service_role;
+
+-- update_task: copy the current body from supabase/schema.sql with `create or replace`, and add
+-- the patch key 'priority' next to dueDate, with the same permission rule, writing an 'edited'
+-- event with detail {"field":"priority"}. Keep the signature, so the grants stay.
+-- The project_activity view needs no change: it already unions task_events as 'task.'||kind.
 
 alter table projects enable row level security;
 alter table project_members enable row level security;
@@ -663,6 +762,7 @@ alter table github_deliveries enable row level security;
 alter table task_links enable row level security;
 alter table notifications enable row level security;
 alter table user_settings enable row level security;
+alter table task_comments enable row level security;
 -- No policies: every read and write goes through the service role on the server,
 -- same as every existing table. Grant to service_role per slice, as 0002 and 0003 do.
 -- Views and functions are not covered by RLS, so each slice also revokes the defaults:
@@ -698,7 +798,7 @@ GitHub moves (rules in [0004-github.md](0004-github.md)): a linked draft PR move
 | /api/projects | POST | name, taskPrefix | project | signed in | 422 bad prefix |
 | /api/projects | GET | | your projects + role | signed in | |
 | /api/projects/[id] | GET | | project, your role, counts | member | 404 |
-| /api/projects/[id] | PATCH | name | project | owner | 403, 404 |
+| /api/projects/[id] | PATCH | name, plus description?, status?, projectType?, icon?, color? from W8 | project | owner | 403, 404, 422 |
 | /api/projects/[id] | DELETE | confirmName | ok | owner | 409 sealed minutes, 422 name mismatch |
 | /api/projects/[id]/members | GET | | members with role, name, email | member | 404 |
 | /api/projects/[id]/members/[userId] | PATCH | role | member | owner, admin (limits in matrix) | 403, 409 own role |
@@ -727,16 +827,37 @@ GitHub moves (rules in [0004-github.md](0004-github.md)): a linked draft PR move
 | /api/projects/[id]/github/sync | POST | | counts | owner, admin | 429 within 60 s |
 | /api/projects/[id]/ledger | GET | kind?, status?, cursor | ledger items with links and task keys | member (redacted for viewer) | 404 |
 | /api/projects/[id]/activity | GET | before? | events | member | |
-| /api/projects/search | GET | q | projects, tasks, meetings (5 each) | signed in, active projects only | |
-| /api/notifications | GET | cursor | items, unreadCount | signed in | |
-| /api/notifications/read | POST | ids or all | ok | signed in | |
-| /api/settings/notifications | POST | emailNotifications | ok | signed in | |
+| /api/projects/search | GET | q | projects, tasks, meetings, decisions (5 each) with href | signed in, active projects plus your personal meetings | |
+| /api/projects (extended) | POST, GET | POST adds description?, projectType?, icon?, color? | GET adds the My Projects card fields, with private repos hidden from Viewers | signed in | 422 |
+| /api/projects/[id] (extended) | GET | | adds details, owner, task totals, openTaskCount, overdueTaskCount, upcomingMeetingCount, decisionCount, linkedPrCount, `github { connected, repos, lastSyncedAt }` (replaces `githubConnected`; Viewers get public repos only) | member | 404 |
+| /api/projects/[id]/members (extended) | GET | | adds imageUrl, githubLogin, openTaskCount | member | 404 |
+| /api/projects/[id]/github/summary | GET | | repos, lastSyncedAt, counts, linked PRs | developer+ | 403 viewer |
+| /api/projects/[id]/tasks (extended) | GET, POST | GET adds priority?, POST adds priority? | priority, commentCount, meeting title, PR refs (Viewers get neither of the last two kinds) | member, developer+ | 422 |
+| /api/tasks/[id] (extended) | GET, PATCH | PATCH adds priority? | GET adds priority, comments (not for Viewer) | as before | 422 |
+| /api/tasks/[id]/comments | POST | body | comment | developer+ | 403, 422 |
+| /api/tasks/[id]/comments/[commentId] | DELETE | | ok | author, or owner or admin | 403, 404 |
+| /api/tasks/[id]/commits | GET | | PR linked commits read on click, never stored | developer+ | 403 viewer, 502 |
+| /api/proposals/[id]/review (extended) | POST | adds priority? | as before | owner, admin | 422 |
+| /api/projects/[id]/invitations/[invitationId]/resend | POST | | link (once), emailed | owner, admin | 404, 410, 422 link kind |
+| /api/invitations/preview (extended) | GET | token | adds inviter, details, counts, createdAt, invitedAt, repoName?, team?, invitationId? | signed in | 410, 429 |
+| /api/invitations/mine | GET | | active email invites for your verified email | signed in | |
+| /api/invitations/mine/[id] | POST | decision | status, projectId | signed in, matching email | 404, 410, 422 |
+| /api/projects/[id]/ledger (extended) | GET | adds meetingId?, q?, tag? | items add tag, participants | member (redacted for viewer) | 422 |
+| /api/projects/[id]/activity (extended) | GET | adds category?, actorId? | adds categoryCounts | member | 422 |
+| /api/my-tasks | GET | | today, open tasks, latest completed, truncated | signed in, active projects only | |
+| /api/my-counts | GET | | openTasks, upcomingMeetings, unread, prReviews | signed in, active projects only | |
+| /api/notifications | GET | cursor, unread?, category? | items, unreadCount, categoryCounts, nextCursor | signed in, active projects only (`project_invitation` excepted) | 422 bad cursor |
+| /api/notifications/read | POST | ids or all, unread? | ok | signed in | |
+| /api/settings/notifications | GET | | emailNotifications, digestEmails | signed in | |
+| /api/settings/notifications | POST | emailNotifications?, digestEmails? | ok | signed in | |
+| /api/settings/github | GET | | connected, login, authorizeUrl | signed in | |
+| /api/settings/github | DELETE | | ok | signed in | |
 | /api/cron/daily | GET | | counts | Vercel cron (`CRON_SECRET`) | 401 |
 | /api/ai/chat (extended) | POST | projectId, messages | stream + citations | developer+ | 403 viewer |
 | /api/search (extended) | POST | query, projectId? | results | developer+ for projectId | 403 |
 | /api/ai/process (extended) | POST | meetingId | proposals instead of follow ups on project meetings | owner, admin | 409 minutes review, 409 proposals already reviewed |
-| /api/meetings (extended) | GET | projectId? | personal + project meetings, projectId, role | signed in | 404 not a member |
-| /api/meetings/[id] (extended) | GET | | adds projectId, role, canManage; Viewer gets no transcript fields and only confirmed action items | read | |
+| /api/meetings (extended) | GET | projectId? | personal + project meetings, projectId, role, plus W8's meeting fields and project list counts | signed in | 404 not a member |
+| /api/meetings/[id] (extended) | GET | | adds projectId, role, canManage, plus W8's meeting fields and transcriptText; Viewer gets no transcript fields and only confirmed action items | read | |
 
 **Pagination**: every list returns at most 50 rows and a `nextCursor` (`created_at` plus `id`), board columns at most 200 tasks each.
 
@@ -780,11 +901,38 @@ POST /api/projects/[id]/github/sync        → owner or admin: read PR state aga
 GET  /api/projects/[id]/ledger     → member: Decisions and Promises across the project's meetings (?kind=&status=&cursor=), redacted for viewers
 POST /api/ledger/links/[id]/review → (extended) accepts code links; on a project meeting owner or admin
 GET  /api/projects/[id]/activity   → member: Activity timeline (?before=)
-GET  /api/projects/search          → signed in: Ctrl K palette (?q=), title and key match across your active projects only
-GET  /api/notifications            → signed in: your notifications (?cursor=), unread count
-POST /api/notifications/read       → signed in: { ids } or { all: true }
-POST /api/settings/notifications   → signed in: { emailNotifications }, the server copy of the email toggle
-GET  /api/cron/daily               → Vercel cron only (Bearer CRON_SECRET): digest, delivery purge, GitHub sync
+GET  /api/projects/search          → signed in: Ctrl K palette (?q=), title and key match across your active projects and your personal meetings, plus decision statements, no embeddings
+POST /api/projects                 → (extended) adds description?, projectType?, icon?, color?
+GET  /api/projects                 → (extended) adds the My Projects card fields, private repos hidden from Viewers
+GET  /api/projects/[id]            → (extended) adds project details, task totals, openTaskCount, overdueTaskCount, upcomingMeetingCount, decisionCount, linkedPrCount, github { connected, repos, lastSyncedAt } (public repos only for Viewers)
+PATCH /api/projects/[id]           → (extended) owner only: { name?, description?, status?, projectType?, icon?, color? }
+GET  /api/projects/[id]/members    → (extended) adds imageUrl, githubLogin, openTaskCount
+GET  /api/projects/[id]/github/summary → developer or higher: linked repos, last sync, linked PR counts and rows
+GET  /api/projects/[id]/tasks      → (extended) ?priority=; adds priority, commentCount, meeting title, PR refs (Viewers get no comment count or PR refs)
+POST /api/projects/[id]/tasks      → (extended) adds priority?
+GET  /api/tasks/[id]               → (extended) adds priority, comments (never for a Viewer)
+PATCH /api/tasks/[id]              → (extended) adds priority?
+POST /api/tasks/[id]/comments      → developer or higher: { body }, plain text, writes a commented event with no text
+DELETE /api/tasks/[id]/comments/[commentId] → the author, or owner or admin
+GET  /api/tasks/[id]/commits       → developer or higher: PR linked commits read from GitHub on click, never stored
+POST /api/proposals/[id]/review    → (extended) adds priority?, set by the reviewer
+POST /api/projects/[id]/invitations/[invitationId]/resend → owner or admin: new token on an email invite, new expiry, returns the link once
+GET  /api/invitations/preview      → (extended) adds inviter, project details, counts, dates; team names and invitationId only on a matching email invite; repo name only when public
+GET  /api/invitations/mine         → signed in: active email invites for your verified email, never a token
+POST /api/invitations/mine/[id]    → signed in, matching email: { decision: "accept" | "decline" }
+GET  /api/projects/[id]/ledger     → (extended) ?meetingId=&q=&tag=; q matches statement only; items add tag, participants
+GET  /api/projects/[id]/activity   → (extended) ?category=&actorId=; adds categoryCounts
+GET  /api/my-tasks                 → signed in: your open tasks across active projects capped at 200, your latest 50 completed, with truncated
+GET  /api/my-counts                → signed in: openTasks, upcomingMeetings, unread, prReviews for the sidebar
+GET  /api/notifications            → signed in: your notifications in active projects, project invitations included (?cursor=&unread=1&category=), unread count, category counts
+POST /api/notifications/read       → signed in: { ids } or { all: true }; { ids, unread: true } marks rows unread
+GET  /api/settings/notifications   → signed in: the stored email and digest toggles, true for a missing row
+POST /api/settings/notifications   → signed in: { emailNotifications?, digestEmails? }, the server copy of the toggles
+GET  /api/settings/github          → signed in: your connected GitHub account and the authorize URL
+DELETE /api/settings/github        → signed in: clears your GitHub account link, touches no installation
+GET  /api/github/callback          → (extended) also the account connect path, told apart by a separately signed state; stores login and id, discards the token
+GET  /api/meetings/[id]            → (extended) adds description, scheduledEndAt, meetingType, organizerName, invitedUserIds, transcriptText (never for a Viewer)
+GET  /api/meetings                 → (extended) adds the same meeting fields; a project list adds summaryExcerpt and counts
 POST /api/ai/chat                  → (extended) { projectId } project assistant, developer or higher, project filtered in SQL, citations built in code
 POST /api/search                   → (extended) { query, projectId? } scopes to one project where you are developer or higher (the route is POST in code; the older GET line in this list is wrong)
 POST /api/ai/process               → (extended) on a project meeting writes proposals, never follow ups; 409 once any proposal was reviewed
@@ -811,6 +959,7 @@ Security, append to the "Never expose to the browser" list: `GITHUB_APP_PRIVATE_
 | Host controls in the call | `canManage` | `GET /api/meetings/[id]` from `requireMeetingAccess(..., "manage")`; replaces `call.state.createdBy` in `MeetingRoom.tsx` |
 | Stream call role | role | `/api/meetings/[id]/members`: `admin` for project Owner and Admin, `call_member` for Developer and Viewer (verify with `stream-react` before W1 ships it) |
 | GitHub install `state` | signed value | HMAC SHA-256 with a key derived by `crypto.hkdfSync` from `GITHUB_APP_CLIENT_SECRET` (info `install-state`), never the webhook secret |
+| GitHub account `state` | signed value | The same scheme with info `account-state`, so the two never stand in for each other |
 
 ### Key invariants
 
@@ -834,7 +983,7 @@ Security, append to the "Never expose to the browser" list: `GITHUB_APP_PRIVATE_
 - **Viewer redaction**: one shared select per table (`src/lib/project-select.ts`) leaves out quote, transcript line, PR title, repo name, PR URL, and `completion_evidence` for a Viewer, so no route has to remember to strip them; the W9 matrix asserts no such key in any Viewer GET.
 - **Not leaking existence**: a non member gets 404 for any project, task, proposal, or project meeting route, the same body as "not found".
 - **Invites**: 32 random bytes as base64url; only the SHA-256 hex is stored; the raw token shows once. Email invites are single use and bound to a verified primary email. Link invites never grant Admin and always need approval.
-- **GitHub**: the webhook is verified with HMAC SHA-256 over the raw body with `timingSafeEqual` before any parse. The install callback proves the installation belongs to the caller by listing the caller's own installations with a user token; that token and the user identity token are discarded after use.
+- **GitHub**: the webhook is verified with HMAC SHA-256 over the raw body with `timingSafeEqual` before any parse. The install callback proves the installation belongs to the caller by listing the caller's own installations with a user token; that token and the user identity token are discarded after use. The account connect path keeps only login and id, and also discards the token.
 - **Assistant**: project filter inside SQL, retrieved text wrapped as untrusted data, citations built in code, read only (OWASP LLM01 prompt injection guidance).
 - **Audit**: access control changes write `audit_log` (invariant 12). This is a student project with no regulated data in scope, but meeting recordings are personal data, so the consent notice and the "kept until deleted" statement are required (W3).
 
@@ -844,8 +993,8 @@ Security, append to the "Never expose to the browser" list: `GITHUB_APP_PRIVATE_
 |---|---|---|---|
 | Supabase | 500 MB database | tasks and events are small rows; one 768 float embedding (about 3 KB) per task and proposal | deliveries older than 30 days purged daily |
 | Vercel Hobby | cron once a day, function time limit | one daily cron, webhook work in `after()` | Sync capped at 100 PR reads per run |
-| GitHub App | free, 5,000 API requests per hour per installation | PR reads only in Sync and setup | 60 second Sync cooldown per project |
-| Resend | 3,000 emails a month, 100 a day | invites, event emails, one digest per user per day; existing summary and Tasdeeq emails share the same limit | workspace budget per UTC day: 60 for invites and event emails (count of `notifications.emailed_at` plus `audit_log` `invite.emailed`), 20 for digests (count of `user_settings.digest_sent_on`); the rest stays free for the existing emails; in app always continues |
+| GitHub App | free, 5,000 API requests per hour per installation | PR reads in Sync, setup, and commits on click | 60 second Sync cooldown per project; commits capped at 5 PRs and 30 commits each |
+| Resend | 3,000 emails a month, 100 a day | invites, event emails, one digest per user per day; existing summary and Tasdeeq emails share the same limit | workspace budget per UTC day: 60 for invites and event emails including `meeting_scheduled` and invite resends (count of `notifications.emailed_at` plus `audit_log` `invite.emailed`), 20 for digests (count of `user_settings.digest_sent_on`, a PKT date that matches the UTC day when the cron runs); the rest stays free for the existing emails; `task_due`, `pr_review_requested`, and member notices send no email; in app always continues |
 | Gemini | free tier rate limits | one batch embedding call per processed meeting, one per manual task, assistant same as chat today | Groq fallback for generation as today |
 | Stream, Clerk | free tiers | no new Stream feature, no Clerk Organizations or paid roles | |
 
@@ -881,7 +1030,7 @@ Each W step is one shippable end to end slice: its migration block, its routes, 
 5. **W5, GitHub** ([0004-github.md](0004-github.md)): W5 SQL block including the `ledger_links` change, App JWT and installation tokens with Node `crypto` (no Octokit), install callback and claims, webhook, linking rules, revert, Sync, task drawer, code links on the Ledger tab, satisfies **AC-43** to **AC-56** (plus AC-43a, AC-48a to AC-48d, AC-52a, and AC-55a, added at the W5 `/architect`).
 6. **W6, Proof Chain surfaces** ([0004-proof-chain.md](0004-proof-chain.md)): `project_activity` view, Decisions and Promises tab, Outcome card, Activity tab, satisfies **AC-57** to **AC-62**.
 7. **W7, Project assistant** ([0004-project-assistant.md](0004-project-assistant.md)): `match_project_chunks`, chat and search extensions, citations, untrusted data wrapping, satisfies **AC-63** to **AC-69**.
-8. **W8, Workspace shell and notifications** ([0004-workspace-shell.md](0004-workspace-shell.md)): W8 SQL block, shell and personal views, notifications, digest cron, Ctrl K with `cmdk`, success and warning tokens, satisfies **AC-70** to **AC-79**.
+8. **W8, Workspace shell and notifications** ([0004-workspace-shell.md](0004-workspace-shell.md)): after W7: W8 SQL block, notifications and email, digest cron, tokens, sidebar and personal views, the PDF's project header and nine tabs, project fields, task priority and comments, board list view and filters, GitHub tab, connected GitHub account, members and invite screens, meeting fields and details, Ctrl K with `cmdk`, satisfies **AC-70** to **AC-79** (plus AC-70a to AC-70y, AC-71a to AC-71c, AC-72a, AC-76a, AC-77a to AC-77g, AC-78a, AC-78b, and AC-79a, added at the W8 `/architect`).
 9. **W9, Security suite and end to end** ([0004-security-e2e.md](0004-security-e2e.md)): route matrix tests, webhook and invite attack tests, injection tests, the bilingual run, satisfies **AC-80** to **AC-84**.
 
 ## Consequences
@@ -892,7 +1041,7 @@ Each W step is one shippable end to end slice: its migration block, its routes, 
 - Personal meetings keep working unchanged.
 
 **Negative / tradeoffs**:
-- Nine steps of work, the largest phase so far; W1 touches almost every API route, so its test burden is high.
+- Nine steps of work, the largest phase so far; W1 touches almost every API route, so its test burden is high. Following the PDF roughly doubles W8.
 - No realtime board: two people moving cards see each other's change only on refetch (focus or 30 seconds), and a stale move gets a 409.
 - GitHub does not redeliver failed webhooks; until someone presses Sync or the daily cron runs, a missed merge stays missed.
 - Revert detection only understands GitHub's own "Reverts owner/repo#N" format.
@@ -908,14 +1057,14 @@ Each W step is one shippable end to end slice: its migration block, its routes, 
 
 - [ ] W-pre is not done: commit the Live Ledger and Tasdeeq work, then run LL5 and the Tasdeeq live run before W1.
 - [ ] Apply the AGENTS.md API Contracts and Security lines above before W1 (your OK, or `/sync`).
-- [ ] Agent skills and MCP discovery was deferred: check for skills covering `@hello-pangea/dnd` and `cmdk` before W4 and W8. Checked for W5 on 2026-11-05: no GitHub Apps skill is installed (`clerk-webhooks` covers Clerk only), and the spec uses plain `fetch` and Node `crypto`, so none is needed.
+- [ ] Agent skills and MCP discovery was deferred: check for skills covering `@hello-pangea/dnd` and `cmdk` before W4 and W8. Checked for W5 on 2026-11-05: no GitHub Apps skill is installed (`clerk-webhooks` covers Clerk only), and the spec uses plain `fetch` and Node `crypto`, so none is needed. Checked for W8 on 2026-11-07: no `cmdk` skill is installed; it is used through one component, so none is needed.
 - [x] Before W3, verify with the `stream-react` skill whether call level permissions can make the consent gate server enforced on the free tier. Settled 2026-11-03: yes, a custom `project` call type without `join-call` for `user` and `guest` (see [0004-project-meetings.md](0004-project-meetings.md)); W3 build step 1 confirms Stream accepts it on this plan.
 - [ ] Turn Clerk email verification back on at Deploy; until then the email invite binding trusts an unverified address in dev (see [0004-invitations.md](0004-invitations.md)).
 - [ ] Fix the existing AGENTS.md line `GET  /api/search`: the route in `src/app/api/search/route.ts` is `POST` with `{ query }`; W7 extends that POST.
 - [x] Before W3, the same `stream-react` check decides whether offboarding can revoke Stream call access. Settled 2026-11-03: removal takes the user off the call members of open `project` calls and kicks them (AC-30b). Their Stream token stays valid but no longer opens any project call.
 - [ ] Clerk `user.deleted` is not handled: a deleted Owner leaves a project with no reachable Owner. Decide a recovery path before Deploy.
 - [ ] Project pages use the PKT day for overdue while the meeting Ledger tab uses the browser's `today`; near midnight they can differ. Align them in a later polish step.
-- [ ] Post W9 stretch: create GitHub issues from tasks (cut from the core, needs Issues write).
+- [ ] Post W9 stretch: create GitHub issues from tasks (cut from the core, needs Issues write). This also brings back the PDF's "Also create GitHub issues" toggle, Issues sub tab, and linked issues.
 - [ ] Post W9 optional: Web Speech live captions experiment (out of the core).
 
 ## Rationale

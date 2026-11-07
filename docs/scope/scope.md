@@ -80,8 +80,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | in-progress |
 | 23 | GitHub App integration with strict linking rules (W5) | Project Workspace | in-progress |
 | 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | in-progress |
-| 25 | Project AI assistant with code built citations (W7) | Project Workspace | planned |
-| 26 | Workspace shell, personal views, notifications, Ctrl K (W8) | Project Workspace | planned |
+| 25 | Project AI assistant with code built citations (W7) | Project Workspace | in-progress |
+| 26 | Workspace shell, personal views, notifications, Ctrl K (W8) | Project Workspace | in-progress |
 | 27 | Workspace verify and security suite (W9) | Project Workspace | planned |
 | 11 | Deploy and harden | Deploy | planned |
 | 12 | General AI chat page | FYP Polish | done |
@@ -654,19 +654,38 @@ Spec: [0004-proof-chain](../specs/0004-conversations-to-code/0004-proof-chain.md
 - [ ] Review it (fresh model): `/check review proof chain`
 - [ ] Document it: `/document proof chain`
 
-### 25. Project AI assistant with code built citations · planned · GA
+### 25. Project AI assistant with code built citations · in-progress · GA
 Extend `/api/ai/chat` and `/api/search` with a project scope rather than new routes. Retrieval filters by project inside SQL, covers meetings, ledger items, and task titles, treats transcripts, PR text, and commits as untrusted data, stays read only, and builds citations in code from retrieved record ids, answering "not found in this project's records" when nothing matches.
 **Done when:** a cross project question returns nothing from other projects and injected PR text does not change answers.
-Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
-- [ ] Build it: `/develop project assistant`
-  - [ ] W7 Project scoped chat and search with code built citations (AC-63 to AC-69)
+Spec: [0004-project-assistant](../specs/0004-conversations-to-code/0004-project-assistant.md), under [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [x] Design it (spec)
+- [x] Build it: `/develop project assistant`
+  - [x] W7 Project scoped chat and search with code built citations (AC-63 to AC-69)
+- [ ] Verify it: `/check verify`
+- [ ] Test it: `/test`
+- [ ] Review it (fresh model): `/check review`
+- [ ] Document it: `/document`
 
-### 26. Workspace shell, personal views, notifications, Ctrl K · planned · GA
-New sidebar and navigation from the PDF layout (My Dashboard, My Tasks, My Meetings, My Projects, Notifications, project tabs), styled with the locked Stitch tokens plus new success and warning tokens. Notifications table and bell, one daily digest via the once a day Vercel cron, a Ctrl K palette, and a useful empty state in every project tab. Recordings fold into meeting detail, Prep into the project overview, Search into Ctrl K. No per developer contribution views (they read as surveillance).
-**Done when:** every tab renders a useful empty state in a fresh project and every PDF screen in the core has a working home.
-Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
-- [ ] Build it: `/develop workspace shell`
-  - [ ] W8 Tabs, notifications, email budget, daily cron, My Tasks, Ctrl K, tokens (AC-70 to AC-79)
+### 26. Workspace shell, personal views, notifications, Ctrl K · in-progress · GA
+New sidebar and navigation from the PDF (My Dashboard, My Tasks, My Meetings, My Projects, Notifications, AI Assistant, project shortcuts and counts, header with breadcrumbs, search, Help, and profile menu), styled with the locked Stitch tokens plus new success and warning tokens. A project gets the PDF's header and nine tabs (Overview, Meetings, Tasks, Members, GitHub, Development Activity, Decisions and Promises, AI Assistant, Settings). Projects gain description, status, type, icon, and color. Tasks gain priority and comments, and the board gains a list view and filters. Adds a GitHub tab, a connected GitHub account for review notices, richer members and invite screens, meeting type and participants, a Transcript tab, and bulk proposal confirm on Meeting Details. Notifications table and bell, one daily digest via the once a day Vercel cron, a Ctrl K palette, and a useful empty state in every project tab. Recordings fold into meeting detail, Prep into the project overview, Search into Ctrl K. No per developer contribution views (they read as surveillance).
+**Done when:** every tab renders a useful empty state in a fresh project and every PDF screen has a working home, apart from the items the spec lists under "What stays out of the PDF".
+Spec: [0004-workspace-shell](../specs/0004-conversations-to-code/0004-workspace-shell.md), under [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
+- [x] Design it (spec)
+- [ ] Build it: `/develop workspace shell` (after W7; 21 slices, so I'd recommend several sessions)
+  - [ ] Notifications data, `notify`, routes, and wiring into every caller (AC-71 to AC-72)
+  - [ ] Event email gate, settings route and toggles, daily cron with due notices, digest, purge, and Sync (AC-74 to AC-76a)
+  - [ ] Tokens, sidebar, header, bell, Notifications page, My Profile, Settings, Connected Accounts, review notices (AC-72a, AC-73, AC-77a, AC-77e to AC-77g, AC-79, AC-79a)
+  - [ ] Project fields, New Project, My Projects, project header, tabs with aliases, Overview, Settings, empty states (AC-70, AC-70a, AC-70b, AC-70e to AC-70h, AC-77d)
+  - [ ] Tasks with review, priority, filters, Board and List, drawer, comments, commits on click (AC-70c, AC-70o to AC-70r)
+  - [ ] Members, Add Members, invite page, pending invitation banner (AC-70j, AC-70k, AC-70s, AC-70t)
+  - [ ] Meetings tab, schedule fields, Meeting Details, bulk proposal confirm (AC-70d, AC-70u to AC-70w)
+  - [ ] GitHub tab, Decisions and Activity filters, AI Assistant tab (AC-70i, AC-70l to AC-70n)
+  - [ ] My Tasks, My Dashboard, My Meetings (AC-77, AC-77b, AC-77c)
+  - [ ] Ctrl K palette with decisions, search route, `q` on `/search`, Raise hand, auth layouts (AC-78 to AC-78b, AC-70x, AC-70y)
+- [ ] Verify it: `/check verify workspace shell`
+- [ ] Test it: `/test workspace shell`
+- [ ] Review it (fresh model): `/check review workspace shell`
+- [ ] Document it: `/document workspace shell`
 
 ### 27. Workspace verify and security suite · planned · GA
 Security tests (non member access, forged webhook, invite replay, role escalation), planted PR scenarios, and one real bilingual project meeting run through the full chain, plus the demo script.
@@ -695,10 +714,12 @@ Out of scope for the current build pass, kept so the plan stays honest.
 - While You Were Gone (a recap of what you missed when your connection drops, for load shedding and weak networks). Runner up from the November 2026 research; blocked until stored transcripts keep timestamps · needs a decision
 - Viva / FYP Panel Mode (a meeting mode for viva and panel sessions). Runner up from the November 2026 research · needs a decision
 - Offline Safe Voice (keep recording your own mic during load shedding or a dropped connection, then merge it into the transcript when you reconnect). Runner up from the third research pass (`reports/NeuraMeet third signature feature.md`) · needs a decision
+- Prepare on a project's next meeting drawing on the whole project instead of only your own meetings, through W7's project filter. From spec 0004-workspace-shell · needs a decision
 - Meeting Purpose and Goal Attainment (state a meeting goal, then show whether it was met). Runner up from the third research pass; a large field study found goal nudges did not help · needs a decision
 - Cross meeting Fact Drift (flag numbers, dates, or requirements stated differently across meetings). Runner up from the third research pass; reads as a Promise Ledger variant · needs a decision
 - Live captions in the meeting (from the PDF). Stream captions are a paid add-on ($8 per 1,000 call minutes) with no Urdu, and Groq's free Whisper limits cannot cover live captions plus post call transcripts. Optional stretch after W9: browser Web Speech captions for each speaker's own mic, labelled experimental (Chrome and Edge only, audio processed by Google), with the post call transcript staying the record · needs a decision
-- Cut from the PDF for this build: the development simulator on Task Details (fake evidence next to real), the Contributors tab and per developer contribution widgets, a global AI assistant outside projects, sprints and milestones, raw commit ingestion beyond PR linked commits, Clerk Organizations
+- Cut from the PDF for this build: the development simulator on Task Details (fake evidence next to real), the Contributors tab, My GitHub Contributions, and per developer contribution widgets (By assignee bars, done counts), a global AI assistant reading project data, sprints and milestones, raw commit ingestion beyond PR linked commits (no Commits sub tab, commit counts, or commit rows in Activity), Clerk Organizations
+- Also left out of the PDF, for reasons other than the cut list: Also create GitHub issues, Issues sub tab, and linked issues (needs Issues write, post W9 stretch); PR Approve and review status (the App is read only); per project webhook health (not stored per repo); meeting reminders (you chose none); dark theme (tokens are light only); remember me (Clerk owns sessions)
 
 ## Step 9.5 FYP Polish Pass
 
