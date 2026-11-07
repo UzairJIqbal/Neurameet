@@ -350,6 +350,19 @@ describe("POST /api/ai/process (Promise Ledger extraction)", () => {
     expect(mockWriteLedger).not.toHaveBeenCalled();
   });
 
+  it("returns a friendly message, never the provider's error text", async () => {
+    ownedMeeting();
+    mockGenerate.mockRejectedValue(
+      new Error("Failed to validate JSON, see failed_generation"),
+    );
+
+    const res = await call("u1");
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: "AI is busy right now, please try again in a minute",
+    });
+  });
+
   it("returns 404 when the meeting has no transcript", async () => {
     queues.meetings = [
       { data: { id: "m1", started_at: null, created_at: null }, error: null },

@@ -116,13 +116,49 @@ export async function generateStructuredWithFallback<OBJECT>({
     });
   } catch (error) {
     console.warn("Gemini structured call failed, falling back to Groq:", error);
-    // gpt-oss-20b supports json_schema, so use the default structured-outputs
-    // path (no providerOptions override) — same as the Gemini primary.
-    return await generateObject({
+    return await generateFallbackObject({ schema, prompt });
+  }
+}
+
+// gpt-oss-20b is a reasoning model and its reasoning counts against the
+// completion budget. Keep reasoning low and name the budget, or Groq can cut the
+// JSON off or return none at all.
+export const FALLBACK_MAX_OUTPUT_TOKENS = 8192;
+
+// Groq answers 400 when the model's output misses the schema. That is not an
+// error the SDK retries, but the next generation often succeeds.
+function isGroqJsonFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return (
+    message.includes("to validate JSON") ||
+    message.includes("to generate JSON") ||
+    message.includes("max completion tokens")
+  );
+}
+
+async function generateFallbackObject<OBJECT>({
+  schema,
+  prompt,
+}: {
+  schema: z.ZodType<OBJECT>;
+  prompt: string;
+}): Promise<{ object: OBJECT }> {
+  // gpt-oss-20b supports json_schema, so use the default structured-outputs
+  // path, same as the Gemini primary.
+  const call = () =>
+    generateObject({
       model: fallbackModel,
       schema,
       prompt,
       maxRetries: 1,
+      maxOutputTokens: FALLBACK_MAX_OUTPUT_TOKENS,
+      providerOptions: { groq: { reasoningEffort: "low" } },
     });
+  try {
+    return await call();
+  } catch (error) {
+    if (!isGroqJsonFailure(error)) throw error;
+    console.warn("Groq returned no valid JSON, trying once more:", error);
+    return await call();
   }
 }

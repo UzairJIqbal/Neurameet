@@ -413,8 +413,10 @@ Extraction rules:
       ...(projectId ? { proposalCount: result.actionItems.length } : {}),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Processing failed";
     console.error("AI processing error:", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "AI is busy right now, please try again in a minute" },
+      { status: 500 },
+    );
   }
 }

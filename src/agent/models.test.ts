@@ -7,6 +7,7 @@ vi.mock("ai", () => ({ generateText: vi.fn(), generateObject: vi.fn() }));
 
 import { generateObject } from "ai";
 import {
+  FALLBACK_MAX_OUTPUT_TOKENS,
   generateStructuredWithFallback,
   PRIMARY_STRUCTURED_TIMEOUT_MS,
 } from "./models";
@@ -87,6 +88,66 @@ describe("generateStructuredWithFallback", () => {
     });
 
     expect(result.object).toEqual({ ok: false });
+    expect(modelsCalled()).toEqual(["gemini", "groq"]);
+  });
+
+  it("gives Groq a token budget and low reasoning, Gemini neither", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockProviders(() => Promise.reject(new Error("quota")));
+
+    await generateStructuredWithFallback({ schema, prompt: "p" });
+
+    const [gemini, groq] = vi.mocked(generateObject).mock.calls;
+    expect(gemini[0]).not.toHaveProperty("providerOptions");
+    expect(groq[0]).toMatchObject({
+      maxOutputTokens: FALLBACK_MAX_OUTPUT_TOKENS,
+      providerOptions: { groq: { reasoningEffort: "low" } },
+    });
+  });
+
+  it.each([
+    "Failed to validate JSON. Please adjust your prompt.",
+    "Failed to generate JSON. Please adjust your prompt.",
+    "max completion tokens reached before generating a valid document",
+  ])("tries Groq once more after: %s", async (message) => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let groqCalls = 0;
+    vi.mocked(generateObject).mockImplementation(((args: CallArgs) => {
+      if (args.model === "gemini") return Promise.reject(new Error("quota"));
+      groqCalls += 1;
+      return groqCalls === 1
+        ? Promise.reject(new Error(message))
+        : Promise.resolve({ object: { ok: true } });
+    }) as unknown as typeof generateObject);
+
+    const result = await generateStructuredWithFallback({
+      schema,
+      prompt: "p",
+    });
+
+    expect(result.object).toEqual({ ok: true });
+    expect(modelsCalled()).toEqual(["gemini", "groq", "groq"]);
+  });
+
+  it("stops after the second Groq JSON failure", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(generateObject).mockRejectedValue(
+      new Error("Failed to validate JSON."),
+    );
+
+    await expect(
+      generateStructuredWithFallback({ schema, prompt: "p" }),
+    ).rejects.toThrow("validate JSON");
+    expect(modelsCalled()).toEqual(["gemini", "groq", "groq"]);
+  });
+
+  it("does not try Groq again on other errors", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(generateObject).mockRejectedValue(new Error("rate limited"));
+
+    await expect(
+      generateStructuredWithFallback({ schema, prompt: "p" }),
+    ).rejects.toThrow("rate limited");
     expect(modelsCalled()).toEqual(["gemini", "groq"]);
   });
 
