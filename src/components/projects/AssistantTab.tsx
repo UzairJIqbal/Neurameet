@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Send, Square, Trash2 } from "lucide-react";
+import { Plus, Send, Square } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -79,11 +79,20 @@ const AssistantMessage = ({ message }: { message: UIMessage }) => {
   );
 };
 
+type Props = {
+  projectId: string;
+  heading?: string;
+  /** Fills the input. The nonce lets the same text fill it twice. */
+  prefill?: { text: string; nonce: number } | null;
+  aboveInput?: React.ReactNode;
+};
+
 // The project assistant (spec 0004, W7). History stays in this browser tab,
-// per project. W8 adds the heading, suggestions, and Project Memory panel.
-const AssistantTab = ({ projectId }: { projectId: string }) => {
+// per project. `ProjectAssistant` adds the suggestions and Project Memory panel.
+const AssistantTab = ({ projectId, heading, prefill, aboveInput }: Props) => {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const chatId = `project:${projectId}`;
 
   const transport = useMemo(
@@ -110,6 +119,12 @@ const AssistantTab = ({ projectId }: { projectId: string }) => {
     if (error) toast.error(errorText(error));
   }, [error]);
 
+  useEffect(() => {
+    if (!prefill) return;
+    setInput(prefill.text);
+    inputRef.current?.focus();
+  }, [prefill]);
+
   const isStreaming = status === "streaming" || status === "submitted";
 
   const handleSend = (e: React.FormEvent) => {
@@ -127,7 +142,21 @@ const AssistantTab = ({ projectId }: { projectId: string }) => {
   };
 
   return (
-    <div className="flex h-[60vh] flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+    <div className="flex h-[60vh] min-w-0 flex-1 flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center justify-between gap-3 border-b border-outline-variant px-4 py-3">
+        {heading ? (
+          <h2 className="min-w-0 break-words text-headline-sm text-on-surface">{heading}</h2>
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={handleClear}
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-outline-variant px-3 py-1.5 text-body-md text-on-surface transition-colors hover:bg-surface-container-high"
+        >
+          <Plus className="h-4 w-4" /> New chat
+        </button>
+      </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
         {messages.length === 0 && (
           <p className="text-body-md text-on-surface-variant">
@@ -171,22 +200,17 @@ const AssistantTab = ({ projectId }: { projectId: string }) => {
         <div ref={bottomRef} />
       </div>
 
+      {aboveInput && <div className="border-t border-outline-variant px-4 pt-3">{aboveInput}</div>}
+
       <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-outline-variant p-4">
         <input
+          ref={inputRef}
+          aria-label="Ask about this project"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about this project…"
           className="flex-1 rounded-md border border-outline-variant bg-surface px-4 py-2.5 text-body-md text-on-surface placeholder:text-on-surface-variant focus:border-primary-container focus:outline-none"
         />
-        <button
-          type="button"
-          onClick={handleClear}
-          aria-label="Clear conversation"
-          title="Clear conversation"
-          className="inline-flex items-center justify-center rounded-md border border-outline-variant p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
         {isStreaming ? (
           <button
             type="button"

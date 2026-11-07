@@ -1,7 +1,7 @@
-/* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Upload } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
@@ -10,12 +10,23 @@ import { LoadError } from "@/components/ui/load-error";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import toast from "react-hot-toast";
 import { MeetingListItem } from "@/lib/meeting-types";
+import { listProjects } from "@/lib/project-client";
+
+const CHIP =
+  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
+const startOf = (m: MeetingListItem) =>
+  m.startedAt ? new Date(m.startedAt).getTime() : Number.MAX_SAFE_INTEGER;
 
 const MeetingList = () => {
   const router = useRouter();
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [projectNames, setProjectNames] = useState<Map<string, string>>(
+    new Map(),
+  );
+  const [filter, setFilter] = useState("all");
+  const [now] = useState(() => Date.now());
   const { timedOut } = useLoadingTimeout(isLoading, {
     timeoutMs: 12000,
     retryNonce,
@@ -49,6 +60,43 @@ const MeetingList = () => {
     fetchMeetings();
     return () => controller.abort();
   }, [retryNonce]);
+
+  // Names for the project chip and the filter. A failure only drops the names;
+  // the list itself still works.
+  useEffect(() => {
+    const controller = new AbortController();
+    listProjects(controller.signal)
+      .then((res) =>
+        setProjectNames(
+          new Map((res.projects ?? []).map((p) => [p.id, p.name])),
+        ),
+      )
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  const filtered = useMemo(
+    () =>
+      meetings.filter((m) =>
+        filter === "all"
+          ? true
+          : filter === "personal"
+            ? !m.projectId
+            : m.projectId === filter,
+      ),
+    [meetings, filter],
+  );
+  const upcoming = useMemo(
+    () =>
+      filtered
+        .filter((m) => m.status === "scheduled")
+        .sort((a, b) => startOf(a) - startOf(b)),
+    [filtered],
+  );
+  const past = useMemo(
+    () => filtered.filter((m) => m.status !== "scheduled"),
+    [filtered],
+  );
 
   const handleDeleteMeeting = async (id: string) => {
     try {
@@ -86,14 +134,81 @@ const MeetingList = () => {
           Meeting Intelligence
         </h1>
         <p className="text-body-md text-on-surface-variant">
-          {meetings.length} meeting{meetings.length === 1 ? "" : "s"}
+          {filtered.length} meeting{filtered.length === 1 ? "" : "s"}
         </p>
+        {projectNames.size > 0 && (
+          <label className="mt-2 w-full max-w-xs">
+            <span className="sr-only">Filter meetings</span>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none"
+            >
+              <option value="all">All meetings</option>
+              <option value="personal">Personal</option>
+              {[...projectNames.entries()].map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </header>
 
-      {meetings.length === 0 ? (
+      {upcoming.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-headline-sm font-semibold text-on-surface">
+            Upcoming
+          </h2>
+          <ul className="divide-y divide-surface-variant rounded-xl border border-surface-variant bg-surface-container-lowest">
+            {upcoming.map((m) => (
+              <li
+                key={m.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-6 py-4"
+              >
+                <div className="min-w-0">
+                  <p className="break-words font-body-md font-medium text-on-surface">
+                    {m.title}
+                  </p>
+                  <p className="text-body-md text-on-surface-variant">
+                    {m.startedAt
+                      ? new Date(m.startedAt).toLocaleString()
+                      : "No time set"}
+                    {m.projectId && projectNames.get(m.projectId)
+                      ? ` · ${projectNames.get(m.projectId)}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {m.startedAt && new Date(m.startedAt).getTime() < now && (
+                    <span
+                      className={`${CHIP} bg-warning-container text-on-warning-container`}
+                    >
+                      Time passed
+                    </span>
+                  )}
+                  {m.streamCallId && (
+                    <Link
+                      href={`/meeting/${m.streamCallId}`}
+                      className="rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary"
+                    >
+                      Join
+                    </Link>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {past.length === 0 && upcoming.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest px-6 py-16 text-center">
           <FileText className="h-10 w-10 text-on-surface-variant" />
-          <p className="text-body-lg text-on-surface-variant">No meetings yet.</p>
+          <p className="text-body-lg text-on-surface-variant">
+            No meetings yet.
+          </p>
           <button
             onClick={() => router.push("/dashboard")}
             className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
@@ -102,16 +217,18 @@ const MeetingList = () => {
             Upload Transcript
           </button>
         </div>
-      ) : (
+      ) : past.length === 0 ? null : (
         <div className="shrink-0 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
           <div className="grid grid-cols-12 gap-4 border-b border-surface-variant bg-surface-container-low/50 px-6 py-4 text-label-caps uppercase tracking-wider text-on-surface-variant">
             <div className="col-span-6 md:col-span-4">Meeting</div>
             <div className="col-span-6 md:col-span-2">Date</div>
-            <div className="hidden md:flex md:items-center md:col-span-2">Category</div>
+            <div className="hidden md:flex md:items-center md:col-span-2">
+              Category
+            </div>
             <div className="col-span-12 text-right md:col-span-4">Action</div>
           </div>
           <div className="divide-y divide-surface-variant">
-            {meetings.map((m) => (
+            {past.map((m) => (
               <div
                 key={m.id}
                 className="grid grid-cols-12 items-center gap-4 px-6 py-4 transition-colors hover:bg-surface-container-low"
@@ -123,6 +240,13 @@ const MeetingList = () => {
                   <span className="break-words font-body-md font-medium text-on-surface">
                     {m.title}
                   </span>
+                  {m.projectId && projectNames.get(m.projectId) && (
+                    <span
+                      className={`${CHIP} bg-secondary-container text-on-secondary-container`}
+                    >
+                      {projectNames.get(m.projectId)}
+                    </span>
+                  )}
                 </div>
                 <div className="col-span-6 text-body-md text-on-surface-variant md:col-span-2">
                   {m.startedAt
@@ -149,12 +273,14 @@ const MeetingList = () => {
                   >
                     Insights
                   </button>
-                  <ConfirmDelete
-                    label="Delete meeting"
-                    confirmLabel="Delete"
-                    warning="If a minutes review is open, it and its answers are deleted too."
-                    onConfirm={() => handleDeleteMeeting(m.id)}
-                  />
+                  {(!m.projectId || m.role === "owner") && (
+                    <ConfirmDelete
+                      label="Delete meeting"
+                      confirmLabel="Delete"
+                      warning="If a minutes review is open, it and its answers are deleted too."
+                      onConfirm={() => handleDeleteMeeting(m.id)}
+                    />
+                  )}
                 </div>
               </div>
             ))}

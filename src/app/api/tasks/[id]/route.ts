@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -7,6 +7,7 @@ import {
   requireProjectRole,
 } from "@/lib/project-auth";
 import { lookupProfiles, rpcErrorCode } from "@/lib/projects";
+import { notifyTaskAssigned } from "@/lib/notification-events";
 import {
   readTask,
   taskLinkSelectFor,
@@ -20,11 +21,13 @@ import {
   TASK_DESCRIPTION_MAX,
   TASK_TITLE_MAX,
   isIsoDate,
+  isTaskPriority,
   isTaskStatus,
   needsRenumber,
 } from "@/lib/tasks";
 import { patchDenial, type TaskRulePatch } from "@/lib/task-rules";
 import { outcomeForTask } from "@/lib/proof-chain";
+import { readTaskComments } from "@/lib/task-comments";
 import type { TaskDetailResponse, TaskResponse } from "@/lib/task-types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -84,7 +87,10 @@ export async function GET(_request: Request, { params }: Params) {
       .eq("task_id", id)
       .order("created_at", { ascending: true });
     if (eventErr) throw eventErr;
-    const eventRows = (eventData ?? []) as TaskEventRow[];
+    // A Viewer gets no comments and no way to count them (AC-70r).
+    const eventRows = ((eventData ?? []) as TaskEventRow[]).filter(
+      (e) => role !== "viewer" || e.kind !== "commented",
+    );
     const names = await lookupProfiles(
       eventRows.map((e) => e.actor_id).filter((v): v is string => !!v),
     );
@@ -109,6 +115,7 @@ export async function GET(_request: Request, { params }: Params) {
     }
 
     const response: TaskDetailResponse = {
+      projectId: head.project_id,
       task,
       events: eventRows.map((e) => toTaskEvent(e, role, names)),
       prLinks: linkRows.map((row) => toTaskPrLink(row, role)),
@@ -124,6 +131,7 @@ export async function GET(_request: Request, { params }: Params) {
             }),
       },
       outcome: await outcomeForTask(supabase, task, role),
+      ...(role === "viewer" ? {} : await readTaskComments(supabase, id)),
     };
     return NextResponse.json(response);
   } catch (err) {
@@ -195,6 +203,12 @@ function parsePatch(raw: Record<string, unknown> | null): ParsedPatch {
       return { ok: false, error: "Due date must be YYYY-MM-DD" };
     }
     patch.dueDate = raw.dueDate;
+  }
+  if ("priority" in raw) {
+    if (!isTaskPriority(raw.priority)) {
+      return { ok: false, error: "Unknown priority" };
+    }
+    patch.priority = raw.priority;
   }
   if ("completionEvidence" in raw) {
     if (typeof raw.completionEvidence !== "string") {
@@ -334,6 +348,10 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     const task = await readTask(supabase, id, role);
     if (!task) return NextResponse.json(NOT_FOUND, { status: 404 });
+    // update_task returns only the id, so the key uses ifVersion + 1, never a later read.
+    if (patch.assigneeId && patch.assigneeId !== head.assignee_id) {
+      after(() => notifyTaskAssigned(supabase, id, ifVersion + 1, userId));
+    }
     return NextResponse.json({ task } satisfies TaskResponse);
   } catch (err) {
     const denied = accessErrorResponse(err);

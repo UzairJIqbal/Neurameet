@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
-import type { ProjectDetail, ProjectRole } from "@/lib/project-types";
+import {
+  render,
+  screen,
+  cleanup,
+  within,
+  fireEvent,
+} from "@testing-library/react";
+import type { ProjectFull, ProjectRole } from "@/lib/project-types";
 
 const chat = vi.hoisted(() => ({
   useChat: vi.fn(),
@@ -25,6 +31,7 @@ vi.mock("@/lib/project-client", async () => {
   );
   return { ...actual, getProject: chat.getProject };
 });
+vi.mock("./OverviewTab", () => ({ default: () => <div>overview tab</div> }));
 vi.mock("./MembersTab", () => ({ default: () => <div>members tab</div> }));
 vi.mock("./TasksBoard", () => ({ default: () => <div>tasks tab</div> }));
 vi.mock("./ProposalsPanel", () => ({
@@ -33,9 +40,11 @@ vi.mock("./ProposalsPanel", () => ({
 vi.mock("./GitHubTab", () => ({ default: () => <div>github tab</div> }));
 vi.mock("./DecisionsTab", () => ({ default: () => <div>decisions tab</div> }));
 vi.mock("./ActivityTab", () => ({ default: () => <div>activity tab</div> }));
+vi.mock("@/components/MeetingModel", () => ({ default: () => null }));
 
 import toast from "react-hot-toast";
 import AssistantTab from "./AssistantTab";
+import ProjectAssistant from "./ProjectAssistant";
 import ProjectDetailView from "./ProjectDetailView";
 
 const sources = [
@@ -70,7 +79,7 @@ const mockChat = (messages: unknown[], error?: Error) =>
     error,
   });
 
-const project = (role: ProjectRole): ProjectDetail => ({
+const project = (role: ProjectRole): ProjectFull => ({
   id: "p1",
   name: "Core",
   taskPrefix: "NM",
@@ -78,6 +87,27 @@ const project = (role: ProjectRole): ProjectDetail => ({
   memberCount: 1,
   meetingCount: 1,
   createdAt: "2026-11-01T00:00:00Z",
+  description: null,
+  status: "active",
+  projectType: "web",
+  icon: "folder",
+  color: "primary",
+  ownerName: "Olivia",
+  avatars: [],
+  taskTotals: {
+    todo: 1,
+    in_progress: 1,
+    in_review: 0,
+    completed: 2,
+    blocked: 0,
+  },
+  openTaskCount: 2,
+  overdueTaskCount: 0,
+  upcomingMeetingCount: 1,
+  processedMeetingCount: 1,
+  decisionCount: 0,
+  linkedPrCount: 0,
+  github: { connected: false, repos: [], lastSyncedAt: null },
 });
 
 beforeEach(() => {
@@ -171,7 +201,7 @@ describe("ProjectDetailView assistant tab", () => {
     chat.params = new URLSearchParams("tab=assistant");
     chat.getProject.mockResolvedValue({ project: project("viewer") });
     render(<ProjectDetailView id="p1" />);
-    await screen.findByText("members tab");
+    await screen.findByText("overview tab");
     expect(screen.queryByRole("tab", { name: "AI Assistant" })).toBeNull();
     expect(chat.useChat).not.toHaveBeenCalled();
   });
@@ -188,4 +218,60 @@ describe("ProjectDetailView assistant tab", () => {
       expect(chat.useChat).toHaveBeenCalled();
     },
   );
+});
+
+describe("ProjectAssistant (AC-70n)", () => {
+  const project = {
+    id: "p1",
+    name: "Billing",
+    processedMeetingCount: 3,
+    decisionCount: 7,
+    linkedPrCount: 2,
+    taskTotals: { todo: 1, in_progress: 2, in_review: 0, done: 4 },
+  } as unknown as ProjectFull;
+
+  beforeEach(() => {
+    chat.useChat.mockReturnValue({
+      messages: [],
+      sendMessage: vi.fn(),
+      status: "ready",
+      stop: vi.fn(),
+      setMessages: vi.fn(),
+      error: undefined,
+    });
+  });
+
+  it("names the project and offers New chat", () => {
+    render(<ProjectAssistant project={project} />);
+    expect(
+      screen.getByRole("heading", { name: "Ask anything about Billing" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeTruthy();
+  });
+
+  it("fills the input from a suggestion without sending it", () => {
+    render(<ProjectAssistant project={project} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Which tasks are still pending?" }),
+    );
+    expect(
+      (screen.getByLabelText("Ask about this project") as HTMLInputElement)
+        .value,
+    ).toBe("Which tasks are still pending?");
+    expect(
+      chat.useChat.mock.results[0].value.sendMessage,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("shows what it answers from, with no commit or issue counts", () => {
+    render(<ProjectAssistant project={project} />);
+    const panel = within(screen.getByLabelText("Project Memory"));
+    expect(panel.getByText("Processed meetings").nextSibling?.textContent).toBe(
+      "3",
+    );
+    expect(panel.getByText("Decisions").nextSibling?.textContent).toBe("7");
+    expect(panel.getByText("Tasks").nextSibling?.textContent).toBe("7");
+    expect(panel.getByText("Linked PRs").nextSibling?.textContent).toBe("2");
+    expect(panel.queryByText(/commit|issue/i)).toBeNull();
+  });
 });

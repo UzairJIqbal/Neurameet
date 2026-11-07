@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SYNC_AUDIT_ACTION } from "@/lib/project-cards";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -16,7 +17,6 @@ export const maxDuration = 60;
 type Params = { params: Promise<{ id: string }> };
 
 const SYNC_COOLDOWN_MS = 60_000;
-const SYNC_ACTION = "github.synced";
 
 // Owner or Admin: read PR state again and apply the same rules as the webhook (AC-54).
 export async function POST(_request: Request, { params }: Params) {
@@ -33,7 +33,7 @@ export async function POST(_request: Request, { params }: Params) {
       .from("audit_log")
       .select("created_at")
       .eq("project_id", id)
-      .eq("action", SYNC_ACTION)
+      .eq("action", SYNC_AUDIT_ACTION)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -50,7 +50,7 @@ export async function POST(_request: Request, { params }: Params) {
     const { error: auditError } = await supabase.from("audit_log").insert({
       project_id: id,
       actor_id: userId,
-      action: SYNC_ACTION,
+      action: SYNC_AUDIT_ACTION,
       target_type: "project",
       target_id: id,
     });

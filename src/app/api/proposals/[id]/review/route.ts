@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -8,8 +8,15 @@ import {
 } from "@/lib/project-auth";
 import { rpcErrorCode } from "@/lib/projects";
 import { readTask } from "@/lib/project-select";
+import { notifyTaskAssigned } from "@/lib/notification-events";
 import { embedTitle } from "@/agent/proposals";
-import { TASK_TITLE_MAX, isIsoDate } from "@/lib/tasks";
+import { setInitialPriority } from "@/lib/task-board";
+import {
+  TASK_TITLE_MAX,
+  isIsoDate,
+  isTaskPriority,
+  type TaskPriority,
+} from "@/lib/tasks";
 import type {
   ProposalDecision,
   ReviewProposalResponse,
@@ -42,6 +49,7 @@ type ParsedBody = {
   dueDate: string | null;
   mergeIntoTaskId: string | null;
   confirmWithoutQuote: boolean;
+  priority: TaskPriority | null;
 };
 
 function parseBody(
@@ -82,6 +90,11 @@ function parseBody(
     return { ok: false, error: "Pick the task to merge into" };
   }
 
+  const priority = raw?.priority ?? null;
+  if (priority !== null && !isTaskPriority(priority)) {
+    return { ok: false, error: "Unknown priority" };
+  }
+
   return {
     ok: true,
     body: {
@@ -92,6 +105,7 @@ function parseBody(
       dueDate: dueDate as string | null,
       mergeIntoTaskId: typeof merge === "string" ? merge : null,
       confirmWithoutQuote: raw?.confirmWithoutQuote === true,
+      priority,
     },
   };
 }
@@ -177,9 +191,16 @@ export async function POST(request: Request, { params }: Params) {
 
     const result = (data ?? {}) as { taskId?: string; itemId?: string };
     const response: ReviewProposalResponse = {};
+    if (result.taskId && body.decision === "confirm" && body.priority) {
+      await setInitialPriority(supabase, result.taskId, body.priority);
+    }
     if (result.taskId) {
       const task = await readTask(supabase, result.taskId, role);
       if (task) response.task = task;
+    }
+    const confirmedId = body.decision === "confirm" ? result.taskId : undefined;
+    if (confirmedId) {
+      after(() => notifyTaskAssigned(supabase, confirmedId, 1, userId));
     }
     if (result.itemId) response.item = { id: result.itemId };
     return NextResponse.json(response);

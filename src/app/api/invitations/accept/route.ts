@@ -1,7 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { rpcErrorCode } from "@/lib/projects";
+import {
+  notifyJoinRequest,
+  notifyMemberJoined,
+} from "@/lib/notification-events";
 import {
   GONE_MESSAGE,
   RATE_LIMIT_MESSAGE,
@@ -73,10 +77,19 @@ export async function POST(request: Request) {
           return gone(supabase, userId, invite);
         throw error;
       }
+      after(() =>
+        notifyMemberJoined(supabase, {
+          projectId: invite.project_id,
+          userId,
+          name: caller.displayName,
+          role: invite.role,
+          actorId: userId,
+        }),
+      );
       return done("joined", invite.project_id);
     }
 
-    const { error } = await supabase.rpc("request_project_join", {
+    const { data, error } = await supabase.rpc("request_project_join", {
       p_invitation: invite.id,
       p_user: userId,
       p_name: caller.displayName,
@@ -85,6 +98,16 @@ export async function POST(request: Request) {
     if (error) {
       if (rpcErrorCode(error) === "gone") return gone(supabase, userId, invite);
       throw error;
+    }
+    const requestId = (data as { id?: string } | null)?.id;
+    if (requestId) {
+      after(() =>
+        notifyJoinRequest(supabase, {
+          projectId: invite.project_id,
+          requestId,
+          name: caller.displayName,
+        }),
+      );
     }
     return done("pending", invite.project_id);
   } catch (err) {

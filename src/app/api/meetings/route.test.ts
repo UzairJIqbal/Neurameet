@@ -4,7 +4,16 @@ import { callsOf, ok, queue, resetQueues } from "@/test/supabase-queue-mock";
 const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
+vi.mock("@clerk/nextjs/server", () => ({
+  auth: mockAuth,
+  clerkClient: async () => ({
+    users: {
+      getUserList: async () => ({
+        data: [{ id: "u1", firstName: "Dana", lastName: "Khan", imageUrl: "" }],
+      }),
+    },
+  }),
+}));
 vi.mock(
   "@/lib/supabase-server",
   async () => (await import("@/test/supabase-queue-mock")).supabaseServerModule,
@@ -77,5 +86,49 @@ describe("GET /api/meetings", () => {
     const body = await (await list("u1", "?projectId=p1")).json();
     expect(body.meetings).toHaveLength(1);
     expect(body.meetings[0].projectId).toBe("p1");
+  });
+
+  describe("project list counts (AC-70d)", () => {
+    const processed = {
+      ...row("m2", "2026-11-02", "p1"),
+      meeting_insights: [{ summary: "x".repeat(200) }],
+    };
+
+    it("adds the excerpt and counts, with proposals for a Developer", async () => {
+      queue("project_members", ok([{ project_id: "p1", role: "developer" }]));
+      queue("meetings", ok([processed]));
+      queue("ledger_items", ok([{ meeting_id: "m2" }]));
+      queue(
+        "action_items",
+        ok([
+          { meeting_id: "m2", review_state: "proposed" },
+          { meeting_id: "m2", review_state: "confirmed" },
+          { meeting_id: "m2", review_state: "rejected" },
+        ]),
+      );
+      const body = await (await list("u1", "?projectId=p1")).json();
+      expect(body.meetings[0]).toMatchObject({
+        decisionCount: 1,
+        actionItemCount: 2,
+        proposalCount: 1,
+      });
+      expect(body.meetings[0].summaryExcerpt).toHaveLength(163);
+    });
+
+    it("counts confirmed items only and omits proposals for a Viewer", async () => {
+      queue("project_members", ok([{ project_id: "p1", role: "viewer" }]));
+      queue("meetings", ok([processed]));
+      queue("ledger_items", ok([]));
+      queue(
+        "action_items",
+        ok([
+          { meeting_id: "m2", review_state: "proposed" },
+          { meeting_id: "m2", review_state: "confirmed" },
+        ]),
+      );
+      const body = await (await list("u1", "?projectId=p1")).json();
+      expect(body.meetings[0].actionItemCount).toBe(1);
+      expect(body.meetings[0]).not.toHaveProperty("proposalCount");
+    });
   });
 });

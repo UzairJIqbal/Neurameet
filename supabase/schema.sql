@@ -1604,3 +1604,207 @@ as $$
 $$;
 revoke execute on function match_project_chunks(uuid, vector, integer, real) from public, anon, authenticated;
 grant execute on function match_project_chunks(uuid, vector, integer, real) to service_role;
+
+-- ===== W8. Notifications and the server copy of the email toggle =====
+create table if not exists notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  project_id uuid references projects(id) on delete cascade,
+  kind text not null check (kind in ('task_assigned', 'proposals_ready', 'join_request',
+    'join_approved', 'task_completed_by_merge', 'task_reopened_by_revert', 'kept_suggestion',
+    'meeting_scheduled', 'task_due', 'project_invitation', 'member_role_changed',
+    'member_joined', 'pr_review_requested')),
+  title text not null,
+  body text not null,
+  link text not null,                    -- app path only, never an outside URL
+  dedupe_key text not null,              -- e.g. 'task_assigned:<taskId>:<version>'
+  read_at timestamptz,
+  emailed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (user_id, dedupe_key)           -- one event can reach several people
+);
+create index if not exists notifications_user on notifications (user_id, created_at desc);
+
+create table if not exists user_settings (
+  user_id text primary key,
+  email_notifications boolean not null default true,  -- missing row = true, same as DEFAULT_PREFS
+  digest_sent_on date,                                 -- PKT day of the last digest (budget and once a day)
+  digest_emails boolean not null default true,         -- the Account tab's digest toggle
+  github_user_id bigint,                               -- from GET /user, no token is ever stored
+  github_login text,
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists user_settings_github_user
+  on user_settings (github_user_id) where github_user_id is not null;
+
+-- ===== W8. Fields the PDF shows that nothing stores today =====
+alter table projects
+  add column if not exists description text check (char_length(description) <= 500),
+  add column if not exists status text not null default 'active'
+    check (status in ('active', 'planning', 'on_hold', 'completed')),
+  add column if not exists project_type text not null default 'other'
+    check (project_type in ('web', 'mobile', 'ai_ml', 'backend', 'other')),
+  add column if not exists icon text not null default 'folder'
+    check (icon in ('folder', 'code', 'smartphone', 'brain', 'server', 'globe', 'rocket', 'database')),
+  add column if not exists color text not null default 'primary'
+    check (color in ('primary', 'secondary', 'tertiary', 'success', 'warning'));  -- token keys, never raw values
+
+alter table tasks
+  add column if not exists priority text not null default 'medium'
+    check (priority in ('low', 'medium', 'high', 'urgent'));
+
+alter table task_links add column if not exists pr_author_login text;
+
+alter table meetings
+  add column if not exists description text check (char_length(description) <= 1000),
+  add column if not exists scheduled_end_at timestamptz,
+  add column if not exists meeting_type text
+    check (meeting_type in ('code_review', 'sprint_planning', 'architecture', 'standup', 'other')),
+  add column if not exists invited_user_ids text[] not null default '{}';  -- display and notice only, never access
+
+alter table project_invitations add column if not exists declined_at timestamptz;
+
+create table if not exists task_comments (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid references tasks(id) on delete cascade not null,
+  project_id uuid references projects(id) on delete cascade not null,
+  author_id text not null,
+  body text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists task_comments_task on task_comments (task_id, created_at desc);
+
+alter table task_events drop constraint if exists task_events_kind_check;
+alter table task_events add constraint task_events_kind_check check (kind in ('created', 'edited',
+  'status_changed', 'assigned', 'unassigned', 'completed_manual', 'completed_by_merge',
+  'reopened_by_revert', 'pr_linked', 'pr_state_changed', 'proposal_merged', 'commented'));
+
+-- The comment and its event commit together. The event never holds the comment's text.
+create or replace function add_task_comment(p_task uuid, p_actor text, p_body text)
+returns task_comments language plpgsql set search_path = public as $$
+declare
+  v_project uuid;
+  c task_comments;
+begin
+  select project_id into v_project from tasks where id = p_task;
+  if v_project is null then raise exception 'task_not_found'; end if;
+  insert into task_comments (task_id, project_id, author_id, body)
+    values (p_task, v_project, p_actor, p_body) returning * into c;
+  insert into task_events (task_id, project_id, actor_id, kind, detail)
+    values (p_task, v_project, p_actor, 'commented', jsonb_build_object('commentId', c.id));
+  return c;
+end;
+$$;
+
+-- One grouped read for project lists, so a page never runs one query per project.
+create or replace function project_task_counts(p_projects uuid[], p_today date)
+returns table (project_id uuid, status text, total bigint, overdue bigint)
+language sql stable set search_path = public as $$
+  select t.project_id, t.status, count(*),
+    count(*) filter (where t.due_date < p_today and t.status <> 'completed')
+  from tasks t where t.project_id = any(p_projects)
+  group by t.project_id, t.status;
+$$;
+
+revoke execute on function add_task_comment(uuid, text, text) from public, anon, authenticated;
+revoke execute on function project_task_counts(uuid[], date) from public, anon, authenticated;
+grant execute on function add_task_comment(uuid, text, text) to service_role;
+grant execute on function project_task_counts(uuid[], date) to service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON task_comments, notifications, user_settings TO service_role;
+
+-- update_task gains the patch key 'priority', same signature, so the grants stay.
+create or replace function update_task(p_task uuid, p_actor text, p_patch jsonb,
+  p_if_version integer)
+returns jsonb language plpgsql set search_path = public as $$
+declare o tasks; n tasks; v_status text; v_assignee text; v_completing boolean;
+begin
+  select * into o from tasks where id = p_task for update;
+  if not found then raise exception 'not_found'; end if;
+  if o.version <> p_if_version then raise exception 'stale'; end if;
+  v_status := coalesce(p_patch->>'status', o.status);
+  v_assignee := case when p_patch ? 'assigneeId' then p_patch->>'assigneeId' else o.assignee_id end;
+  v_completing := v_status = 'completed' and o.status <> 'completed';
+  if v_assignee is distinct from o.assignee_id and v_assignee is not null and not exists (
+    select 1 from project_members
+    where project_id = o.project_id and user_id = v_assignee and removed_at is null
+  ) then
+    raise exception 'assignee_not_member';
+  end if;
+  if v_completing and coalesce(btrim(p_patch->>'completionEvidence'), '') = '' then
+    raise exception 'evidence_required';
+  end if;
+  update tasks set
+    status = v_status,
+    position = coalesce((p_patch->>'position')::double precision, o.position),
+    assignee_id = v_assignee,
+    title = coalesce(p_patch->>'title', o.title),
+    description = case when p_patch ? 'description' then p_patch->>'description' else o.description end,
+    due_date = case when p_patch ? 'dueDate' then (p_patch->>'dueDate')::date else o.due_date end,
+    priority = coalesce(p_patch->>'priority', o.priority),
+    completion_kind = case when v_completing then 'manual'
+      when v_status <> 'completed' then null else o.completion_kind end,
+    completion_evidence = case when v_completing then btrim(p_patch->>'completionEvidence')
+      when v_status <> 'completed' then null else o.completion_evidence end,
+    completed_at = case when v_completing then now()
+      when v_status <> 'completed' then null else o.completed_at end,
+    completed_by = case when v_completing then p_actor
+      when v_status <> 'completed' then null else o.completed_by end,
+    version = o.version + 1,
+    updated_at = now()
+  where id = p_task returning * into n;
+
+  if n.status <> o.status then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+      values (n.id, n.project_id, p_actor,
+        case when v_completing then 'completed_manual' else 'status_changed' end,
+        o.status, n.status,
+        case when v_completing then jsonb_build_object('evidence', n.completion_evidence)
+          else '{}'::jsonb end);
+  end if;
+  if n.assignee_id is distinct from o.assignee_id then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value)
+      values (n.id, n.project_id, p_actor,
+        case when n.assignee_id is null then 'unassigned' else 'assigned' end,
+        o.assignee_id, n.assignee_id);
+  end if;
+  if n.title <> o.title then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+      values (n.id, n.project_id, p_actor, 'edited', o.title, n.title, '{"field":"title"}');
+  end if;
+  if n.description is distinct from o.description then
+    insert into task_events (task_id, project_id, actor_id, kind, detail)
+      values (n.id, n.project_id, p_actor, 'edited', '{"field":"description"}');
+  end if;
+  if n.due_date is distinct from o.due_date then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+      values (n.id, n.project_id, p_actor, 'edited', o.due_date::text, n.due_date::text,
+        '{"field":"dueDate"}');
+  end if;
+  if n.priority <> o.priority then
+    insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
+      values (n.id, n.project_id, p_actor, 'edited', o.priority, n.priority, '{"field":"priority"}');
+  end if;
+  return jsonb_build_object('taskId', n.id);
+end $$;
+-- The project_activity view needs no change: it already unions task_events as 'task.'||kind.
+
+alter table projects enable row level security;
+alter table project_members enable row level security;
+alter table audit_log enable row level security;
+alter table project_invitations enable row level security;
+alter table project_join_requests enable row level security;
+alter table meeting_participants enable row level security;
+alter table tasks enable row level security;
+alter table task_events enable row level security;
+alter table github_installations enable row level security;
+alter table github_installation_claims enable row level security;
+alter table github_repos enable row level security;
+alter table github_deliveries enable row level security;
+alter table task_links enable row level security;
+alter table notifications enable row level security;
+alter table user_settings enable row level security;
+alter table task_comments enable row level security;
+-- No policies: every read and write goes through the service role on the server,
+-- same as every existing table. Grant to service_role per slice, as 0002 and 0003 do.
+-- Views and functions are not covered by RLS, so each slice also revokes the defaults:
+revoke all on project_activity from anon, authenticated;

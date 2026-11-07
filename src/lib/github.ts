@@ -123,6 +123,13 @@ async function paged<T>(
   return all;
 }
 
+/** Who the callback's token belongs to. The id is stable; a login can change. */
+export function githubUser(
+  token: string,
+): Promise<{ id: number; login: string }> {
+  return ghFetch<{ id: number; login: string }>(`${API}/user`, token);
+}
+
 export function userInstallations(
   token: string,
 ): Promise<GitHubInstallationListing[]> {
@@ -162,6 +169,24 @@ export function pull(
   return ghFetch<GitHubPull>(`${API}/repos/${fullName}/pulls/${number}`, token);
 }
 
+/** The fields of a PR commit the task drawer shows. */
+export type GitHubPullCommit = {
+  sha: string;
+  commit: { message: string };
+  author: { login: string } | null;
+};
+
+export function pullCommits(
+  fullName: string,
+  number: number,
+  token: string,
+): Promise<GitHubPullCommit[]> {
+  return ghFetch<GitHubPullCommit[]>(
+    `${API}/repos/${fullName}/pulls/${number}/commits?per_page=30`,
+    token,
+  );
+}
+
 function safeEqual(a: Buffer, b: Buffer): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
@@ -183,20 +208,16 @@ export function verifySignature(
 
 export type InstallState = { projectId: string; userId: string; exp: number };
 
-function stateKey(): Buffer {
+type StateInfo = "install-state" | "account-state";
+
+function stateKey(info: StateInfo): Buffer {
   return Buffer.from(
-    hkdfSync(
-      "sha256",
-      requireEnv("GITHUB_APP_CLIENT_SECRET"),
-      "",
-      "install-state",
-      32,
-    ),
+    hkdfSync("sha256", requireEnv("GITHUB_APP_CLIENT_SECRET"), "", info, 32),
   );
 }
 
-const signStatePayload = (payload: string): string =>
-  createHmac("sha256", stateKey()).update(payload).digest("base64url");
+const signStatePayload = (payload: string, info: StateInfo): string =>
+  createHmac("sha256", stateKey(info)).update(payload).digest("base64url");
 
 export function signInstallState(
   projectId: string,
@@ -205,7 +226,7 @@ export function signInstallState(
 ): string {
   const state: InstallState = { projectId, userId, exp: now + STATE_TTL_MS };
   const payload = Buffer.from(JSON.stringify(state)).toString("base64url");
-  return `${payload}.${signStatePayload(payload)}`;
+  return `${payload}.${signStatePayload(payload, "install-state")}`;
 }
 
 /** Null when missing, tampered, expired, or the secret is not set. */
@@ -217,7 +238,7 @@ export function readInstallState(
   const [payload, signature, extra] = state.split(".");
   if (!payload || !signature || extra !== undefined) return null;
   try {
-    const expected = Buffer.from(signStatePayload(payload));
+    const expected = Buffer.from(signStatePayload(payload, "install-state"));
     if (!safeEqual(Buffer.from(signature), expected)) return null;
     const parsed = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8"),
@@ -239,4 +260,50 @@ export function installUrls(
     installUrl: `https://github.com/apps/${slug}/installations/new?state=${state}`,
     authorizeUrl: `https://github.com/login/oauth/authorize?client_id=${clientId}&state=${state}`,
   };
+}
+
+// AC-77g: connecting a GitHub account uses its own key and prefix, so an install
+// state can never stand in for an account state, or the reverse.
+export type AccountState = { userId: string; exp: number };
+
+const ACCOUNT_STATE_PREFIX = "acct.";
+
+export const isAccountState = (state: string | null): boolean =>
+  state?.startsWith(ACCOUNT_STATE_PREFIX) ?? false;
+
+export function signAccountState(
+  userId: string,
+  now: number = Date.now(),
+): string {
+  const state: AccountState = { userId, exp: now + STATE_TTL_MS };
+  const payload = Buffer.from(JSON.stringify(state)).toString("base64url");
+  return `${ACCOUNT_STATE_PREFIX}${payload}.${signStatePayload(payload, "account-state")}`;
+}
+
+/** Null when missing, tampered, expired, or the secret is not set. */
+export function readAccountState(
+  state: string | null,
+  now: number = Date.now(),
+): AccountState | null {
+  if (!state || !isAccountState(state)) return null;
+  const [payload, signature, extra] = state
+    .slice(ACCOUNT_STATE_PREFIX.length)
+    .split(".");
+  if (!payload || !signature || extra !== undefined) return null;
+  try {
+    const expected = Buffer.from(signStatePayload(payload, "account-state"));
+    if (!safeEqual(Buffer.from(signature), expected)) return null;
+    const parsed = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8"),
+    ) as AccountState;
+    return parsed.exp > now ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function accountAuthorizeUrl(userId: string): string {
+  const state = encodeURIComponent(signAccountState(userId));
+  const clientId = requireEnv("GITHUB_APP_CLIENT_ID");
+  return `https://github.com/login/oauth/authorize?client_id=${clientId}&state=${state}`;
 }

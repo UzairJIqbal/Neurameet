@@ -35,7 +35,11 @@ export function isAssignableRole(
   return value === "admin" || value === "developer" || value === "viewer";
 }
 
-export type ClerkProfile = { name: string; email: string | null };
+export type ClerkProfile = {
+  name: string;
+  email: string | null;
+  imageUrl: string | null;
+};
 
 /** Names and primary emails from Clerk, batched; a failed lookup falls back to "Unknown member". */
 export async function lookupProfiles(
@@ -60,6 +64,7 @@ export async function lookupProfiles(
         profiles.set(user.id, {
           name: name || user.username || email || UNKNOWN_MEMBER,
           email,
+          imageUrl: user.imageUrl || null,
         });
       }
     }
@@ -68,7 +73,7 @@ export async function lookupProfiles(
   }
   for (const id of unique) {
     if (!profiles.has(id))
-      profiles.set(id, { name: UNKNOWN_MEMBER, email: null });
+      profiles.set(id, { name: UNKNOWN_MEMBER, email: null, imageUrl: null });
   }
   return profiles;
 }

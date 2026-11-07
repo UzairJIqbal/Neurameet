@@ -1,6 +1,5 @@
-/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unused-expressions */
-/* eslint-disable prettier/prettier */
+
 /* eslint-disable prettier/prettier */
 "use client";
 import React, { useState, useEffect } from "react";
@@ -29,6 +28,20 @@ import { createScheduledMeetingRow } from "@/actions/meetings";
 import { withStreamConnectionRetry } from "@/lib/streamRetry";
 import { DEFAULT_CALL_TYPE, type StreamCallType } from "@/lib/stream-call-type";
 import { ProjectPicker } from "@/components/ProjectPicker";
+import ParticipantsPicker from "@/components/ParticipantsPicker";
+import {
+  MEETING_DESCRIPTION_MAX,
+  MEETING_TYPE_LABELS,
+  PROJECT_MEETING_TYPES,
+  type ProjectMeetingType,
+} from "@/lib/meeting-types";
+
+type MeetingDetails = {
+  description?: string;
+  scheduledEndAt?: string;
+  meetingType?: ProjectMeetingType;
+  invitedUserIds?: string[];
+};
 
 type MeetingType =
   | "isInstantMeeting"
@@ -50,9 +63,12 @@ const prepareCallDevices = async (call: Call) => {
 const MeetingModel = ({
   type,
   onClose,
+  initialProjectId = null,
 }: {
   type: MeetingType;
   onClose: () => void;
+  /** Opens with this project picked, from a project page. */
+  initialProjectId?: string | null;
 }) => {
   const router = useRouter();
   const { setOpen } = useModal();
@@ -104,11 +120,15 @@ const MeetingModel = ({
     dateTime: new Date(),
     title: "",
     description: "",
+    endTime: null as Date | null,
   });
+  const [meetingType, setMeetingType] = useState<ProjectMeetingType | "">("");
+  // null until the list loads; the server then defaults to all active members.
+  const [invitedUserIds, setInvitedUserIds] = useState<string[] | null>(null);
   const [guestAdmissionMode, setGuestAdmissionMode] =
     useState<"open" | "approval">("approval");
   // W3: null means a personal meeting (today's flow, unchanged).
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(initialProjectId);
   const client = useStreamVideoClient();
   const { user } = useUser();
 
@@ -119,6 +139,7 @@ const MeetingModel = ({
     streamCallId: string,
     title: string,
     startsAt: string,
+    details?: MeetingDetails,
   ): Promise<StreamCallType | null> => {
     try {
       const result = await createScheduledMeetingRow({
@@ -127,6 +148,7 @@ const MeetingModel = ({
         startsAt,
         guestAdmissionMode,
         projectId,
+        ...details,
       });
       if (result.ok) return result.callType;
       toast.error(result.error);
@@ -223,12 +245,24 @@ const MeetingModel = ({
         toast("Please Select Date and Time");
         return;
       }
+      if (values.endTime && values.endTime <= values.dateTime) {
+        toast.error("The end time must be after the start");
+        return;
+      }
       const startsAt = values.dateTime.toISOString();
       const title = values.title.trim();
       const description = values.description || "";
+      const details: MeetingDetails = {
+        description,
+        scheduledEndAt: values.endTime?.toISOString(),
+        meetingType: meetingType || undefined,
+      };
       const id = uuidv4();
       const callType = projectId
-        ? await saveProjectRow(id, title, startsAt)
+        ? await saveProjectRow(id, title, startsAt, {
+            ...details,
+            invitedUserIds: invitedUserIds ?? undefined,
+          })
         : DEFAULT_CALL_TYPE;
       if (!callType) return;
       const call = client.call(callType, id);
@@ -407,6 +441,8 @@ const MeetingModel = ({
                 </label>
                 <textarea
                   className="min-h-24 resize-y rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface text-balance focus-visible:ring-0 focus-visible:ring-offset-0"
+                  value={values.description}
+                  maxLength={MEETING_DESCRIPTION_MAX}
                   onChange={(e) =>
                     setValues({ ...values, description: e.target.value })
                   }
@@ -430,9 +466,66 @@ const MeetingModel = ({
                   className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
                 />
               </div>
-              <div className="mt-4">
-                <ProjectPicker value={projectId} onChange={setProjectId} />
+              <div className="mt-4 flex w-full flex-col gap-2.5">
+                <label
+                  htmlFor="MeetingEndTime"
+                  className="text-base font-normal leading-[22.4px] text-on-surface-variant"
+                >
+                  End time (optional)
+                </label>
+                <DatePicker
+                  id="MeetingEndTime"
+                  selected={values.endTime}
+                  onChange={(date) => setValues({ ...values, endTime: date })}
+                  showTimeSelect
+                  isClearable
+                  timeFormat="HH:mm"
+                  timeIntervals={1}
+                  timeCaption="time"
+                  dateFormat="MMMM d, yyyy h:mm aa"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
+                />
               </div>
+              <div className="mt-4 flex flex-col gap-2.5">
+                <label
+                  htmlFor="MeetingType"
+                  className="text-base font-normal leading-[22.4px] text-on-surface-variant"
+                >
+                  Meeting type (optional)
+                </label>
+                <select
+                  id="MeetingType"
+                  value={meetingType}
+                  onChange={(e) =>
+                    setMeetingType(e.target.value as ProjectMeetingType | "")
+                  }
+                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
+                >
+                  <option value="">Choose a type</option>
+                  {PROJECT_MEETING_TYPES.map((value) => (
+                    <option key={value} value={value}>
+                      {MEETING_TYPE_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-4">
+                <ProjectPicker
+                  value={projectId}
+                  onChange={(next) => {
+                    setProjectId(next);
+                    setInvitedUserIds(null);
+                  }}
+                />
+              </div>
+              {projectId && (
+                <ParticipantsPicker
+                  key={projectId}
+                  projectId={projectId}
+                  value={invitedUserIds ?? []}
+                  onChange={setInvitedUserIds}
+                />
+              )}
               {/* Guest admission mode — owner chooses before scheduling */}
               <div className="flex flex-col gap-2 mt-4">
                 <label className="text-base font-normal leading-[22.4px] text-on-surface-variant">

@@ -717,7 +717,7 @@ Project Decisions and Promises tab on `ledger_items` (project scoped; Owner/Admi
 ### Step W7 — Project AI assistant 🟡 (built 2026-11-07, verify and test pending)
 `match_project_chunks` RPC filtering by project inside SQL; retrieval over meetings, ledger items, and task titles; citations built in code from record ids; transcripts, PR text, and commits wrapped as untrusted data; read only; "not found in this project's records" fallback. Extend `/api/ai/chat` and `/api/search` with `projectId` rather than adding routes. Exit: a cross project question returns nothing from other projects; injected transcript, task, and ledger text does not change answers (PR text does not reach the model in W7, see the spec Follow-up).
 
-### Step W8 — Workspace shell, personal views, notifications, Ctrl K ⬜
+### Step W8 — Workspace shell, personal views, notifications, Ctrl K 🟡 (in progress, `prompts/step-W8-workspace-shell.md`)
 New sidebar from the PDF layout, My Dashboard, My Tasks with Overdue (Asia/Karachi day rule), notifications table and bell, one daily digest via the once a day Vercel Hobby cron, Ctrl K palette (`cmdk` recommended), success and warning tokens added to the Stitch set, an empty state in every project tab. Recordings fold into meeting detail, Prep into project overview, Search into Ctrl K. Exit: every tab renders a useful empty state in a fresh project.
 
 ### Step W9 — Verify + security suite ⬜

@@ -10,7 +10,13 @@
 // after the probe succeeds. This test locks that in for the microphone path
 // (the camera path mirrors it).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 
 // Shared mocks created once and referenced both inside the vi.mock factories
 // and inside the tests, so we can assert on the exact device-manager calls.
@@ -46,7 +52,11 @@ const h = vi.hoisted(() => {
     mockMic,
     mockCam,
     mockCall,
-    toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() }),
+    toast: Object.assign(vi.fn(), {
+      error: vi.fn(),
+      success: vi.fn(),
+      dismiss: vi.fn(),
+    }),
   };
 });
 
@@ -155,9 +165,7 @@ describe("MeetingRoom mic toggle (probe before enable)", () => {
 
     render(<MeetingRoom />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /unmute microphone/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /unmute microphone/i }));
 
     // The probe must have run (getUserMedia attempted once)...
     await waitFor(() => {
@@ -176,9 +184,7 @@ describe("MeetingRoom mic toggle (probe before enable)", () => {
   it("enables the mic when the device actually works", async () => {
     render(<MeetingRoom />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /unmute microphone/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /unmute microphone/i }));
 
     await waitFor(() => {
       expect(h.mockMic.enable).toHaveBeenCalled();
@@ -187,6 +193,15 @@ describe("MeetingRoom mic toggle (probe before enable)", () => {
     expect(h.toast).not.toHaveBeenCalledWith(
       expect.stringContaining("Microphone unavailable"),
     );
+  });
+
+  it("Raise hand sends Stream's raised-hand reaction (AC-70x)", () => {
+    render(<MeetingRoom />);
+    fireEvent.click(screen.getByRole("button", { name: /raise hand/i }));
+    expect(h.mockCall.sendReaction).toHaveBeenCalledWith({
+      type: "raised-hand",
+      emoji_code: ":raise-hand:",
+    });
   });
 
   it("mutes without ever calling getUserMedia", async () => {
@@ -198,9 +213,7 @@ describe("MeetingRoom mic toggle (probe before enable)", () => {
 
     render(<MeetingRoom />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /mute microphone/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /mute microphone/i }));
 
     await waitFor(() => {
       expect(h.mockMic.disable).toHaveBeenCalled();
@@ -233,7 +246,10 @@ describe("MeetingRoom end-call recording stop (no-op recording guard)", () => {
     }) as unknown as typeof h.mockCall.on;
     // The call.ended handler best-effort POSTs an attendance event; stub fetch
     // so it doesn't attempt a real network call under jsdom.
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve()));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve()),
+    );
     h.useCall.mockReturnValue(h.mockCall);
     h.useCallCallingState.mockReturnValue(h.CallingState.JOINED);
     h.useCallCustomData.mockReturnValue({ title: "Test Meeting" });
@@ -412,7 +428,16 @@ describe("MeetingRoom guest approval single-click (G2 regression)", () => {
     }) as unknown as typeof h.mockCall.on;
 
     // fetch mock — simulate a successful admit API call
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => ({ status: "admitted" }) })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ status: "admitted" }),
+        }),
+      ),
+    );
 
     h.useCall.mockReturnValue(h.mockCall);
     h.useCallCallingState.mockReturnValue(h.CallingState.JOINED);
@@ -445,7 +470,13 @@ describe("MeetingRoom guest approval single-click (G2 regression)", () => {
     });
 
     // Trigger the guest toast
-    handlers["custom"]({ custom: { event: "guest.request_join", guest_token: "gt-1", guest_name: "Alice" } });
+    handlers["custom"]({
+      custom: {
+        event: "guest.request_join",
+        guest_token: "gt-1",
+        guest_name: "Alice",
+      },
+    });
 
     // Verify the toast was shown with the correct guest token
     await waitFor(() => {
@@ -458,7 +489,8 @@ describe("MeetingRoom guest approval single-click (G2 regression)", () => {
     // Extract the ToastContent component from the mock call and render it
     // so we can click the Accept button (react-hot-toast mock doesn't render
     // toast content to the DOM in jsdom).
-    const toastCalls = (h.toast as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    const toastCalls = (h.toast as unknown as ReturnType<typeof vi.fn>).mock
+      .calls;
     const toastCall = toastCalls.find(
       (call: unknown[]) => (call[1] as { id?: string }).id === "gt-1",
     );

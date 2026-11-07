@@ -39,6 +39,8 @@ const invite = (over: Partial<InviteRow> = {}): InviteRow => ({
   expires_at: "2026-11-10T12:00:00Z",
   revoked_at: null,
   used_at: null,
+  declined_at: null,
+  created_at: "2026-11-01T12:00:00Z",
   ...over,
 });
 
@@ -129,7 +131,11 @@ describe("resolveInviteState (AC-19)", () => {
   it("a pending request shows on a link, even an expired one", () => {
     expect(
       resolveInviteState(
-        invite({ kind: "link", email: null, expires_at: "2026-11-01T00:00:00Z" }),
+        invite({
+          kind: "link",
+          email: null,
+          expires_at: "2026-11-01T00:00:00Z",
+        }),
         { isMember: false, hasPending: true },
         NOW,
       ),

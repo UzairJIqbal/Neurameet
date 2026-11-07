@@ -19,6 +19,7 @@ import {
   LEDGER_MATCH_FAILED_MESSAGE,
   requestLedgerMatch,
 } from "@/lib/ledger-match-client";
+import MeetingHeader from "./MeetingHeader";
 import MeetingTabs from "./MeetingTabs";
 
 const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
@@ -28,7 +29,7 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
-  // Bumped after a retry re-runs matching, so the Ledger tab refetches.
+  // Bumped after a retry re-runs matching, so the Decisions and Promises tab refetches.
   const [ledgerVersion, setLedgerVersion] = useState(0);
   const { timedOut } = useLoadingTimeout(isLoading, {
     timeoutMs: 12000,
@@ -71,6 +72,16 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
     fetchDetail();
     return () => controller.abort();
   }, [meetingId, retryNonce]);
+
+  // No loading state, so the open tab survives a proposal confirm (AC-70w).
+  const refreshDetail = async () => {
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}`);
+      if (res.ok) setData((await res.json()) as MeetingDetailResponse);
+    } catch (err) {
+      console.error("Meeting refresh failed:", err);
+    }
+  };
 
   const retrySummary = async () => {
     // Guard against a slow/rate-limited AI provider hanging the request forever
@@ -169,7 +180,6 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
   }
 
   const { meeting, insights, actionItems, attendanceCount } = data;
-  const dateLabel = meeting.startedAt ?? meeting.createdAt;
   // Owner check for D3.4 recording-access control. The detail API already
   // restricts to owner-owned meetings, so this is defense-in-depth: a
   // non-owner (if the API filter is ever relaxed) sees no Recording tab.
@@ -192,24 +202,12 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         </Link>
       </div>
 
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-display-lg-mobile font-display-lg text-on-surface md:text-display-lg">
-            {meeting.title}
-          </h1>
-          <span className="inline-flex items-center rounded-full bg-surface-container-low px-3 py-1 text-label-caps uppercase tracking-wider text-on-surface-variant">
-            {meeting.status}
-          </span>
-          {insights?.category && (
-            <span className="inline-flex items-center rounded-full bg-primary-container/15 px-3 py-1 text-label-caps uppercase tracking-wider text-primary-container">
-              {insights.category}
-            </span>
-          )}
-        </div>
-        <p className="text-body-md text-on-surface-variant">
-          {dateLabel ? new Date(dateLabel).toLocaleString() : "No date"}
-        </p>
-      </header>
+      <MeetingHeader
+        meeting={meeting}
+        insights={insights}
+        projectId={data.projectId ?? null}
+        projectName={data.projectName ?? null}
+      />
 
       <MeetingTabs
         meeting={meeting as MeetingDetailData}
@@ -223,6 +221,9 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         ledgerVersion={ledgerVersion}
         projectId={data.projectId ?? null}
         canManage={data.projectId ? !!data.canManage : isOwner}
+        role={data.role ?? null}
+        transcriptText={data.transcriptText}
+        onProposalsChanged={refreshDetail}
       />
     </section>
   );

@@ -1,21 +1,23 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { CalendarDays, Quote, User } from "lucide-react";
+import { CalendarDays, Quote, User, Video } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { STATUS_BADGE, badgeBase } from "@/components/meeting-intelligence/LedgerTab";
-import { getProjectLedger } from "@/lib/project-client";
+import { getProjectLedger, listProjectMeetings } from "@/lib/project-client";
 import { reviewLedgerLink } from "@/lib/ledger-client";
-import type { LedgerReviewDecision } from "@/lib/meeting-types";
+import { MEETING_CATEGORIES, type LedgerReviewDecision } from "@/lib/meeting-types";
 import type { ProjectDetail } from "@/lib/project-types";
 import type { ProjectLedgerItem, ProjectLedgerResponse, ReviewRow } from "@/lib/proof-types";
 import OutcomeCard from "./OutcomeCard";
 import TaskDrawer from "./TaskDrawer";
+import { AvatarStack } from "./project-visuals";
+import { useCardLoad } from "./useCardLoad";
 
 const selectClass =
   "rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface";
@@ -25,6 +27,10 @@ const secondaryButton =
   "rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 const card = "flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-4";
 const REVIEW_LIMIT = 50;
+const SEARCH_DEBOUNCE_MS = 300;
+const chipBase = "rounded-full px-3 py-1 text-body-md";
+const chipOn = "bg-primary-container text-on-primary";
+const chipOff = "border border-surface-variant text-on-surface-variant hover:bg-surface-container-low";
 
 const dateOf = (iso: string) => new Date(iso).toLocaleDateString();
 
@@ -100,7 +106,7 @@ const ItemCard = ({ item, onOpenTask }: { item: ProjectLedgerItem; onOpenTask: (
           {isPromise ? "Promise" : "Decision"}
         </span>
         <span className={`${badgeBase} ${status.className}`}>{status.label}</span>
-        <span className="text-body-md text-on-surface-variant">{dateOf(item.meeting.startedAt)}</span>
+        {item.tag && <span className={`${badgeBase} bg-surface-container-high text-on-surface-variant`}>{item.tag}</span>}
       </div>
       <p dir="auto" className="break-words text-body-md font-medium text-on-surface">{item.statement}</p>
       {isPromise && (item.assignee || item.dueDate) && (
@@ -117,6 +123,17 @@ const ItemCard = ({ item, onOpenTask }: { item: ProjectLedgerItem; onOpenTask: (
       )}
       <OutcomeCard outcome={item.outcome} onOpenTask={onOpenTask} />
       {outside && <p className="text-body-md text-on-surface-variant">Evidence outside this project</p>}
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-surface-variant pt-3">
+        <Link
+          href={`/meeting-intelligence/${item.meeting.id}`}
+          className="inline-flex min-w-0 items-center gap-2 text-body-md text-on-surface-variant hover:text-primary"
+        >
+          <Video className="h-4 w-4 shrink-0" />
+          <span className="break-words">{item.meeting.title}</span>
+          <span className="shrink-0">· {dateOf(item.meeting.startedAt)}</span>
+        </Link>
+        <AvatarStack avatars={item.participants} total={item.participants.length} />
+      </div>
     </li>
   );
 };
@@ -125,6 +142,10 @@ const ItemCard = ({ item, onOpenTask }: { item: ProjectLedgerItem; onOpenTask: (
 const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
+  const [meetingId, setMeetingId] = useState("");
+  const [tag, setTag] = useState("");
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
   const [data, setData] = useState<ProjectLedgerResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -136,6 +157,16 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
   const controllerRef = useRef<AbortController | null>(null);
   const moreRef = useRef<AbortController | null>(null);
   const { timedOut } = useLoadingTimeout(isLoading, { retryNonce });
+  const query = useMemo(() => ({ kind, status, meetingId, q, tag }), [kind, status, meetingId, q, tag]);
+
+  // The list of meetings is only for the select: if it fails, "All meetings" stays.
+  const loadMeetings = useCallback((signal: AbortSignal) => listProjectMeetings(project.id, signal), [project.id]);
+  const { data: meetingOptions } = useCardLoad(loadMeetings);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setQ(qInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [qInput]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -145,7 +176,7 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
     setFailed(false);
     setMoreFailed(false);
     setLoadingMore(false);
-    getProjectLedger(project.id, { kind, status }, controller.signal)
+    getProjectLedger(project.id, query, controller.signal)
       .then((json) => {
         if (!controller.signal.aborted) setData(json);
       })
@@ -158,7 +189,7 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
         if (!controller.signal.aborted) setIsLoading(false);
       });
     return () => controller.abort();
-  }, [project.id, kind, status, retryNonce]);
+  }, [project.id, query, retryNonce]);
 
   useEffect(() => {
     if (timedOut) controllerRef.current?.abort();
@@ -175,7 +206,7 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
     setLoadingMore(true);
     setMoreFailed(false);
     try {
-      const next = await getProjectLedger(project.id, { kind, status, cursor: data.nextCursor }, controller.signal);
+      const next = await getProjectLedger(project.id, { ...query, cursor: data.nextCursor }, controller.signal);
       if (controller.signal.aborted) return;
       setData((current) =>
         current ? { ...next, items: [...current.items, ...next.items] } : next,
@@ -201,7 +232,7 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
     moreRef.current?.abort();
     setLoadingMore(false);
     try {
-      setData(await getProjectLedger(project.id, { kind, status }));
+      setData(await getProjectLedger(project.id, query));
     } catch (err) {
       console.error("Failed to reload after a review:", err);
       toast.error("Your review saved, but the list did not refresh.");
@@ -211,7 +242,17 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
   };
 
   const filters = (
+    <div className="flex flex-col gap-3">
     <div className="flex flex-wrap gap-3">
+      <input
+        type="search"
+        aria-label="Search decisions"
+        placeholder="Search decisions..."
+        value={qInput}
+        maxLength={100}
+        onChange={(e) => setQInput(e.target.value)}
+        className={`${selectClass} min-w-0 flex-1 sm:min-w-[16rem]`}
+      />
       <select aria-label="Filter by kind" value={kind} onChange={(e) => setKind(e.target.value)} className={selectClass}>
         <option value="">All kinds</option>
         <option value="promise">Promises</option>
@@ -224,6 +265,26 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
         <option value="kept">Kept</option>
         <option value="reversed">Reversed</option>
       </select>
+      <select aria-label="Filter by meeting" value={meetingId} onChange={(e) => setMeetingId(e.target.value)} className={`${selectClass} max-w-full`}>
+        <option value="">All meetings</option>
+        {meetingOptions?.meetings.map((meeting) => (
+          <option key={meeting.id} value={meeting.id}>{meeting.title}</option>
+        ))}
+      </select>
+    </div>
+    <div className="flex flex-wrap gap-2">
+      {["", ...MEETING_CATEGORIES].map((value) => (
+        <button
+          key={value || "all"}
+          type="button"
+          aria-pressed={tag === value}
+          onClick={() => setTag(value)}
+          className={`${chipBase} ${tag === value ? chipOn : chipOff}`}
+        >
+          {value || "All tags"}
+        </button>
+      ))}
+    </div>
     </div>
   );
 
@@ -251,16 +312,18 @@ const DecisionsTab = ({ project }: { project: ProjectDetail }) => {
 
       {filters}
 
-      {isLoading || !data ? (
+      {!data ? (
         <LoaderOne />
+      ) : isLoading ? (
+        <p className="text-body-md text-on-surface-variant">Loading…</p>
       ) : data.items.length === 0 ? (
         <p className="text-body-md text-on-surface-variant">
-          {kind || status
+          {kind || status || meetingId || q || tag
             ? "Nothing matches these filters. You can try a different filter."
-            : "No decisions or promises yet. Add a meeting to this project, and they appear here once its transcript is processed."}
+            : "Decisions and promises show up here once a project meeting is processed."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
           {data.items.map((item) => (
             <ItemCard key={item.id} item={item} onOpenTask={setOpenTaskId} />
           ))}

@@ -20,6 +20,7 @@ const row: TaskRow = {
   title: "Fix login",
   description: null,
   status: "todo",
+  priority: "high",
   position: 1,
   assignee_id: "u1",
   due_date: null,

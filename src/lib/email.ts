@@ -90,8 +90,12 @@ export async function sendMeetingReadyEmail(
 // Tasdeeq, Verified Minutes (spec 0003, AC-17). These emails carry only the
 // title, deadline, status text, hash, and links, never the minutes text.
 
-const escapeHtml = (text: string): string =>
-  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+export const escapeHtml = (text: string): string =>
+  text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 const appLink = (path: string): string =>
   `${process.env.NEXT_PUBLIC_APP_URL ?? ""}${path}`;
@@ -256,6 +260,42 @@ export async function sendProjectInviteEmail(
   } catch (err) {
     console.error(
       "[invitations] invite email failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// W8 event and digest emails (spec 0004-workspace-shell, AC-74). Same verified
+// sender and no fallback, as for project invites.
+
+/** One workspace email. Never throws; false when not sent. */
+export async function sendWorkspaceEmail(
+  to: string,
+  subject: string,
+  html: string,
+): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_WORKSPACE_FROM;
+  if (!apiKey || !from) return false;
+  try {
+    const res = await fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to, subject, html }),
+    });
+    if (!res.ok) {
+      console.error(`[notifications] email failed (${res.status})`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(
+      "[notifications] email failed:",
       err instanceof Error ? err.message : err,
     );
     return false;

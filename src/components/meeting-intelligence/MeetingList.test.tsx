@@ -72,8 +72,96 @@ describe("Meeting Intelligence list responsive (P13.4)", () => {
       'button[aria-label="Delete meeting"]',
     ) as HTMLButtonElement;
     const children = Array.from(cell.children) as HTMLElement[];
-    expect(children.indexOf(openBtn)).toBeLessThan(
-      children.indexOf(deleteBtn),
-    );
+    expect(children.indexOf(openBtn)).toBeLessThan(children.indexOf(deleteBtn));
+  });
+});
+
+describe("Meeting Intelligence list, workspace views (AC-77c)", () => {
+  const soon = new Date(Date.now() + 3_600_000).toISOString();
+  const past = new Date(Date.now() - 3_600_000).toISOString();
+  const rows = [
+    {
+      id: "a",
+      title: "Sprint planning",
+      status: "scheduled",
+      startedAt: soon,
+      streamCallId: "call-a",
+      projectId: "p1",
+      role: "developer",
+    },
+    {
+      id: "b",
+      title: "Missed standup",
+      status: "scheduled",
+      startedAt: past,
+      streamCallId: "call-b",
+    },
+    {
+      id: "c",
+      title: "Design review",
+      status: "ended",
+      startedAt: past,
+      createdAt: past,
+      hasInsights: true,
+      category: "Review",
+      projectId: "p1",
+      role: "developer",
+    },
+    {
+      id: "d",
+      title: "Personal sync",
+      status: "ended",
+      startedAt: past,
+      createdAt: past,
+    },
+  ];
+
+  beforeEach(() => {
+    global.fetch = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes("/api/projects")
+          ? { projects: [{ id: "p1", name: "Apollo" }] }
+          : { meetings: rows },
+    })) as unknown as typeof fetch;
+  });
+
+  it("lists scheduled rows under Upcoming with Join, soonest first, and Time passed on a missed one", async () => {
+    render(<MeetingList />);
+    expect(await screen.findByText("Upcoming")).toBeTruthy();
+    const joins = screen.getAllByRole("link", { name: "Join" });
+    expect(joins.map((j) => j.getAttribute("href"))).toEqual([
+      "/meeting/call-b",
+      "/meeting/call-a",
+    ]);
+    expect(screen.getAllByText("Time passed")).toHaveLength(1);
+  });
+
+  it("shows the project chip on a project row and no chip on a personal one", async () => {
+    render(<MeetingList />);
+    await screen.findByText("Design review");
+    expect((await screen.findAllByText("Apollo")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Personal sync")).toBeTruthy();
+  });
+
+  it("filters to Personal or one project", async () => {
+    const { fireEvent } = await import("@testing-library/react");
+    render(<MeetingList />);
+    await screen.findByText("Design review");
+    const select = (await screen.findByLabelText(
+      "Filter meetings",
+    )) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "personal" } });
+    expect(screen.queryByText("Design review")).toBeNull();
+    expect(screen.getByText("Personal sync")).toBeTruthy();
+    fireEvent.change(select, { target: { value: "p1" } });
+    expect(screen.getByText("Design review")).toBeTruthy();
+    expect(screen.queryByText("Personal sync")).toBeNull();
+  });
+
+  it("hides Delete on a project row you do not own", async () => {
+    render(<MeetingList />);
+    await screen.findByText("Design review");
+    expect(screen.getAllByLabelText("Delete meeting")).toHaveLength(1);
   });
 });

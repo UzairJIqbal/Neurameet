@@ -6,30 +6,30 @@ import {
   accessErrorResponse,
   requireProjectRole,
 } from "@/lib/project-auth";
+import {
+  detailColumns,
+  loadProjectFull,
+  parseProjectDetails,
+  PROJECT_COLUMNS,
+  type ProjectRow,
+} from "@/lib/project-cards";
 import { parseProjectName } from "@/lib/projects";
-import type { ProjectDetail } from "@/lib/project-types";
 
 type Params = { params: Promise<{ id: string }> };
-type ProjectRow = {
-  id: string;
-  name: string;
-  task_prefix: string;
-  created_at: string;
-};
 
 const SEALED = { error: "Sealed minutes can't be deleted" };
 
 async function loadProject(id: string): Promise<ProjectRow | null> {
   const { data, error } = await supabaseServer()
     .from("projects")
-    .select("id, name, task_prefix, created_at")
+    .select(PROJECT_COLUMNS)
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return (data as ProjectRow | null) ?? null;
+  return (data as unknown as ProjectRow | null) ?? null;
 }
 
-// Any member: the project, your role, and its member and meeting counts.
+// Any member: the project, your role, and its counts. A failed count is null.
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
   const { userId } = await auth();
@@ -48,29 +48,7 @@ export async function GET(_request: Request, { params }: Params) {
     if (!project)
       return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const [members, meetings] = await Promise.all([
-      supabase
-        .from("project_members")
-        .select("user_id", { count: "exact", head: true })
-        .eq("project_id", id)
-        .is("removed_at", null),
-      supabase
-        .from("meetings")
-        .select("id", { count: "exact", head: true })
-        .eq("project_id", id),
-    ]);
-    if (members.error) throw members.error;
-    if (meetings.error) throw meetings.error;
-
-    const detail: ProjectDetail = {
-      id: project.id,
-      name: project.name,
-      taskPrefix: project.task_prefix,
-      role,
-      memberCount: members.count ?? 0,
-      meetingCount: meetings.count ?? 0,
-      createdAt: project.created_at,
-    };
+    const detail = await loadProjectFull(supabase, project, role);
     return NextResponse.json({ project: detail });
   } catch (err) {
     const denied = accessErrorResponse(err);
@@ -83,7 +61,7 @@ export async function GET(_request: Request, { params }: Params) {
   }
 }
 
-// Owner only: rename. The task prefix is fixed after creation.
+// Owner only: the name and details, each optional. The prefix is fixed.
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
   const { userId } = await auth();
@@ -104,20 +82,31 @@ export async function PATCH(request: Request, { params }: Params) {
         { status: 422 },
       );
     }
-    const parsed = parseProjectName(body?.name);
-    if (!parsed.ok)
-      return NextResponse.json({ error: parsed.error }, { status: 422 });
+    const details = parseProjectDetails(body ?? {});
+    if (!details.ok)
+      return NextResponse.json({ error: details.error }, { status: 422 });
+    const columns: Record<string, string | null> = detailColumns(details.value);
+
+    // No detail to change means the name is what you sent, or it is missing.
+    let name: string | undefined;
+    if (body?.name !== undefined || Object.keys(columns).length === 0) {
+      const parsed = parseProjectName(body?.name);
+      if (!parsed.ok)
+        return NextResponse.json({ error: parsed.error }, { status: 422 });
+      name = parsed.name;
+      columns.name = name;
+    }
 
     const { error } = await supabase
       .from("projects")
-      .update({ name: parsed.name, updated_at: new Date().toISOString() })
+      .update({ ...columns, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw error;
-    return NextResponse.json({ ok: true, name: parsed.name });
+    return NextResponse.json({ ok: true, name, ...details.value });
   } catch (err) {
     const denied = accessErrorResponse(err);
     if (denied) return denied;
-    console.error("[projects] rename failed:", err);
+    console.error("[projects] update failed:", err);
     return NextResponse.json(
       { error: "Failed to update project" },
       { status: 500 },

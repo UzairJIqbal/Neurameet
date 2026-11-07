@@ -4,15 +4,18 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
-import { Plus, RefreshCw, Search } from "lucide-react";
+import { LayoutGrid, List, Plus, Search } from "lucide-react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
-import { getTask, listMembers, listTasks, ProjectClientError, syncGitHub, updateTask } from "@/lib/project-client";
+import { getTask, listMembers, listTasks, ProjectClientError, updateTask } from "@/lib/project-client";
 import { patchDenial } from "@/lib/task-rules";
+import { readStoredView, writeStoredView } from "@/lib/user-prefs";
 import {
   BOARD_REFETCH_MS,
+  TASK_PRIORITIES,
+  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
   TASK_STATUS_LABELS,
   columnCards,
@@ -22,8 +25,8 @@ import {
 } from "@/lib/tasks";
 import type { ProjectDetail, ProjectMember, ProjectRole } from "@/lib/project-types";
 import type { Task, TasksResponse } from "@/lib/task-types";
-import type { GitHubSyncResult } from "@/lib/github-types";
 import TaskCard from "./TaskCard";
+import TasksList from "./TasksList";
 import TaskDrawer from "./TaskDrawer";
 import CompleteTaskDialog from "./CompleteTaskDialog";
 import NewTaskDialog from "./NewTaskDialog";
@@ -35,31 +38,20 @@ const inputClass =
 const primaryButton =
   "inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
-const secondaryButton =
-  "inline-flex items-center gap-2 rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+const VIEW_KEY = "neurameet:tasks-view";
+const VIEWS = ["board", "list"] as const;
+type View = (typeof VIEWS)[number];
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
 
-const syncSummary = (result: GitHubSyncResult): string => {
-  if (result.repos === 0) return "No repositories are linked to this project yet.";
-  const parts = [
-    `Read ${result.prsRead} PR${result.prsRead === 1 ? "" : "s"}`,
-    `${result.linked} linked`,
-    `${result.moved} moved`,
-    `${result.completed} completed`,
-    `${result.reopened} reopened`,
-  ];
-  if (result.failed > 0) parts.push(`${result.failed} failed`);
-  return `${parts.join(", ")}.${result.partial ? " Run it again for the rest." : ""}`;
-};
-
 // The Kanban board (AC-41). Every move is optimistic and sends ifVersion; a
 // 409 puts the card back and refetches. The server checks the same role rules
 // the board uses to refuse a drop early.
-const TasksBoard = ({ project }: { project: ProjectDetail }) => {
+const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reloadKey?: number }) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -72,13 +64,15 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [assignee, setAssignee] = useState("");
+  const [priority, setPriority] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [view, setView] = useState<View>("board");
   const [isLoading, setIsLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [pending, setPending] = useState<PendingComplete | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const [newStatus, setNewStatus] = useState<TaskStatus | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const busyRef = useRef(false);
@@ -118,11 +112,15 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
 
   const fetchBoard = useCallback(
     async (signal?: AbortSignal) => {
-      const data = await listTasks(project.id, { q: search, assigneeId: assignee }, signal);
+      const data = await listTasks(
+        project.id,
+        { q: search, assigneeId: assignee, priority, status: statusFilter },
+        signal,
+      );
       setTasks(data.tasks);
       setTruncated(data.truncated);
     },
-    [project.id, search, assignee],
+    [project.id, search, assignee, priority, statusFilter],
   );
 
   // First load, and again whenever the filters change.
@@ -150,7 +148,16 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
     };
     load();
     return () => controller.abort();
-  }, [fetchBoard, project.id, retryNonce]);
+  }, [fetchBoard, project.id, retryNonce, reloadKey]);
+
+  useEffect(() => {
+    setView(readStoredView(VIEW_KEY, VIEWS, "board"));
+  }, []);
+
+  const chooseView = (next: View) => {
+    setView(next);
+    writeStoredView(VIEW_KEY, next);
+  };
 
   useEffect(() => {
     if (timedOut) controllerRef.current?.abort();
@@ -176,8 +183,16 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
     };
   }, [refresh]);
 
+  // A PATCH answer has no board fields, so the card keeps the ones it holds.
   const replaceTask = (next: Task) =>
-    setTasks((prev) => prev.map((t) => (t.id === next.id ? next : t)));
+    setTasks((prev) => prev.map((t) => (t.id === next.id ? { ...t, ...next } : t)));
+
+  const changeCommentCount = (taskId: string, delta: number) =>
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, commentCount: Math.max(0, (t.commentCount ?? 0) + delta) } : t,
+      ),
+    );
 
   const sendMove = async (
     original: Task,
@@ -253,25 +268,17 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
 
   const reload = useCallback(() => setRetryNonce((k) => k + 1), []);
 
-  const runSync = async () => {
-    setSyncing(true);
-    try {
-      toast.success(syncSummary(await syncGitHub(project.id)));
-      await fetchBoard();
-    } catch (err) {
-      toast.error(errorText(err, "Failed to sync with GitHub"));
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   if (timedOut) return <LoadError message="We couldn't load the board." onRetry={reload} />;
   if (!loaded && isLoading) return <LoaderOne />;
   if (!loaded) return <LoadError message="We couldn't load the board." onRetry={reload} />;
 
   const canCreate = role !== "viewer";
-  const canDrag = role !== "viewer";
-  const canSync = role === "owner" || role === "admin";
+  // AC-70p: positions are relative to the full column, not a filtered part of it.
+  const filterOn = Boolean(query.trim() || assignee || priority || statusFilter);
+  const canDrag = role !== "viewer" && !filterOn;
+  const isEmpty = tasks.length === 0 && !filterOn;
+  const isTruncated = Object.keys(truncated).length > 0;
+  const columns = TASK_STATUSES.filter((status) => !statusFilter || status === statusFilter);
 
   return (
     <div className="flex flex-col gap-4">
@@ -301,25 +308,94 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
             </option>
           ))}
         </select>
+        <select
+          aria-label="Filter by priority"
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">All priorities</option>
+          {TASK_PRIORITIES.map((value) => (
+            <option key={value} value={value}>
+              {TASK_PRIORITY_LABELS[value]}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter by status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">All statuses</option>
+          {TASK_STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {TASK_STATUS_LABELS[value]}
+            </option>
+          ))}
+        </select>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          {canSync && (
-            <button type="button" disabled={syncing} onClick={runSync} className={secondaryButton}>
-              <RefreshCw className="h-4 w-4" aria-hidden />
-              {syncing ? "Syncing…" : "Sync GitHub"}
-            </button>
-          )}
-          {canCreate && (
-            <button type="button" onClick={() => setShowNew(true)} className={primaryButton}>
+          <div className="flex rounded-lg border border-surface-variant">
+            {VIEWS.map((key) => {
+              const Icon = key === "board" ? LayoutGrid : List;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-label={key === "board" ? "Board view" : "List view"}
+                  aria-pressed={view === key}
+                  onClick={() => chooseView(key)}
+                  className={`p-2 ${view === key ? "bg-primary-container text-on-primary" : "text-on-surface-variant hover:bg-surface-container-low"}`}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                </button>
+              );
+            })}
+          </div>
+          {canCreate && !isEmpty && (
+            <button type="button" onClick={() => setNewStatus("todo")} className={primaryButton}>
               <Plus className="h-4 w-4" />
-              New task
+              Add Task
             </button>
           )}
         </div>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {TASK_STATUSES.map((status) => {
+      {filterOn && view === "board" && role !== "viewer" && (
+        <p className="text-body-md text-on-surface-variant">Dragging is off while a filter is on.</p>
+      )}
+
+      {isEmpty && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-5">
+          <p className="text-body-md text-on-surface-variant">
+            No tasks yet. Tasks come from reviewed proposals, or you can add one.
+          </p>
+          {canCreate && (
+            <button type="button" onClick={() => setNewStatus("todo")} className={primaryButton}>
+              Add Task
+            </button>
+          )}
+        </div>
+      )}
+
+      {view === "list" && !isEmpty && (
+        <div className="flex flex-col gap-2">
+          {tasks.length === 0 ? (
+            <p className="rounded-xl border border-surface-variant bg-surface-container-lowest p-5 text-body-md text-on-surface-variant">
+              No tasks match these filters.
+            </p>
+          ) : (
+            <TasksList tasks={tasks} showRestricted={role !== "viewer"} onOpen={setOpenTaskId} />
+          )}
+          {isTruncated && (
+            <p className="text-body-md text-on-surface-variant">Long columns show their first tasks only.</p>
+          )}
+        </div>
+      )}
+
+      {view === "board" && <DragDropContext onDragEnd={handleDragEnd}>
+        <div className={`grid grid-cols-1 gap-4 ${statusFilter ? "" : "md:grid-cols-2 xl:grid-cols-5"}`}>
+          {columns.map((status) => {
             const cards = columnCards(tasks, status);
             const total = truncated[status];
             return (
@@ -332,7 +408,20 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
                   <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">
                     {TASK_STATUS_LABELS[status]}
                   </h3>
-                  <span className="font-mono text-label-mono text-on-surface-variant">{total ?? cards.length}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-label-mono text-on-surface-variant">{total ?? cards.length}</span>
+                    {/* Completing needs an evidence note, so Completed has no `+`. */}
+                    {canCreate && status !== "completed" && (
+                      <button
+                        type="button"
+                        aria-label={`Add a task to ${TASK_STATUS_LABELS[status]}`}
+                        onClick={() => setNewStatus(status)}
+                        className="rounded p-0.5 text-on-surface-variant hover:bg-surface-container"
+                      >
+                        <Plus className="h-4 w-4" aria-hidden />
+                      </button>
+                    )}
+                  </span>
                 </header>
                 <Droppable droppableId={status}>
                   {(drop) => (
@@ -373,7 +462,7 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
             );
           })}
         </div>
-      </DragDropContext>
+      </DragDropContext>}
 
       {pending && (
         <CompleteTaskDialog
@@ -383,15 +472,24 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
           onConfirm={confirmComplete}
         />
       )}
-      {openTaskId && <TaskDrawer taskId={openTaskId} onClose={closeDrawer} />}
-      {showNew && (
+      {openTaskId && (
+        <TaskDrawer
+          taskId={openTaskId}
+          onClose={closeDrawer}
+          onChanged={replaceTask}
+          onCommentsChanged={(delta) => changeCommentCount(openTaskId, delta)}
+        />
+      )}
+      {newStatus && (
         <NewTaskDialog
           projectId={project.id}
           members={members}
-          onClose={() => setShowNew(false)}
+          initialStatus={newStatus}
+          onClose={() => setNewStatus(null)}
           onCreated={(task) => {
-            setShowNew(false);
+            setNewStatus(null);
             setTasks((prev) => [...prev, task]);
+            refresh();
           }}
         />
       )}

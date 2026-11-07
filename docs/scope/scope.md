@@ -671,17 +671,17 @@ New sidebar and navigation from the PDF (My Dashboard, My Tasks, My Meetings, My
 **Done when:** every tab renders a useful empty state in a fresh project and every PDF screen has a working home, apart from the items the spec lists under "What stays out of the PDF".
 Spec: [0004-workspace-shell](../specs/0004-conversations-to-code/0004-workspace-shell.md), under [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
 - [x] Design it (spec)
-- [ ] Build it: `/develop workspace shell` (after W7; 21 slices, so I'd recommend several sessions)
-  - [ ] Notifications data, `notify`, routes, and wiring into every caller (AC-71 to AC-72)
-  - [ ] Event email gate, settings route and toggles, daily cron with due notices, digest, purge, and Sync (AC-74 to AC-76a)
-  - [ ] Tokens, sidebar, header, bell, Notifications page, My Profile, Settings, Connected Accounts, review notices (AC-72a, AC-73, AC-77a, AC-77e to AC-77g, AC-79, AC-79a)
-  - [ ] Project fields, New Project, My Projects, project header, tabs with aliases, Overview, Settings, empty states (AC-70, AC-70a, AC-70b, AC-70e to AC-70h, AC-77d)
-  - [ ] Tasks with review, priority, filters, Board and List, drawer, comments, commits on click (AC-70c, AC-70o to AC-70r)
-  - [ ] Members, Add Members, invite page, pending invitation banner (AC-70j, AC-70k, AC-70s, AC-70t)
-  - [ ] Meetings tab, schedule fields, Meeting Details, bulk proposal confirm (AC-70d, AC-70u to AC-70w)
-  - [ ] GitHub tab, Decisions and Activity filters, AI Assistant tab (AC-70i, AC-70l to AC-70n)
-  - [ ] My Tasks, My Dashboard, My Meetings (AC-77, AC-77b, AC-77c)
-  - [ ] Ctrl K palette with decisions, search route, `q` on `/search`, Raise hand, auth layouts (AC-78 to AC-78b, AC-70x, AC-70y)
+- [x] Build it: `/develop workspace shell` (21 slices, built 2026-11-08)
+  - [x] Notifications data, `notify`, routes, and wiring into every caller (AC-71 to AC-72)
+  - [x] Event email gate, settings route and toggles, daily cron with due notices, digest, purge, and Sync (AC-74 to AC-76a)
+  - [x] Tokens, sidebar, header, bell, Notifications page, My Profile, Settings, Connected Accounts, review notices (AC-72a, AC-73, AC-77a, AC-77e to AC-77g, AC-79, AC-79a)
+  - [x] Project fields, New Project, My Projects, project header, tabs with aliases, Overview, Settings, empty states (AC-70, AC-70a, AC-70b, AC-70e to AC-70h, AC-77d)
+  - [x] Tasks with review, priority, filters, Board and List, drawer, comments, commits on click (AC-70c, AC-70o to AC-70r)
+  - [x] Members, Add Members, invite page, pending invitation banner (AC-70j, AC-70k, AC-70s, AC-70t)
+  - [x] Meetings tab, schedule fields, Meeting Details, bulk proposal confirm (AC-70d, AC-70u to AC-70w)
+  - [x] GitHub tab, Decisions and Activity filters, AI Assistant tab (AC-70i, AC-70l to AC-70n)
+  - [x] My Tasks, My Dashboard, My Meetings (AC-77, AC-77b, AC-77c)
+  - [x] Ctrl K palette with decisions, search route, `q` on `/search`, Raise hand, auth layouts (AC-78 to AC-78b, AC-70x, AC-70y)
 - [ ] Verify it: `/check verify workspace shell`
 - [ ] Test it: `/test workspace shell`
 - [ ] Review it (fresh model): `/check review workspace shell`

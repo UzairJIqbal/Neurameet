@@ -8,35 +8,91 @@ import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
+import { ModalProvider } from "@/components/ui/animated-modal";
+import MeetingModel from "@/components/MeetingModel";
+import { useShellDetail } from "@/components/shell/ShellContext";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { getProject, ProjectClientError } from "@/lib/project-client";
-import { ROLE_LABELS, type ProjectDetail } from "@/lib/project-types";
+import type { ProjectFull, ProjectRole } from "@/lib/project-types";
+import ProjectHeader from "./ProjectHeader";
+import OverviewTab from "./OverviewTab";
+import ProjectMeetingsTab from "./ProjectMeetingsTab";
+import ProjectSettingsTab from "./ProjectSettingsTab";
+import AddMembersDialog from "./AddMembersDialog";
 import MembersTab from "./MembersTab";
 import TasksBoard from "./TasksBoard";
 import ProposalsPanel from "./ProposalsPanel";
-import GitHubTab from "./GitHubTab";
+import GitHubPanel from "./GitHubPanel";
 import DecisionsTab from "./DecisionsTab";
 import ActivityTab from "./ActivityTab";
-import AssistantTab from "./AssistantTab";
+import ProjectAssistant from "./ProjectAssistant";
 
-type TabKey = "members" | "tasks" | "promises" | "proposals" | "activity" | "assistant" | "github";
-
-const TAB_LABELS: Record<TabKey, string> = {
-  members: "Members",
-  tasks: "Tasks",
-  promises: "Decisions and Promises",
-  proposals: "Proposals",
-  activity: "Activity",
-  assistant: "AI Assistant",
-  github: "GitHub",
+// Confirming or merging a proposal changes the board, so the tab owns the key
+// that reloads it (AC-70c).
+const TasksTab = ({ project }: { project: ProjectFull }) => {
+  const [reloadKey, setReloadKey] = useState(0);
+  const bump = useCallback(() => setReloadKey((k) => k + 1), []);
+  return (
+    <div className="flex flex-col gap-6">
+      {project.role !== "viewer" && <ProposalsPanel project={project} onChanged={bump} />}
+      <TasksBoard project={project} reloadKey={reloadKey} />
+    </div>
+  );
 };
 
-// Proposals and the assistant are hidden for Viewers (AC-37, AC-63). GitHub is
-// the Owner's alone (AC-47).
-const tabsFor = (project: ProjectDetail): TabKey[] => {
-  if (project.role === "viewer") return ["members", "tasks", "promises", "activity"];
-  const tabs: TabKey[] = ["members", "tasks", "promises", "proposals", "activity", "assistant"];
-  return project.role === "owner" ? [...tabs, "github"] : tabs;
+type TabKey =
+  | "overview"
+  | "meetings"
+  | "tasks"
+  | "members"
+  | "github"
+  | "activity"
+  | "promises"
+  | "assistant"
+  | "settings";
+
+const TAB_ORDER: TabKey[] = [
+  "overview",
+  "meetings",
+  "tasks",
+  "members",
+  "github",
+  "activity",
+  "promises",
+  "assistant",
+  "settings",
+];
+
+const TAB_LABELS: Record<TabKey, string> = {
+  overview: "Overview",
+  meetings: "Meetings",
+  tasks: "Tasks",
+  members: "Members",
+  github: "GitHub",
+  activity: "Development Activity",
+  promises: "Decisions and Promises",
+  assistant: "AI Assistant",
+  settings: "Settings",
+};
+
+// AC-70: Owner and Admin all nine, Developer all but Settings, Viewer all but
+// GitHub, AI Assistant, and Settings.
+const HIDDEN_TABS: Record<ProjectRole, TabKey[]> = {
+  owner: [],
+  admin: [],
+  developer: ["settings"],
+  viewer: ["github", "assistant", "settings"],
+};
+
+export const tabsForRole = (role: ProjectRole): TabKey[] =>
+  TAB_ORDER.filter((key) => !HIDDEN_TABS[role].includes(key));
+
+// AC-70a: old links keep working. Anything unknown or not allowed is Overview.
+const TAB_ALIASES: Record<string, TabKey> = { board: "tasks", proposals: "tasks" };
+
+export const resolveTab = (requested: string | null, role: ProjectRole): TabKey => {
+  const key = (requested && TAB_ALIASES[requested]) || requested;
+  return tabsForRole(role).find((tab) => tab === key) ?? "overview";
 };
 
 // Page shell: header plus tabs, the selected tab kept in ?tab=.
@@ -44,12 +100,16 @@ const ProjectDetailView = ({ id }: { id: string }) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [project, setProject] = useState<ProjectFull | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [dialog, setDialog] = useState<"schedule" | "invite" | null>(null);
+  const [inviteNonce, setInviteNonce] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
   const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
+
+  useShellDetail(project?.name ?? null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -82,6 +142,12 @@ const ProjectDetailView = ({ id }: { id: string }) => {
   }, [timedOut]);
 
   const reload = useCallback(() => setRetryNonce((k) => k + 1), []);
+  const closeDialog = useCallback(() => {
+    setDialog(null);
+    reload();
+  }, [reload]);
+  const openSchedule = useCallback(() => setDialog("schedule"), []);
+  const openInvite = useCallback(() => setDialog("invite"), []);
 
   if (timedOut) {
     return (
@@ -109,9 +175,8 @@ const ProjectDetailView = ({ id }: { id: string }) => {
     );
   }
 
-  const tabs = tabsFor(project);
-  const requested = searchParams.get("tab") as TabKey | null;
-  const tab: TabKey = requested && tabs.includes(requested) ? requested : "members";
+  const tabs = tabsForRole(project.role);
+  const tab = resolveTab(searchParams.get("tab"), project.role);
   const selectTab = (key: TabKey) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", key);
@@ -128,23 +193,13 @@ const ProjectDetailView = ({ id }: { id: string }) => {
         Projects
       </Link>
 
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="break-words text-display-lg-mobile font-display-lg text-on-surface md:text-display-lg">
-            {project.name}
-          </h1>
-          <span className="rounded-md bg-surface-container px-2 py-1 font-mono text-label-mono text-on-surface-variant">
-            {project.taskPrefix}
-          </span>
-          <span className="inline-flex items-center rounded-full bg-primary-container/15 px-3 py-1 text-label-caps uppercase tracking-wider text-primary-container">
-            {ROLE_LABELS[project.role]}
-          </span>
-        </div>
-        <p className="text-body-md text-on-surface-variant">
-          {project.memberCount} member{project.memberCount === 1 ? "" : "s"} · {project.meetingCount} meeting
-          {project.meetingCount === 1 ? "" : "s"}
-        </p>
-      </header>
+      <ProjectHeader
+        project={project}
+        onAddMember={openInvite}
+        onSchedule={openSchedule}
+        onOpenSettings={() => selectTab("settings")}
+        onChanged={reload}
+      />
 
       <nav role="tablist" className="flex gap-2 overflow-x-auto border-b border-surface-variant">
         {tabs.map((key) => (
@@ -165,13 +220,42 @@ const ProjectDetailView = ({ id }: { id: string }) => {
         ))}
       </nav>
 
-      {tab === "members" && <MembersTab project={project} onProjectChanged={reload} />}
-      {tab === "tasks" && <TasksBoard project={project} />}
-      {tab === "proposals" && <ProposalsPanel project={project} />}
-      {tab === "github" && <GitHubTab project={project} />}
+      {/* The key reloads a data tab's cards after a change made in the header. */}
+      {tab === "overview" && (
+        <OverviewTab key={retryNonce} project={project} onSchedule={openSchedule} onAddMember={openInvite} />
+      )}
+      {tab === "meetings" && <ProjectMeetingsTab key={retryNonce} project={project} onSchedule={openSchedule} />}
+      {tab === "tasks" && (
+        <TasksTab project={project} />
+      )}
+      {tab === "members" && <MembersTab project={project} onProjectChanged={reload} onAddMember={openInvite} invitesNonce={inviteNonce} />}
+      {tab === "github" && <GitHubPanel project={project} reloadKey={retryNonce} onChanged={reload} />}
       {tab === "promises" && <DecisionsTab project={project} />}
       {tab === "activity" && <ActivityTab project={project} />}
-      {tab === "assistant" && <AssistantTab projectId={project.id} />}
+      {tab === "assistant" &&
+        (project.processedMeetingCount === 0 ? (
+          <p className="text-body-md text-on-surface-variant">
+            The assistant answers from processed meetings. Process one first.
+          </p>
+        ) : (
+          <ProjectAssistant project={project} />
+        ))}
+      {tab === "settings" && <ProjectSettingsTab project={project} onProjectChanged={reload} />}
+
+      {dialog === "schedule" && (
+        <ModalProvider>
+          <MeetingModel type="isScheduleMeeting" initialProjectId={project.id} onClose={closeDialog} />
+        </ModalProvider>
+      )}
+      {dialog === "invite" && (
+        <AddMembersDialog
+          projectId={project.id}
+          projectName={project.name}
+          myRole={project.role}
+          onClose={closeDialog}
+          onCreated={() => setInviteNonce((n) => n + 1)}
+        />
+      )}
     </section>
   );
 };

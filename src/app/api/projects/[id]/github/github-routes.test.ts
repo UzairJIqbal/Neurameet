@@ -22,6 +22,7 @@ import { callsOf, ok, queue, resetQueues } from "@/test/supabase-queue-mock";
 import { GET as listRepos, POST as linkRepo } from "./repos/route";
 import { DELETE as unlinkRepo } from "./repos/[repoId]/route";
 import { POST as sync } from "./sync/route";
+import { GET as summary } from "./summary/route";
 
 const P = "p1";
 const params = { params: Promise.resolve({ id: P }) };
@@ -218,5 +219,87 @@ describe("POST github/sync", () => {
     queue("audit_log", ok(null), { data: null, error: { message: "down" } });
     expect((await sync(new Request(url), params)).status).toBe(500);
     expect(mockSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET github/summary", () => {
+  const LINK = {
+    id: "l1",
+    task_id: "t1",
+    repo_id: 100,
+    repo_full_name: "acme/app",
+    pr_number: 7,
+    pr_title: "Fix login",
+    pr_url: "https://github.com/acme/app/pull/7",
+    pr_author_login: "ali",
+    state: "open",
+    merged_at: null,
+    reverted_at: null,
+    tasks: { project_id: P, number: 1 },
+  };
+  const summaryData = () => {
+    queue("projects", ok({ task_prefix: "NM" }));
+    queue(
+      "github_repos",
+      ok([
+        {
+          repo_id: 100,
+          full_name: "acme/app",
+          private: true,
+          default_branch: "main",
+        },
+      ]),
+    );
+    queue(
+      "task_links",
+      // The last sync read comes first.
+      ok(null),
+      ok([
+        LINK,
+        {
+          ...LINK,
+          id: "l2",
+          task_id: "t2",
+          tasks: { project_id: P, number: 2 },
+        },
+        {
+          ...LINK,
+          id: "l3",
+          task_id: "t1",
+          pr_number: 8,
+          state: "merged",
+          merged_at: "2026-11-01T00:00:00Z",
+        },
+      ]),
+    );
+  };
+
+  it("is 403 for a Viewer and 404 for a stranger", async () => {
+    role("viewer");
+    expect((await summary(new Request(url), params)).status).toBe(403);
+    role(null);
+    expect((await summary(new Request(url), params)).status).toBe(404);
+  });
+
+  it("gives a Developer one row per linked PR and counts linked PRs only", async () => {
+    role("developer");
+    summaryData();
+    const res = await summary(new Request(url), params);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.counts).toEqual({ openPrs: 1, mergedPrs: 1, linkedTasks: 2 });
+    expect(body.pulls).toHaveLength(2);
+    expect(body.pulls[0]).toMatchObject({
+      number: 7,
+      authorLogin: "ali",
+      taskKeys: ["NM-1", "NM-2"],
+    });
+    expect(body.repos[0]).toEqual({
+      repoId: 100,
+      fullName: "acme/app",
+      private: true,
+      defaultBranch: "main",
+    });
+    expect(body.truncated).toBe(false);
   });
 });

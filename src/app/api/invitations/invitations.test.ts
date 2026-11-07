@@ -7,6 +7,10 @@ const { mockAuth, mockGetUserList, mockGetUser } = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: vi.fn(),
+}));
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mockAuth,
   clerkClient: async () => ({
@@ -31,10 +35,13 @@ import {
   GET as listInvites,
 } from "../projects/[id]/invitations/route";
 import { DELETE as revokeInvite } from "../projects/[id]/invitations/[invitationId]/route";
+import { POST as resendInvite } from "../projects/[id]/invitations/[invitationId]/resend/route";
 import { GET as listRequests } from "../projects/[id]/join-requests/route";
 import { POST as decideRequest } from "../projects/[id]/join-requests/[requestId]/route";
 import { GET as preview } from "./preview/route";
 import { POST as accept } from "./accept/route";
+import { GET as listMine } from "./mine/route";
+import { POST as decideMine } from "./mine/[id]/route";
 
 const P = "p1";
 const INV = "11111111-1111-4111-8111-111111111111";
@@ -75,6 +82,8 @@ const inviteRow = (over: Record<string, unknown> = {}) => ({
   expires_at: new Date(Date.now() + 86_400_000).toISOString(),
   revoked_at: null,
   used_at: null,
+  declined_at: null,
+  created_at: "2026-11-01T00:00:00Z",
   ...over,
 });
 
@@ -338,26 +347,207 @@ describe("DELETE /api/projects/[id]/invitations/[invitationId]", () => {
   });
 });
 
+describe("POST /api/projects/[id]/invitations/[invitationId]/resend", () => {
+  const resend = (invitationId = INV) =>
+    resendInvite(new Request("http://localhost/api", { method: "POST" }), {
+      params: Promise.resolve({ id: P, invitationId }),
+    });
+  const stored = (over: Record<string, unknown> = {}) => ({
+    ...inviteRow(),
+    declined_at: null,
+    ...over,
+  });
+
+  it("replaces the token and expiry, so the old link stops working", async () => {
+    role("owner");
+    queue("project_invitations", ok(stored()), ok({ id: INV }));
+    const res = await resend();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const token = String(body.link).split("/").pop() as string;
+    const update = callsOf("project_invitations", "update")[0].args[0] as {
+      token_hash: string;
+      expires_at: string;
+    };
+    expect(update.token_hash).toBe(hashInviteToken(token));
+    expect(update.token_hash).not.toBe(token);
+    const days =
+      (new Date(update.expires_at).getTime() - Date.now()) / 86_400_000;
+    expect(Math.round(days)).toBe(7);
+  });
+
+  it("never writes the token to the audit", async () => {
+    role("admin");
+    queue("project_invitations", ok(stored()), ok({ id: INV }));
+    const body = await (await resend()).json();
+    const audit = callsOf("audit_log", "insert")[0].args[0] as {
+      action: string;
+      detail: unknown;
+    };
+    expect(audit.action).toBe("invite.resent");
+    expect(JSON.stringify(audit)).not.toContain(
+      String(body.link).split("/").pop(),
+    );
+  });
+
+  it("returns 422 for a link invite", async () => {
+    role("owner");
+    queue("project_invitations", ok(stored({ kind: "link", email: null })));
+    expect((await resend()).status).toBe(422);
+    expect(callsOf("project_invitations", "update")).toHaveLength(0);
+  });
+
+  it.each([
+    ["revoked", { revoked_at: "2026-11-01T00:00:00Z" }],
+    ["used", { used_at: "2026-11-01T00:00:00Z" }],
+    ["declined", { declined_at: "2026-11-01T00:00:00Z" }],
+    ["expired", { expires_at: "2020-01-01T00:00:00Z" }],
+  ])("returns 410 for a %s invite", async (_name, over) => {
+    role("owner");
+    queue("project_invitations", ok(stored(over)));
+    expect((await resend()).status).toBe(410);
+    expect(callsOf("project_invitations", "update")).toHaveLength(0);
+  });
+
+  it("returns 410 when it loses a race with a revoke", async () => {
+    role("owner");
+    queue("project_invitations", ok(stored()), ok(null));
+    expect((await resend()).status).toBe(410);
+    expect(callsOf("audit_log", "insert")).toHaveLength(0);
+  });
+
+  it("returns 404 for a bad id or another project's invite", async () => {
+    role("owner");
+    expect((await resend("not-a-uuid")).status).toBe(404);
+    role("owner");
+    queue("project_invitations", ok(null));
+    expect((await resend()).status).toBe(404);
+  });
+
+  it("stops an Admin resending an Admin invite", async () => {
+    role("admin");
+    queue("project_invitations", ok(stored({ role: "admin" })));
+    expect((await resend()).status).toBe(403);
+    expect(callsOf("project_invitations", "update")).toHaveLength(0);
+  });
+
+  it("returns 403 to a Developer and 401 when signed out", async () => {
+    role("developer");
+    expect((await resend()).status).toBe(403);
+    signIn(null);
+    expect((await resend()).status).toBe(401);
+  });
+});
+
 describe("GET /api/invitations/preview", () => {
   const open = (token = TOKEN) =>
     preview(
       new Request(`http://localhost/api/invitations/preview?token=${token}`),
     );
 
-  beforeEach(() => signIn("u2"));
+  beforeEach(() => {
+    signIn("u2");
+    clerkUser("someone.else@x.com");
+  });
+
+  // AC-70s: what the page reads after the invite itself loads.
+  const facts = (repos: Record<string, unknown>[] = []) => {
+    queue(
+      "projects",
+      ok({
+        description: "Payments",
+        icon: "rocket",
+        color: "primary",
+        created_at: "2026-10-01T00:00:00Z",
+      }),
+    );
+    queue("project_members", {
+      data: [{ user_id: "owner" }, { user_id: "u9" }],
+      error: null,
+      count: 2,
+    });
+    queue("tasks", count(5));
+    queue("meetings", count(3));
+    queue("github_repos", ok(repos));
+    mockGetUserList.mockResolvedValue({
+      data: [
+        { id: "owner", firstName: "Olivia", lastName: "", imageUrl: "" },
+        { id: "u9", firstName: "Zara", lastName: "", imageUrl: "" },
+      ],
+    });
+  };
 
   it("shows project, role, kind, status and never the email", async () => {
     loaded(inviteRow());
+    facts();
     const res = await open();
     const body = await res.json();
-    expect(body).toEqual({
+    expect(body).toMatchObject({
       projectName: "Core",
       role: "developer",
       kind: "email",
       status: "valid",
+      inviterName: "Olivia",
+      description: "Payments",
+      memberCount: 2,
+      taskCount: 5,
+      meetingCount: 3,
+      createdAt: "2026-10-01T00:00:00Z",
+      invitedAt: "2026-11-01T00:00:00Z",
+      repoConnected: false,
     });
     expect(JSON.stringify(body)).not.toContain("b@x.com");
     expect(callsOf("rpc:accept_email_invitation", "rpc")).toHaveLength(0);
+  });
+
+  it("gives team names and the id only to the person the email names", async () => {
+    clerkUser("b@x.com");
+    loaded(inviteRow());
+    facts();
+    const body = await (await open()).json();
+    expect(body.invitationId).toBe(INV);
+    expect(body.team.map((m: { name: string }) => m.name)).toEqual([
+      "Olivia",
+      "Zara",
+    ]);
+  });
+
+  it("another person on an email invite sees no team and no id", async () => {
+    loaded(inviteRow());
+    facts();
+    const body = await (await open()).json();
+    expect(body.team).toBeUndefined();
+    expect(body.invitationId).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("Zara");
+  });
+
+  it("a link invite shows only the member count and no private repo name", async () => {
+    clerkUser("b@x.com");
+    loaded(inviteRow({ kind: "link", email: null }));
+    facts([{ full_name: "acme/secret", private: true }]);
+    const body = await (await open()).json();
+    expect(body.memberCount).toBe(2);
+    expect(body.team).toBeUndefined();
+    expect(body.invitationId).toBeUndefined();
+    expect(body.repoConnected).toBe(true);
+    expect(body.repoName).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("acme/secret");
+  });
+
+  it("names a public repo", async () => {
+    loaded(inviteRow());
+    facts([
+      { full_name: "acme/secret", private: true },
+      { full_name: "acme/open", private: false },
+    ]);
+    const body = await (await open()).json();
+    expect(body.repoName).toBe("acme/open");
+  });
+
+  it("a declined invite answers 410 on its token", async () => {
+    loaded(inviteRow({ declined_at: "2026-11-02" }));
+    const res = await open();
+    expect(res.status).toBe(410);
   });
 
   it("a member also gets the project id to link to", async () => {
@@ -559,5 +749,167 @@ describe("join requests", () => {
     expect(
       (await decideRequest(post({ decision: "maybe" }), params(REQ))).status,
     ).toBe(422);
+  });
+});
+
+describe("GET /api/invitations/mine", () => {
+  beforeEach(() => {
+    signIn("u2");
+    clerkUser("b@x.com");
+  });
+
+  const mineRow = {
+    id: INV,
+    project_id: P,
+    role: "developer",
+    created_by: "owner",
+    created_at: "2026-11-01T00:00:00Z",
+    expires_at: "2026-11-08T00:00:00Z",
+  };
+  const coreProject = {
+    id: P,
+    name: "Core",
+    description: null,
+    icon: "folder",
+    color: "primary",
+  };
+
+  it("is 401 signed out", async () => {
+    signIn(null);
+    expect((await listMine()).status).toBe(401);
+  });
+
+  it("lists active invites for your verified email, never a token", async () => {
+    queue("project_invitations", ok([mineRow]));
+    queue("project_members", ok([]));
+    queue("projects", ok([coreProject]));
+    const body = await (await listMine()).json();
+    expect(body.invitations).toHaveLength(1);
+    expect(body.invitations[0]).toMatchObject({
+      id: INV,
+      projectName: "Core",
+      role: "developer",
+    });
+    expect(JSON.stringify(body)).not.toMatch(/token/i);
+    const filters = callsOf("project_invitations", "eq").map((c) => c.args);
+    expect(filters).toContainEqual(["email", "b@x.com"]);
+    expect(filters).toContainEqual(["kind", "email"]);
+    expect(
+      callsOf("project_invitations", "is").map((c) => c.args),
+    ).toContainEqual(["declined_at", null]);
+  });
+
+  it("is empty when your email is unverified", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    clerkUser("b@x.com", false);
+    queue("project_invitations", ok([mineRow]));
+    const body = await (await listMine()).json();
+    expect(body.invitations).toEqual([]);
+    expect(callsOf("project_invitations", "select")).toHaveLength(0);
+  });
+
+  it("hides a project you already joined", async () => {
+    queue("project_invitations", ok([mineRow]));
+    queue("project_members", ok([{ project_id: P }]));
+    queue("projects", ok([coreProject]));
+    const body = await (await listMine()).json();
+    expect(body.invitations).toEqual([]);
+  });
+});
+
+describe("POST /api/invitations/mine/[id]", () => {
+  const params = (id = INV) => ({ params: Promise.resolve({ id }) });
+  const byId = (invite: Record<string, unknown> | null, member = false) => {
+    queue("project_invitations", ok(invite));
+    if (!invite) return;
+    queue("project_members", ok(member ? { user_id: "u2" } : null));
+    queue("project_join_requests", ok(null));
+    queue("projects", ok({ name: "Core" }));
+  };
+
+  beforeEach(() => {
+    signIn("u2");
+    clerkUser("b@x.com");
+  });
+
+  it("is 401 signed out", async () => {
+    signIn(null);
+    const res = await decideMine(post({ decision: "accept" }), params());
+    expect(res.status).toBe(401);
+  });
+
+  it("is 404 on a bad id and 422 on a bad decision", async () => {
+    expect(
+      (await decideMine(post({ decision: "accept" }), params("nope"))).status,
+    ).toBe(404);
+    expect(
+      (await decideMine(post({ decision: "maybe" }), params())).status,
+    ).toBe(422);
+  });
+
+  it("accept joins through the same rpc as the token path", async () => {
+    byId(inviteRow());
+    const res = await decideMine(post({ decision: "accept" }), params());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "joined", projectId: P });
+    expect(callsOf("rpc:accept_email_invitation", "rpc")[0].args[0]).toEqual({
+      p_invitation: INV,
+      p_user: "u2",
+    });
+  });
+
+  it("accept fails with 404 for another email and joins nothing", async () => {
+    clerkUser("someone.else@x.com");
+    byId(inviteRow());
+    const res = await decideMine(post({ decision: "accept" }), params());
+    expect(res.status).toBe(404);
+    expect(callsOf("rpc:accept_email_invitation", "rpc")).toHaveLength(0);
+  });
+
+  it("is 404 for a link invite, an unknown id, or a used one", async () => {
+    byId(inviteRow({ kind: "link", email: null }));
+    expect(
+      (await decideMine(post({ decision: "accept" }), params())).status,
+    ).toBe(404);
+    byId(null);
+    expect(
+      (await decideMine(post({ decision: "accept" }), params())).status,
+    ).toBe(404);
+    byId(inviteRow({ used_at: "2026-11-02" }));
+    expect(
+      (await decideMine(post({ decision: "decline" }), params())).status,
+    ).toBe(404);
+  });
+
+  it("is 410 when the rpc finds the invite gone", async () => {
+    byId(inviteRow());
+    queue("rpc:accept_email_invitation", fail("gone"));
+    const res = await decideMine(post({ decision: "accept" }), params());
+    expect(res.status).toBe(410);
+  });
+
+  it("decline sets declined_at and writes an invite.declined audit row", async () => {
+    byId(inviteRow());
+    queue("project_invitations", ok({ id: INV }));
+    const res = await decideMine(post({ decision: "decline" }), params());
+    expect(await res.json()).toEqual({ status: "declined", projectId: P });
+    const update = callsOf("project_invitations", "update")[0].args[0] as {
+      declined_at?: string;
+    };
+    expect(update.declined_at).toBeTruthy();
+    expect(callsOf("audit_log", "insert")[0].args[0]).toMatchObject({
+      action: "invite.declined",
+      actor_id: "u2",
+      target_id: INV,
+    });
+    expect(callsOf("rpc:accept_email_invitation", "rpc")).toHaveLength(0);
+  });
+
+  it("decline is 410 when the row changed underneath it", async () => {
+    byId(inviteRow());
+    queue("project_invitations", ok(null));
+    const res = await decideMine(post({ decision: "decline" }), params());
+    expect(res.status).toBe(410);
+    expect(callsOf("audit_log", "insert")).toHaveLength(0);
   });
 });

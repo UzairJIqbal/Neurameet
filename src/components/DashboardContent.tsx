@@ -8,12 +8,11 @@ import {
   Plus,
   Video,
   Upload,
-  Search,
-  X,
-  Bell,
   Sparkles,
   CalendarDays,
   FileText,
+  FolderPlus,
+  GitPullRequest,
   ListChecks,
   ArrowRight,
 } from "lucide-react";
@@ -23,41 +22,23 @@ import { ModalProvider } from "./ui/animated-modal";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { LoadError } from "@/components/ui/load-error";
 import { MeetingListItem, FollowUpItem } from "@/lib/meeting-types";
+import { fetchMyCounts, fetchNotifications } from "@/lib/notification-client";
+import { listMyTasks, listProjects } from "@/lib/project-client";
+import { isDueThisWeek } from "@/lib/my-tasks";
+import { useCardLoad } from "@/components/projects/useCardLoad";
+import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
+import TaskDrawer from "@/components/projects/TaskDrawer";
+import {
+  CardState,
+  FocusTasksCard,
+  MyProjectsSection,
+  NotificationsCard,
+  QuickActionsCard,
+  SummaryChip,
+  UpcomingMeetingCard,
+  type QuickActionItem,
+} from "@/components/shell/DashboardCards";
 import toast from "react-hot-toast";
-
-/* ------------------------------------------------------------------ */
-/*  Quick Action Card                                                  */
-/* ------------------------------------------------------------------ */
-
-type QuickAction = {
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  iconWrap: string;
-  onClick: () => void;
-};
-
-const QuickActionCard = ({
-  title,
-  subtitle,
-  icon,
-  iconWrap,
-  onClick,
-}: QuickAction) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="card-shadow flex flex-col items-center justify-center gap-2 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 transition-all hover:border-primary-container hover:shadow-md"
-  >
-    <div
-      className={`flex h-12 w-12 items-center justify-center rounded-full ${iconWrap}`}
-    >
-      {icon}
-    </div>
-    <span className="text-body-md font-bold text-on-surface">{title}</span>
-    <span className="text-xs text-on-surface-variant">{subtitle}</span>
-  </button>
-);
 
 /* ------------------------------------------------------------------ */
 /*  Skeleton rows — fixed size, no layout shift                        */
@@ -106,6 +87,9 @@ const FollowUpRowSkeleton = () => (
 /*  DashboardContent — main export                                     */
 /* ------------------------------------------------------------------ */
 
+const loadRecentNotifications = (signal: AbortSignal) =>
+  fetchNotifications({ signal });
+
 const DashboardContent = () => {
   const router = useRouter();
   const { user } = useUser();
@@ -115,6 +99,9 @@ const DashboardContent = () => {
     "isInstantMeeting" | "isScheduleMeeting" | "isJoinMeeting" | null
   >(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
 
   // Live, user-scoped data (same sources as Meeting Intelligence / Follow-ups).
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
@@ -126,7 +113,12 @@ const DashboardContent = () => {
     timeoutMs: 12000,
     retryNonce,
   });
-  const [query, setQuery] = useState("");
+
+  // Each card loads on its own, so one failed call blanks only that card.
+  const counts = useCardLoad(fetchMyCounts);
+  const tasks = useCardLoad(listMyTasks);
+  const projects = useCardLoad(listProjects);
+  const notifications = useCardLoad(loadRecentNotifications);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -142,10 +134,12 @@ const DashboardContent = () => {
           throw new Error("Failed to load dashboard data");
         }
 
-        const meetingsData =
-          (await meetingsRes.json()) as { meetings: MeetingListItem[] };
-        const followUpsData =
-          (await followUpsRes.json()) as { followUps: FollowUpItem[] };
+        const meetingsData = (await meetingsRes.json()) as {
+          meetings: MeetingListItem[];
+        };
+        const followUpsData = (await followUpsRes.json()) as {
+          followUps: FollowUpItem[];
+        };
 
         setMeetings(meetingsData.meetings ?? []);
         setFollowUps(followUpsData.followUps ?? []);
@@ -166,8 +160,7 @@ const DashboardContent = () => {
   // Greeting + live summary counts derived from the fetched data.
   const firstName = user?.firstName ?? "there";
   const hour = new Date().getHours();
-  const timeOfDay =
-    hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
+  const timeOfDay = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
 
   const isToday = (value: string | null) => {
     if (!value) return false;
@@ -187,141 +180,145 @@ const DashboardContent = () => {
     (f) => f.status !== "completed",
   ).length;
 
-  // Live, client-side search over the already-fetched dashboard data.
-  const q = query.trim().toLowerCase();
-  const filteredMeetings = q
-    ? meetings.filter((m) => m.title.toLowerCase().includes(q))
-    : meetings;
-  const filteredFollowUps = q
-    ? followUps.filter((f) =>
-        `${f.actionTitle ?? ""} ${f.meetingTitle ?? ""}`
-          .toLowerCase()
-          .includes(q),
-      )
-    : followUps;
-  const visibleMeetings = q ? filteredMeetings : meetings.slice(0, 3);
-  const visibleFollowUps = q ? filteredFollowUps : followUps.slice(0, 3);
+  const visibleMeetings = meetings.slice(0, 3);
+  const visibleFollowUps = followUps.slice(0, 3);
 
-  const quickActions: QuickAction[] = [
+  const myTasks = tasks.data?.tasks ?? [];
+  const today = tasks.data?.today ?? "";
+  const openTasks =
+    counts.data?.openTasks ??
+    myTasks.filter((t) => t.status !== "completed").length;
+  const dueThisWeek = myTasks.filter((t) => isDueThisWeek(t, today)).length;
+  const upcomingCount = counts.data?.upcomingMeetings ?? 0;
+  const prReviews = counts.data?.prReviews ?? 0;
+  const projectCards = projects.data?.projects ?? [];
+  const projectNames = new Map(projectCards.map((p) => [p.id, p.name]));
+  const dateLine = new Date(
+    today ? `${today}T12:00:00` : now,
+  ).toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const quickActions: QuickActionItem[] = [
+    {
+      title: "New Project",
+      subtitle: "Start a workspace",
+      icon: <FolderPlus className="h-6 w-6" />,
+      onClick: () => setShowCreateProject(true),
+    },
     {
       title: "New Meeting",
       subtitle: "Create a new meeting",
       icon: <Plus className="h-6 w-6" />,
-      iconWrap: "bg-primary-container/10 text-primary-container",
       onClick: () => setMeetingModalType("isInstantMeeting"),
     },
     {
-      title: "Join Meeting",
-      subtitle: "Join with a code",
-      icon: <Video className="h-6 w-6" />,
-      iconWrap: "bg-secondary-container/30 text-secondary",
-      onClick: () => router.push("/join-meeting"),
+      title: "AI Assistant",
+      subtitle: "Ask about your meetings",
+      icon: <Sparkles className="h-6 w-6" />,
+      href: "/ai-chat",
     },
     {
-      title: "Upload Transcript",
-      subtitle: "Analyze transcript",
-      icon: <Upload className="h-6 w-6" />,
-      iconWrap: "bg-tertiary-container/30 text-tertiary",
-      onClick: () => setShowUploadModal(true),
-    },
-    {
-      title: "Schedule Meeting",
-      subtitle: "Plan a meeting",
-      icon: <CalendarDays className="h-6 w-6" />,
-      iconWrap: "bg-tertiary-container/30 text-tertiary",
-      onClick: () => setMeetingModalType("isScheduleMeeting"),
+      title: "Review PRs",
+      subtitle: `${prReviews} waiting for you`,
+      icon: <GitPullRequest className="h-6 w-6" />,
+      href: "/notifications?filter=github",
     },
   ];
 
   return (
     <ModalProvider>
       <section className="flex min-h-screen flex-col bg-surface">
-        {/* ---- TopAppBar ---- */}
-        <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-4 bg-surface px-6 py-4 sm:px-10">
+        {/* ---- Greeting ---- */}
+        <header className="flex flex-wrap items-start justify-between gap-4 bg-surface px-6 py-4 sm:px-10">
           <div>
+            <p className="text-body-md text-on-surface-variant">{dateLine}</p>
             <h2 className="text-display-lg font-bold text-on-surface">
               Good {timeOfDay}, {firstName}! 👋
             </h2>
             <p className="mt-1 text-body-md text-on-surface-variant">
               You have {meetingsToday} meeting
-              {meetingsToday === 1 ? "" : "s"} today and {openFollowUps} follow-up
+              {meetingsToday === 1 ? "" : "s"} today and {openFollowUps}{" "}
+              follow-up
               {openFollowUps === 1 ? "" : "s"}.
             </p>
           </div>
-
-          <div className="flex items-center gap-4">
-            <div className="relative hidden md:block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-outline" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search anything..."
-                aria-label="Search meetings and follow-ups"
-                className="w-64 rounded-full border border-surface-variant bg-surface-container-low py-2 pl-9 pr-9 text-body-md text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  aria-label="Clear search"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-outline transition-colors hover:text-on-surface"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => router.push("/ai-chat")}
-              className="flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-label-caps text-on-primary transition-colors hover:bg-primary"
-            >
-              <Sparkles className="h-4 w-4" />
-              Ask NeuraMeet AI
-            </button>
-            <button
-              type="button"
-              className="relative flex h-10 w-10 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-low"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-error" />
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SummaryChip value={openTasks} label="open tasks" />
+            <SummaryChip value={dueThisWeek} label="due this week" />
+            <SummaryChip value={upcomingCount} label="upcoming meetings" />
           </div>
         </header>
 
         {/* ---- Content ---- */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-8">
-          {/* Mobile search entry (hidden on sm+, the header search covers that) */}
-          <div className="relative mb-6 sm:hidden">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-outline" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search meetings & follow-ups"
-              aria-label="Search meetings and follow-ups"
-              className="w-full rounded-full border border-surface-variant bg-surface-container-low py-2 pl-9 pr-9 text-body-md text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <UpcomingMeetingCard
+              meetings={meetings}
+              projectNames={projectNames}
+              now={now}
             />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-outline transition-colors hover:text-on-surface"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+            <QuickActionsCard actions={quickActions} />
+            <CardState
+              isLoading={notifications.isLoading && !notifications.data}
+              failed={notifications.failed && !notifications.data}
+              retry={notifications.retry}
+              message="We could not load your notifications."
+            >
+              <NotificationsCard items={notifications.data?.items ?? []} />
+            </CardState>
           </div>
 
-          {/* Quick Actions */}
-          <h3 className="mb-4 text-headline-sm font-semibold text-on-surface">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {quickActions.map((action) => (
-              <QuickActionCard key={action.title} {...action} />
-            ))}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/join-meeting")}
+              className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+            >
+              <Video className="h-4 w-4" /> Join Meeting
+            </button>
+            <button
+              type="button"
+              onClick={() => setMeetingModalType("isScheduleMeeting")}
+              className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+            >
+              <CalendarDays className="h-4 w-4" /> Schedule Meeting
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowUploadModal(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+            >
+              <Upload className="h-4 w-4" /> Upload Transcript
+            </button>
+          </div>
+
+          <div className="mt-8 flex flex-col gap-4">
+            <CardState
+              isLoading={projects.isLoading && !projects.data}
+              failed={projects.failed && !projects.data}
+              retry={projects.retry}
+              message="We could not load your projects."
+            >
+              <MyProjectsSection projects={projectCards} />
+            </CardState>
+            <CardState
+              isLoading={tasks.isLoading && !tasks.data}
+              failed={tasks.failed && !tasks.data}
+              retry={tasks.retry}
+              message="We could not load your tasks."
+            >
+              <FocusTasksCard
+                tasks={myTasks
+                  .filter((t) => t.status !== "completed")
+                  .slice(0, 5)}
+                today={today}
+                onOpen={setOpenTaskId}
+              />
+            </CardState>
           </div>
 
           {/* Meeting Intelligence + Follow-ups */}
@@ -332,21 +329,21 @@ const DashboardContent = () => {
                 <h3 className="text-headline-sm font-semibold text-on-surface">
                   Meeting Intelligence
                 </h3>
-                {!q && (
-                  <Link
-                    href="/meeting-intelligence"
-                    className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
-                  >
-                    View All <ArrowRight className="text-sm" />
-                  </Link>
-                )}
+                <Link
+                  href="/meeting-intelligence"
+                  className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
+                >
+                  View All <ArrowRight className="text-sm" />
+                </Link>
               </div>
 
               <div className="card-shadow flex-1 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest">
                 <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-3 text-label-caps uppercase tracking-wider text-on-surface-variant">
                   <div className="col-span-6 md:col-span-5">Meeting Title</div>
                   <div className="col-span-6 md:col-span-3">Date</div>
-                  <div className="col-span-12 hidden text-right md:col-span-4 md:block">Action</div>
+                  <div className="col-span-12 hidden text-right md:col-span-4 md:block">
+                    Action
+                  </div>
                 </div>
                 <div className="divide-y divide-surface-variant min-h-[12rem]">
                   {timedOut || loadFailed ? (
@@ -373,13 +370,6 @@ const DashboardContent = () => {
                       >
                         Upload Transcript
                       </button>
-                    </div>
-                  ) : q && filteredMeetings.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-                      <Search className="h-8 w-8 text-on-surface-variant" />
-                      <p className="text-body-md text-on-surface-variant">
-                        No results for &ldquo;{query.trim()}&rdquo;.
-                      </p>
                     </div>
                   ) : (
                     visibleMeetings.map((m) => (
@@ -426,21 +416,21 @@ const DashboardContent = () => {
                 <h3 className="text-headline-sm font-semibold text-on-surface">
                   Meeting Follow-ups
                 </h3>
-                {!q && (
-                  <Link
-                    href="/follow-ups"
-                    className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
-                  >
-                    View All <ArrowRight className="text-sm" />
-                  </Link>
-                )}
+                <Link
+                  href="/follow-ups"
+                  className="flex items-center gap-1 text-body-md text-primary-container hover:underline"
+                >
+                  View All <ArrowRight className="text-sm" />
+                </Link>
               </div>
 
               <div className="card-shadow flex-1 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest">
                 <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-3 text-label-caps uppercase tracking-wider text-on-surface-variant">
                   <div className="col-span-6 md:col-span-5">Action Item</div>
                   <div className="col-span-6 md:col-span-3">Due</div>
-                  <div className="col-span-12 hidden text-right md:col-span-4 md:block">Action</div>
+                  <div className="col-span-12 hidden text-right md:col-span-4 md:block">
+                    Action
+                  </div>
                 </div>
                 <div className="divide-y divide-surface-variant min-h-[12rem]">
                   {timedOut || loadFailed ? (
@@ -459,13 +449,6 @@ const DashboardContent = () => {
                       <ListChecks className="h-8 w-8 text-on-surface-variant" />
                       <p className="text-body-md text-on-surface-variant">
                         No follow-ups yet.
-                      </p>
-                    </div>
-                  ) : q && filteredFollowUps.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-                      <Search className="h-8 w-8 text-on-surface-variant" />
-                      <p className="text-body-md text-on-surface-variant">
-                        No results for &ldquo;{query.trim()}&rdquo;.
                       </p>
                     </div>
                   ) : (
@@ -522,6 +505,19 @@ const DashboardContent = () => {
       )}
       {showUploadModal && (
         <UploadTranscriptModal onClose={() => setShowUploadModal(false)} />
+      )}
+      {showCreateProject && (
+        <CreateProjectDialog
+          onClose={() => setShowCreateProject(false)}
+          onCreated={(project) => router.push(`/projects/${project.id}`)}
+        />
+      )}
+      {openTaskId && (
+        <TaskDrawer
+          taskId={openTaskId}
+          onClose={() => setOpenTaskId(null)}
+          onChanged={tasks.retry}
+        />
       )}
     </ModalProvider>
   );

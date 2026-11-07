@@ -1,17 +1,12 @@
 /* eslint-disable prettier/prettier */
-import { buildReportRows, generateAttendancePdf } from "../src/lib/attendance-pdf";
-import type { AttendanceRow, MeetingDetailData } from "../src/lib/meeting-types";
+import { buildReportRows, generateAttendancePdf, type ReportMeeting } from "../src/lib/attendance-pdf";
+import type { AttendanceRow } from "../src/lib/meeting-types";
 
-const meeting: MeetingDetailData = {
-  id: "00000000-0000-0000-0000-000000000000",
+const meeting: ReportMeeting = {
   title: "Test Meeting",
   status: "ended",
-  streamCallId: "call_1",
   startedAt: "2026-08-17T10:00:00.000Z",
-  endedAt: "2026-08-17T11:00:00.000Z",
   createdAt: "2026-08-17T10:00:00.000Z",
-  user_id: "00000000-0000-0000-0000-000000000000",
-  guestAdmissionMode: "approval",
 };
 
 const rows: AttendanceRow[] = [

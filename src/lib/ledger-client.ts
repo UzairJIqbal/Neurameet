@@ -1,5 +1,5 @@
 // Browser side callers for GET /api/ledger and the link review route, shared by
-// the Ledger tab and the tab badge in MeetingTabs.
+// the Decisions and Promises tab and the tab badge in MeetingTabs.
 import type { LedgerResponse, LedgerReviewDecision } from "@/lib/meeting-types";
 
 /** The viewer's local calendar date, so "overdue" never shifts with time zones. */

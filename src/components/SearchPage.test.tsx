@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 import SearchPage from "./SearchPage";
 
 // jsdom has no layout engine, so these assert the responsive class tokens are
@@ -74,5 +80,14 @@ describe("Search page responsive (P13.8)", () => {
     expect(headerTokens).toContain("flex");
     expect(headerTokens).toContain("flex-wrap");
     expect(headerTokens).toContain("justify-between");
+  });
+  it("runs the search from ?q once on arrival (AC-78a)", async () => {
+    window.history.pushState({}, "", "/search?q=budget%20plan");
+    render(<SearchPage />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(JSON.parse(init.body)).toEqual({ query: "budget plan" });
+    window.history.pushState({}, "", "/");
   });
 });

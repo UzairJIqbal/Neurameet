@@ -100,6 +100,12 @@ colors: {
 | Needs attention / high priority | `bg-error-container text-error` |
 | Key points / secondary info | `bg-secondary-container text-on-secondary-container` |
 | Decisions / taken / accent info | `text-primary-container` |
+| Completed, Active (W8) | `bg-success-container text-on-success-container`, solid `bg-success text-on-success` |
+| Blocked, overdue, On Hold, High priority (W8) | `bg-warning-container text-on-warning-container`, solid `bg-warning text-on-warning` |
+
+W8 values (light only, as this file is light only): `success #1B6D3C`, `on-success #FFFFFF`, `success-container #C9F2D5`, `on-success-container #0B3D20`, `warning #7A5900`, `on-warning #FFFFFF`, `warning-container #FFE3A1`, `on-warning-container #3F2E00`.
+
+Priority: Urgent `error`, High `warning`, Medium `primary`, Low `secondary`. Project status: Active `success`, Planning `secondary`, On Hold `warning`, Completed `primary`. A project color stores a token key, never a raw value.
 
 ---
 

@@ -45,6 +45,16 @@ const config = {
 				"error-container": "#FFDAD6",
 				"on-error-container": "#93000A",
 
+				// Success and warning (W8 status tokens)
+				success: "#1B6D3C",
+				"on-success": "#FFFFFF",
+				"success-container": "#C9F2D5",
+				"on-success-container": "#0B3D20",
+				warning: "#7A5900",
+				"on-warning": "#FFFFFF",
+				"warning-container": "#FFE3A1",
+				"on-warning-container": "#3F2E00",
+
 				// Surface
 				surface: "#FAF8FF",
 				"surface-dim": "#D7D9EA",

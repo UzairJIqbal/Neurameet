@@ -9,10 +9,11 @@ import {
   loadInviteByToken,
   recordAcceptFailure,
 } from "@/lib/invitations";
-import type { InvitePreview } from "@/lib/project-types";
+import { loadInvitePreview } from "@/lib/invite-preview";
 
-// Signed in: what the invite page shows (AC-16a). Consumes nothing, and never
-// returns the invited email, the inviter, or member data.
+// Signed in: what the invite page shows (AC-16a, AC-70s). Consumes nothing, and
+// never returns the invited email. Team names and the invitation id go only to
+// the person an email invite names.
 export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId)
@@ -38,16 +39,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: GONE_MESSAGE }, { status: 410 });
     }
 
-    const preview: InvitePreview = {
-      projectName: loaded.projectName ?? "Project",
-      role: loaded.invite.role,
-      kind: loaded.invite.kind,
-      status: loaded.state,
-      ...(loaded.state === "member"
-        ? { projectId: loaded.invite.project_id }
-        : {}),
-    };
-    return NextResponse.json(preview);
+    return NextResponse.json(
+      await loadInvitePreview(supabase, {
+        invite: loaded.invite,
+        projectName: loaded.projectName,
+        status: loaded.state,
+        userId,
+      }),
+    );
   } catch (err) {
     console.error("[invitations] preview failed:", err);
     return NextResponse.json(

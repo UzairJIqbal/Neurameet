@@ -167,3 +167,110 @@ describe("GET /api/projects/[id]/activity", () => {
     expect(await res.json()).toEqual({ error: "Failed to load activity" });
   });
 });
+
+describe("GET /api/projects/[id]/activity filters (AC-70m)", () => {
+  const getQs = (qs: string) =>
+    GET(new Request(`http://localhost/api/projects/${P}/activity${qs}`), {
+      params: Promise.resolve({ id: P }),
+    });
+
+  const counted = (count: number) => ({ data: null, error: null, count });
+
+  it.each([
+    ["?category=commits", "Unknown category"],
+    ["?actorId=a%20b", "Unknown person"],
+  ])("returns 422 for %s and never reads", async (qs, message) => {
+    const res = await getQs(qs);
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: message });
+    expect(callsOf("project_activity", "select")).toHaveLength(0);
+  });
+
+  it("filters by category through the allowlist, and by person, in SQL", async () => {
+    role("developer");
+    queue("project_activity", ok([]));
+    await getQs("?category=github&actorId=user_1");
+    const kinds = callsOf("project_activity", "in")[0].args;
+    expect(kinds[0]).toBe("kind");
+    expect(kinds[1]).toContain("task.pr_linked");
+    expect(kinds[1]).not.toContain("task.created");
+    expect(callsOf("project_activity", "eq").map((c) => c.args)).toContainEqual(
+      ["actor_id", "user_1"],
+    );
+  });
+
+  it("returns category counts on the first page, not narrowed by the category", async () => {
+    role("developer");
+    queue(
+      "project_activity",
+      ok([]),
+      counted(22),
+      counted(9),
+      counted(8),
+      counted(3),
+      counted(2),
+    );
+    const body = await (await getQs("?category=github")).json();
+    expect(body.categoryCounts).toEqual({
+      all: 22,
+      github: 9,
+      tasks: 8,
+      meetings: 3,
+      members: 2,
+    });
+    const heads = callsOf("project_activity", "select").filter(
+      (c) => (c.args[1] as { head?: boolean } | undefined)?.head,
+    );
+    expect(heads).toHaveLength(5);
+  });
+
+  it("leaves the counts off later pages", async () => {
+    role("developer");
+    queue("project_activity", ok([]));
+    const body = await (await get(`2026-11-01T00:00:00Z|au:${uuid(1)}`)).json();
+    expect(body).not.toHaveProperty("categoryCounts");
+  });
+
+  it("describes a comment by its author and never its text", async () => {
+    role("developer");
+    queue(
+      "project_activity",
+      ok([
+        {
+          row_id: `te:${uuid(1)}`,
+          occurred_at: "2026-11-01T00:00:00Z",
+          actor_id: null,
+          kind: "task.commented",
+          subject_type: "task",
+          subject_id: uuid(2),
+          detail: { commentId: uuid(3), body: "secret comment" },
+        },
+      ]),
+    );
+    const body = await (await get()).json();
+    expect(body.rows[0].kind).toBe("task.commented");
+    expect(JSON.stringify(body)).not.toContain("secret comment");
+  });
+
+  it("hides that a comment happened from a Viewer, in rows and counts", async () => {
+    role("viewer");
+    queue("project_activity", ok([]));
+    await get();
+    expect(
+      callsOf("project_activity", "neq").map((c) => c.args),
+    ).toContainEqual(["kind", "task.commented"]);
+    // One for the rows, one for the "all" count; the Tasks count drops the kind.
+    expect(callsOf("project_activity", "neq")).toHaveLength(2);
+    const lists = callsOf("project_activity", "in").map((c) => c.args[1]);
+    expect(lists.flat()).not.toContain("task.commented");
+  });
+
+  it("hides a Viewer's comments even under the Tasks chip", async () => {
+    role("viewer");
+    queue("project_activity", ok([]));
+    await getQs("?category=tasks");
+    const rowsKinds = callsOf("project_activity", "in")[0].args[1];
+    expect(rowsKinds).toContain("task.created");
+    expect(rowsKinds).not.toContain("task.commented");
+  });
+});

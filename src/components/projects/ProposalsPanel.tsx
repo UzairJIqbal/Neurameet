@@ -4,16 +4,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Quote } from "lucide-react";
-import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { listMembers, listProposals, ProjectClientError, reviewProposal } from "@/lib/project-client";
-import { TASK_TITLE_MAX } from "@/lib/tasks";
 import type { ProjectDetail, ProjectMember } from "@/lib/project-types";
 import type { Proposal, ProposalDecision, ReviewProposalInput } from "@/lib/task-types";
+import MeetingProposals from "./MeetingProposals";
+import { ProposalFields, confirmInput, draftFor, type Draft } from "./proposal-draft";
 
-const inputClass =
-  "rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none disabled:opacity-60";
 const primaryButton =
   "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 const secondaryButton =
@@ -21,14 +19,6 @@ const secondaryButton =
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
-
-type Draft = { title: string; assigneeId: string; dueDate: string };
-
-const draftFor = (p: Proposal): Draft => ({
-  title: p.title,
-  assigneeId: p.proposedAssigneeId ?? "",
-  dueDate: p.dueDate ?? "",
-});
 
 type CardProps = {
   proposal: Proposal;
@@ -44,13 +34,7 @@ const ProposalCard = ({ proposal: p, members, canReview, busy, onDecide }: CardP
 
   const confirm = () => {
     if (!p.quoteVerified && !window.confirm("Confirm without a transcript line?")) return;
-    onDecide(p, {
-      decision: "confirm",
-      title: draft.title.trim(),
-      assigneeId: draft.assigneeId || null,
-      dueDate: draft.dueDate || null,
-      ...(p.quoteVerified ? {} : { confirmWithoutQuote: true }),
-    });
+    onDecide(p, confirmInput(p, draft));
   };
 
   const decide = (decision: ProposalDecision) =>
@@ -79,44 +63,7 @@ const ProposalCard = ({ proposal: p, members, canReview, busy, onDecide }: CardP
         <p className="text-body-md text-error">No matching transcript line</p>
       )}
 
-      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
-        <label className="flex flex-col gap-1 text-body-md text-on-surface">
-          Title
-          <input
-            value={draft.title}
-            maxLength={TASK_TITLE_MAX}
-            disabled={disabled}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-body-md text-on-surface">
-          Assignee
-          <select
-            value={draft.assigneeId}
-            disabled={disabled}
-            onChange={(e) => setDraft({ ...draft, assigneeId: e.target.value })}
-            className={inputClass}
-          >
-            <option value="">Unassigned</option>
-            {members.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-body-md text-on-surface">
-          Due date
-          <input
-            type="date"
-            value={draft.dueDate}
-            disabled={disabled}
-            onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })}
-            className={inputClass}
-          />
-        </label>
-      </div>
+      <ProposalFields draft={draft} members={members} disabled={disabled} onChange={setDraft} />
 
       {p.duplicate && (
         <p className="text-body-md text-on-surface-variant">
@@ -149,8 +96,18 @@ const ProposalCard = ({ proposal: p, members, canReview, busy, onDecide }: CardP
 };
 
 // The review gate (AC-30 to AC-36): AI proposals wait here until an Owner or
-// Admin confirms, rejects, or merges them. Developers see them read only.
-const ProposalsPanel = ({ project }: { project: ProjectDetail }) => {
+// Admin confirms, rejects, or merges them. Developers see them read only. The
+// section is not shown at zero (AC-70c). With `meetingId` it shows that meeting's
+// rows with bulk confirm (AC-70w).
+const ProposalsPanel = ({
+  project,
+  meetingId,
+  onChanged,
+}: {
+  project: Pick<ProjectDetail, "id">;
+  meetingId?: string;
+  onChanged?: () => void;
+}) => {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [canReview, setCanReview] = useState(false);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -213,6 +170,7 @@ const ProposalsPanel = ({ project }: { project: ProjectDetail }) => {
       setProposals((prev) => prev.filter((x) => x.id !== p.id));
       if (input.decision === "reject") toast.success("Proposal rejected");
       else if (res.task) toast.success(`${res.task.key} ${input.decision === "merge" ? "updated" : "created"}`);
+      if (input.decision !== "reject") onChanged?.();
     } catch (err) {
       toast.error(errorText(err, "Failed to review the proposal"));
       if (err instanceof ProjectClientError && err.status === 409) {
@@ -225,25 +183,45 @@ const ProposalsPanel = ({ project }: { project: ProjectDetail }) => {
 
   const reload = useCallback(() => setRetryNonce((k) => k + 1), []);
 
-  if (timedOut) return <LoadError message="We couldn't load the proposals." onRetry={reload} />;
-  if (!loaded && isLoading) return <LoaderOne />;
-  if (!loaded) return <LoadError message="We couldn't load the proposals." onRetry={reload} />;
+  if (timedOut) return <LoadError compact message="We couldn't load the proposals." onRetry={reload} />;
+  if (!loaded && isLoading) return <p className="text-body-md text-on-surface-variant">Loading...</p>;
+  if (!loaded) return <LoadError compact message="We couldn't load the proposals." onRetry={reload} />;
 
-  if (proposals.length === 0) {
+  const visible = meetingId ? proposals.filter((p) => p.meetingId === meetingId) : proposals;
+  if (visible.length === 0) return null;
+
+  if (meetingId) {
     return (
-      <p className="rounded-xl border border-surface-variant bg-surface-container-lowest p-6 text-body-md text-on-surface-variant">
-        No proposals waiting. Action items from project meetings land here for review.
-      </p>
+      <MeetingProposals
+        proposals={visible}
+        members={members}
+        canReview={canReview}
+        busyId={busyId}
+        onDecide={decide}
+        onConfirmed={(ids) => {
+          setProposals((prev) => prev.filter((x) => !ids.includes(x.id)));
+          onChanged?.();
+        }}
+        onStale={() => {
+          fetchProposals().catch(() => undefined);
+        }}
+      />
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <section aria-label="Review" className="flex flex-col gap-3">
+      <h3 className="flex items-center gap-2 text-headline-sm text-on-surface">
+        Review
+        <span className="rounded-full bg-warning-container px-2 py-0.5 text-xs font-medium text-on-warning-container">
+          {visible.length}
+        </span>
+      </h3>
       {!canReview && (
         <p className="text-body-md text-on-surface-variant">An Owner or Admin reviews these proposals.</p>
       )}
       <ul className="flex flex-col gap-3">
-        {proposals.map((p) => (
+        {visible.map((p) => (
           <ProposalCard
             key={p.id}
             proposal={p}
@@ -254,7 +232,7 @@ const ProposalsPanel = ({ project }: { project: ProjectDetail }) => {
           />
         ))}
       </ul>
-    </div>
+    </section>
   );
 };
 

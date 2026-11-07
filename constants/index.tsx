@@ -1,95 +1,85 @@
 /* eslint-disable prettier/prettier */
 
-/* eslint-disable prettier/prettier */
-
-/* eslint-disable prettier/prettier */
-
 import type { ReactNode } from "react";
 import {
+  Bell,
+  Bot,
+  CheckSquare,
+  FolderKanban,
   LayoutDashboard,
-  History,
-  CalendarClock,
-  Brain,
-  MessageSquare,
-  PlayCircle,
-  Video,
   ListTodo,
   Settings,
-  Search,
-  ListChecks,
-  FolderKanban,
+  Video,
+  Brain,
 } from "lucide-react";
+
+/** Which `GET /api/my-counts` value a link shows, if any. */
+export type SidebarCountKey = "openTasks" | "upcomingMeetings" | "unread";
 
 export type SidebarLink = {
   label: string;
   href: string;
   icon: ReactNode;
-  dividerBefore?: boolean;
+  countKey?: SidebarCountKey;
+  /** A filled pill, for the count that asks for attention. */
+  countFilled?: boolean;
 };
 
 export const sidebarLinks: SidebarLink[] = [
   {
-    label: "Dashboard",
+    label: "My Dashboard",
     href: "/dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
   },
   {
-    label: "Projects",
+    label: "My Tasks",
+    href: "/my-tasks",
+    icon: <CheckSquare className="h-5 w-5" />,
+    countKey: "openTasks",
+  },
+  {
+    label: "My Meetings",
+    href: "/meeting-intelligence",
+    icon: <Brain className="h-5 w-5" />,
+    countKey: "upcomingMeetings",
+  },
+  {
+    label: "My Projects",
     href: "/projects",
     icon: <FolderKanban className="h-5 w-5" />,
   },
   {
-    label: "Meeting Intelligence",
-    href: "/meeting-intelligence",
-    icon: <Brain className="h-5 w-5" />,
+    label: "Notifications",
+    href: "/notifications",
+    icon: <Bell className="h-5 w-5" />,
+    countKey: "unread",
+    countFilled: true,
   },
   {
-    label: "AI Chat",
+    label: "AI Assistant",
     href: "/ai-chat",
-    icon: <MessageSquare className="h-5 w-5" />,
+    icon: <Bot className="h-5 w-5" />,
   },
-  {
-    label: "Recordings",
-    href: "/recording",
-    icon: <PlayCircle className="h-5 w-5" />,
-  },
+];
+
+export const sidebarMoreLinks: SidebarLink[] = [
   {
     label: "Follow-ups",
     href: "/follow-ups",
     icon: <ListTodo className="h-5 w-5" />,
   },
   {
-    label: "Previous Meetings",
-    href: "/previous",
-    icon: <History className="h-5 w-5" />,
-  },
-  {
-    label: "Upcoming Meetings",
-    href: "/upcoming",
-    icon: <CalendarClock className="h-5 w-5" />,
-  },
-  {
     label: "Personal Room",
     href: "/personal-room",
     icon: <Video className="h-5 w-5" />,
   },
-  {
-    label: "Search",
-    href: "/search",
-    icon: <Search className="h-5 w-5" />,
-  },
-  {
-    label: "Prep",
-    href: "/prep",
-    icon: <ListChecks className="h-5 w-5" />,
-  },
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: <Settings className="h-5 w-5" />,
-    dividerBefore: true,
-  },
 ];
+
+export const sidebarSettingsLink: SidebarLink = {
+  label: "Settings",
+  href: "/settings",
+  icon: <Settings className="h-5 w-5" />,
+};
 
 export const instantMeetingModelImages = [
   "/icons/images/IM-1.png",

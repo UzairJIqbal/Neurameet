@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -7,15 +7,21 @@ import {
   requireProjectRole,
 } from "@/lib/project-auth";
 import { rpcErrorCode } from "@/lib/projects";
+import {
+  notifyJoinApproved,
+  notifyMemberJoined,
+} from "@/lib/notification-events";
+import type { InviteRole } from "@/lib/project-types";
 import { isUuid } from "@/lib/invitations";
 
 type Params = { params: Promise<{ id: string; requestId: string }> };
 
 type DecidedRow = {
   id: string;
+  user_id: string;
   display_name: string;
   email: string | null;
-  role: string;
+  role: InviteRole;
   status: string;
   decided_at: string | null;
   created_at: string;
@@ -67,6 +73,25 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const row = data as DecidedRow;
+    if (decision === "approve") {
+      after(() =>
+        notifyJoinApproved(supabase, {
+          projectId: id,
+          requestId: row.id,
+          userId: row.user_id,
+          role: row.role,
+        }),
+      );
+      after(() =>
+        notifyMemberJoined(supabase, {
+          projectId: id,
+          userId: row.user_id,
+          name: row.display_name,
+          role: row.role,
+          actorId: userId,
+        }),
+      );
+    }
     return NextResponse.json({
       request: {
         id: row.id,

@@ -1,21 +1,22 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { X } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
-import { getTask } from "@/lib/project-client";
-import { PR_STATE_LABELS, type TaskPrLink } from "@/lib/github-types";
+import { ProjectClientError, getTask, listMembers, updateTask } from "@/lib/project-client";
+import { isManagerRole } from "@/lib/task-rules";
 import { TASK_STATUS_LABELS, isTaskStatus } from "@/lib/tasks";
-import type { TaskDetailResponse, TaskEvent, TaskEventKind } from "@/lib/task-types";
+import type { Task, TaskComment, TaskDetailResponse, TaskEvent, TaskEventKind } from "@/lib/task-types";
 import OutcomeCard from "./OutcomeCard";
+import TaskComments from "./TaskComments";
+import TaskFields, { type DrawerAccess, type TaskSave } from "./TaskFields";
+import TaskGitHubSection from "./TaskGitHubSection";
 
-const RECENT_EVENTS = 10;
-
-const badge =
-  "rounded-full bg-primary-container/15 px-2 py-0.5 text-label-caps uppercase tracking-wider text-primary-container";
+const HEADING = "text-label-caps uppercase tracking-wider text-on-surface-variant";
 
 const EVENT_LABELS: Record<TaskEventKind, string> = {
   created: "created this task",
@@ -29,6 +30,7 @@ const EVENT_LABELS: Record<TaskEventKind, string> = {
   pr_linked: "linked a pull request",
   pr_state_changed: "updated a pull request",
   proposal_merged: "merged a proposal into this task",
+  commented: "left a comment",
 };
 
 const statusLabel = (value: string | null): string | null =>
@@ -43,81 +45,81 @@ const eventText = (event: TaskEvent): string => {
   return `${base}: ${statusLabel(event.fromValue)} to ${statusLabel(event.toValue)}`;
 };
 
-// Viewers get the state only, so a row must work with no repo, number, or title.
-const PrRow = ({ link }: { link: TaskPrLink }) => (
-  <li className="flex flex-col gap-1 rounded-lg border border-surface-variant p-3">
-    <div className="flex flex-wrap items-center gap-2">
-      {link.repoFullName && (
-        <span className="break-all font-mono text-label-mono text-on-surface-variant">
-          {link.repoFullName} #{link.prNumber}
-        </span>
-      )}
-      <span className={badge}>{PR_STATE_LABELS[link.state]}</span>
-      {link.reverted && (
-        <span className="rounded-full bg-error-container px-2 py-0.5 text-label-caps uppercase tracking-wider text-on-error-container">
-          Reverted
-        </span>
-      )}
-    </div>
-    {link.prUrl && (
-      <a
-        href={link.prUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        dir="auto"
-        className="w-fit break-words text-body-md text-primary underline"
-      >
-        {link.prTitle}
-      </a>
-    )}
-  </li>
-);
+const isHttpUrl = (value: string): boolean => {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+};
 
-const CompletedByMerge = ({ evidence }: { evidence?: string | null }) => (
-  <p className="text-body-md font-medium text-on-surface">
-    Completed by merge
-    {evidence && (
-      <>
-        {" · "}
-        <a href={evidence} target="_blank" rel="noopener noreferrer" className="font-normal text-primary underline">
-          View the pull request
-        </a>
-      </>
-    )}
-  </p>
-);
+// A manual note is whatever the person typed, so only a real web address links.
+const CompletionSection = ({ task }: { task: Task }) => {
+  const evidence = task.completionEvidence;
+  const byMerge = task.completionKind === "merge";
+  return (
+    <section aria-label="Completion evidence" className="flex flex-col gap-2">
+      <h3 className={HEADING}>Completion evidence</h3>
+      <p className="text-body-md font-medium text-on-surface">{byMerge ? "Completed by merge" : "Completed by hand"}</p>
+      {evidence &&
+        (isHttpUrl(evidence) ? (
+          <a href={evidence} target="_blank" rel="noopener noreferrer" className="w-fit break-all text-body-md text-primary underline">
+            {byMerge ? "View the pull request" : evidence}
+          </a>
+        ) : (
+          <p dir="auto" className="whitespace-pre-wrap break-words text-body-md text-on-surface">
+            {evidence}
+          </p>
+        ))}
+    </section>
+  );
+};
 
-const DrawerBody = ({ detail }: { detail: TaskDetailResponse }) => {
-  const { task, prLinks, events } = detail;
-  const recent = [...events].reverse().slice(0, RECENT_EVENTS);
+type BodyProps = {
+  detail: TaskDetailResponse;
+  access: DrawerAccess | null;
+  saving: boolean;
+  onSave: TaskSave;
+  onCommentAdded: (comment: TaskComment) => void;
+  onCommentRemoved: (commentId: string) => void;
+};
+
+const DrawerBody = ({ detail, access, saving, onSave, onCommentAdded, onCommentRemoved }: BodyProps) => {
+  const { task, prLinks, events, comments } = detail;
+  const activity = [...events].reverse();
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <span className="font-mono text-label-mono text-on-surface-variant">{task.key}</span>
-        <h2 className="break-words text-headline-sm font-semibold text-on-surface">{task.title}</h2>
-        <p className="text-body-md text-on-surface-variant">{TASK_STATUS_LABELS[task.status]}</p>
-        {task.completionKind === "merge" && <CompletedByMerge evidence={task.completionEvidence} />}
+        <h2 dir="auto" className="break-words text-headline-sm font-semibold text-on-surface">{task.title}</h2>
       </div>
+
+      <TaskFields task={task} proofChain={detail.proofChain} access={access} saving={saving} onSave={onSave} />
 
       {detail.outcome && <OutcomeCard outcome={detail.outcome} />}
 
-      <section aria-label="Pull requests" className="flex flex-col gap-2">
-        <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">Pull requests</h3>
-        {prLinks.length === 0 ? (
-          <p className="text-body-md text-on-surface-variant">No pull requests name this task yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {prLinks.map((link) => (
-              <PrRow key={link.id} link={link} />
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* The route sends comments to everyone but a Viewer, the same line as commits. */}
+      <TaskGitHubSection taskId={task.id} links={prLinks} showCommits={comments !== undefined} />
 
-      <section aria-label="Recent activity" className="flex flex-col gap-2">
-        <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">Recent activity</h3>
+      {task.completionKind && <CompletionSection task={task} />}
+
+      {comments && (
+        <TaskComments
+          taskId={task.id}
+          comments={comments}
+          truncated={detail.commentsTruncated ?? false}
+          me={access?.me ?? null}
+          isManager={access ? isManagerRole(access.role) : false}
+          onAdded={onCommentAdded}
+          onRemoved={onCommentRemoved}
+        />
+      )}
+
+      <section aria-label="Activity" className="flex flex-col gap-2">
+        <h3 className={HEADING}>Activity</h3>
         <ul className="flex flex-col gap-2">
-          {recent.map((event) => (
+          {activity.map((event) => (
             <li key={event.id} className="flex flex-col text-body-md text-on-surface">
               <span>{eventText(event)}</span>
               <span className="font-mono text-label-mono text-on-surface-variant">
@@ -131,13 +133,27 @@ const DrawerBody = ({ detail }: { detail: TaskDetailResponse }) => {
   );
 };
 
-// Opened by clicking a board card: the task's PRs and recent history (AC-55).
-const TaskDrawer = ({ taskId, onClose }: { taskId: string; onClose: () => void }) => {
+type Props = {
+  taskId: string;
+  onClose: () => void;
+  /** Called with the saved task so a board or list can update its row. */
+  onChanged?: (task: Task) => void;
+  onCommentsChanged?: (delta: number) => void;
+};
+
+const errorText = (err: unknown, fallback: string) =>
+  err instanceof ProjectClientError ? err.message : fallback;
+
+// Opened from a task row or card: the whole task, editable by role (AC-70q).
+const TaskDrawer = ({ taskId, onClose, onChanged, onCommentsChanged }: Props) => {
   const [detail, setDetail] = useState<TaskDetailResponse | null>(null);
+  const [access, setAccess] = useState<DrawerAccess | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
   const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
+  const projectId = detail?.projectId;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -158,6 +174,19 @@ const TaskDrawer = ({ taskId, onClose }: { taskId: string; onClose: () => void }
     return () => controller.abort();
   }, [taskId, retryNonce]);
 
+  // The role and the assignee list come from here. Until it answers, or if it
+  // fails, the fields read only rather than offer a change the route may refuse.
+  useEffect(() => {
+    if (!projectId) return;
+    const controller = new AbortController();
+    listMembers(projectId, controller.signal)
+      .then((data) => setAccess({ role: data.myRole, me: data.me, members: data.members }))
+      .catch((err) => {
+        if (!controller.signal.aborted) console.error("Failed to load the members:", err);
+      });
+    return () => controller.abort();
+  }, [projectId]);
+
   useEffect(() => {
     if (timedOut) controllerRef.current?.abort();
   }, [timedOut]);
@@ -170,6 +199,52 @@ const TaskDrawer = ({ taskId, onClose }: { taskId: string; onClose: () => void }
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Quiet: the activity list catches up without the fields flashing a spinner.
+  const reload = useCallback(async () => {
+    try {
+      setDetail(await getTask(taskId));
+    } catch (err) {
+      console.error("Failed to refresh the task:", err);
+    }
+  }, [taskId]);
+
+  const save: TaskSave = async (patch) => {
+    if (!detail) return false;
+    setSaving(true);
+    try {
+      const { task } = await updateTask(taskId, { ...patch, ifVersion: detail.task.version });
+      setDetail((prev) => (prev ? { ...prev, task: { ...prev.task, ...task } } : prev));
+      onChanged?.(task);
+      void reload();
+      return true;
+    } catch (err) {
+      if (err instanceof ProjectClientError && err.status === 409) {
+        toast.error("Someone else changed this task. We loaded the latest.");
+        const fresh = (err.data as { task?: Task } | null)?.task;
+        if (fresh) onChanged?.(fresh);
+        await reload();
+      } else {
+        toast.error(errorText(err, "Failed to save the task"));
+      }
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const commentAdded = (comment: TaskComment) => {
+    setDetail((prev) => (prev ? { ...prev, comments: [comment, ...(prev.comments ?? [])] } : prev));
+    onCommentsChanged?.(1);
+    void reload();
+  };
+
+  const commentRemoved = (commentId: string) => {
+    setDetail((prev) =>
+      prev ? { ...prev, comments: (prev.comments ?? []).filter((c) => c.id !== commentId) } : prev,
+    );
+    onCommentsChanged?.(-1);
+  };
+
   const retry = () => setRetryNonce((k) => k + 1);
   const failed = timedOut || (!isLoading && !detail);
 
@@ -180,7 +255,7 @@ const TaskDrawer = ({ taskId, onClose }: { taskId: string; onClose: () => void }
         aria-modal="true"
         aria-label="Task details"
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
+        className="flex h-full w-full max-w-xl flex-col gap-4 overflow-y-auto border-l border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
       >
         <button
           type="button"
@@ -195,7 +270,14 @@ const TaskDrawer = ({ taskId, onClose }: { taskId: string; onClose: () => void }
         ) : isLoading || !detail ? (
           <LoaderOne />
         ) : (
-          <DrawerBody detail={detail} />
+          <DrawerBody
+            detail={detail}
+            access={access}
+            saving={saving}
+            onSave={save}
+            onCommentAdded={commentAdded}
+            onCommentRemoved={commentRemoved}
+          />
         )}
       </aside>
     </div>

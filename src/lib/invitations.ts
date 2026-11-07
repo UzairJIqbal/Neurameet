@@ -80,12 +80,14 @@ export type InviteRow = {
   expires_at: string;
   revoked_at: string | null;
   used_at: string | null;
+  declined_at: string | null;
+  created_at: string;
 };
 
 export type InviteState = "valid" | "member" | "pending" | "gone";
 
 // AC-19 order: unknown, then active member, then (link only) a pending request
-// already waiting, then revoked, used, or expired.
+// already waiting, then revoked, used, declined, or expired.
 export function resolveInviteState(
   invite: InviteRow | null,
   caller: { isMember: boolean; hasPending: boolean },
@@ -94,7 +96,7 @@ export function resolveInviteState(
   if (!invite) return "gone";
   if (caller.isMember) return "member";
   if (invite.kind === "link" && caller.hasPending) return "pending";
-  if (invite.revoked_at || invite.used_at) return "gone";
+  if (invite.revoked_at || invite.used_at || invite.declined_at) return "gone";
   if (new Date(invite.expires_at).getTime() <= now.getTime()) return "gone";
   return "valid";
 }
@@ -106,7 +108,7 @@ export type LoadedInvite = {
 };
 
 const INVITE_COLUMNS =
-  "id, project_id, kind, email, role, created_by, expires_at, revoked_at, used_at";
+  "id, project_id, kind, email, role, created_by, expires_at, revoked_at, used_at, declined_at, created_at";
 
 /** Looks the token up by hash and resolves the caller's state (AC-16a, AC-19). */
 export async function loadInviteByToken(
@@ -120,7 +122,29 @@ export async function loadInviteByToken(
     .eq("token_hash", hashInviteToken(token))
     .maybeSingle();
   if (error) throw error;
-  const invite = (data as InviteRow | null) ?? null;
+  return resolveLoaded(supabase, (data as InviteRow | null) ?? null, userId);
+}
+
+/** The same load by id, for `/api/invitations/mine/[id]` (AC-70t). */
+export async function loadInviteById(
+  supabase: SupabaseClient,
+  invitationId: string,
+  userId: string,
+): Promise<LoadedInvite> {
+  const { data, error } = await supabase
+    .from("project_invitations")
+    .select(INVITE_COLUMNS)
+    .eq("id", invitationId)
+    .maybeSingle();
+  if (error) throw error;
+  return resolveLoaded(supabase, (data as InviteRow | null) ?? null, userId);
+}
+
+async function resolveLoaded(
+  supabase: SupabaseClient,
+  invite: InviteRow | null,
+  userId: string,
+): Promise<LoadedInvite> {
   if (!invite) return { state: "gone", invite: null, projectName: null };
 
   const [member, pending, project] = await Promise.all([
@@ -219,21 +243,39 @@ const utcDayStart = (now: Date): string =>
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   ).toISOString();
 
-// W2 counts only audit_log invite.emailed rows; W8 adds notifications.emailed_at.
+/** Emails sent since UTC midnight: invites plus W8 event emails. Null when unreadable. */
+export async function workspaceEmailsSentToday(
+  supabase: SupabaseClient,
+  now: Date = new Date(),
+): Promise<number | null> {
+  const since = utcDayStart(now);
+  const [invites, events] = await Promise.all([
+    supabase
+      .from("audit_log")
+      .select("id", { count: "exact", head: true })
+      .eq("action", INVITE_EMAILED_ACTION)
+      .gte("created_at", since),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .gte("emailed_at", since),
+  ]);
+  if (invites.error || events.error) {
+    console.error(
+      "[invitations] email budget count failed:",
+      invites.error ?? events.error,
+    );
+    return null;
+  }
+  return (invites.count ?? 0) + (events.count ?? 0);
+}
+
 export async function workspaceEmailBudgetLeft(
   supabase: SupabaseClient,
   now: Date = new Date(),
 ): Promise<boolean> {
-  const { count, error } = await supabase
-    .from("audit_log")
-    .select("id", { count: "exact", head: true })
-    .eq("action", INVITE_EMAILED_ACTION)
-    .gte("created_at", utcDayStart(now));
-  if (error) {
-    console.error("[invitations] email budget count failed:", error);
-    return false;
-  }
-  return (count ?? 0) < WORKSPACE_EMAIL_DAILY_BUDGET;
+  const sent = await workspaceEmailsSentToday(supabase, now);
+  return sent !== null && sent < WORKSPACE_EMAIL_DAILY_BUDGET;
 }
 
 export type InviteEmailJob = {
@@ -288,4 +330,27 @@ export async function getCallerProfile(userId: string): Promise<CallerProfile> {
     verified: primary?.verification?.status === "verified",
     displayName: displayNameFor({ fullName, username: user.username, email }),
   };
+}
+
+/** Clerk users whose primary email is this invite's address, checked by emailMatchesInvite. */
+export async function findUserIdsByInviteEmail(
+  email: string,
+): Promise<string[]> {
+  const client = await clerkClient();
+  const { data } = await client.users.getUserList({
+    emailAddress: [email],
+    limit: 10,
+  });
+  return data
+    .filter((user) =>
+      emailMatchesInvite(
+        {
+          email: user.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null,
+          verified:
+            user.primaryEmailAddress?.verification?.status === "verified",
+        },
+        email,
+      ),
+    )
+    .map((user) => user.id);
 }

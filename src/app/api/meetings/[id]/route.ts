@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase-server";
+import { lookupProfiles } from "@/lib/projects";
 import {
   accessErrorResponse,
   checkMeetingAccess,
@@ -11,10 +12,12 @@ import {
 } from "@/lib/project-auth";
 import {
   ActionItem,
+  ActionItemReviewState,
   GuestAdmissionMode,
   MeetingDetailData,
   MeetingDetailResponse,
   MeetingInsights,
+  ProjectMeetingType,
 } from "@/lib/meeting-types";
 
 interface InsightsRow {
@@ -30,6 +33,7 @@ interface ActionItemRow {
   title: string;
   assignee: string | null;
   due_date: string | null;
+  review_state: ActionItemReviewState;
 }
 
 // Personal meeting fallback: a recorded participant (by Clerk user id, by the
@@ -75,7 +79,7 @@ export async function GET(
     // Project meeting: any active member (spec 0004, need "read").
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, guest_admission_mode, project_id")
+      .select("id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, guest_admission_mode, project_id, description, scheduled_end_at, meeting_type, invited_user_ids")
       .eq("id", id)
       .single();
 
@@ -104,10 +108,10 @@ export async function GET(
       ? access.role !== null && NEED_ROLES.manage.includes(access.role)
       : access.isCreator;
     // A Viewer on a project meeting sees only confirmed action items (W4).
-    const confirmedOnly = access.role === "viewer";
+    const isViewer = access.role === "viewer";
     const actionItemsQuery = supabase
       .from("action_items")
-      .select("id, title, assignee, due_date")
+      .select("id, title, assignee, due_date, review_state")
       .eq("meeting_id", id);
 
     const [
@@ -115,13 +119,15 @@ export async function GET(
       { data: actionItems },
       { count: attendanceCount },
       { data: project },
+      { data: transcript },
+      profiles,
     ] = await Promise.all([
       supabase
         .from("meeting_insights")
         .select("summary, key_points, decisions, category, detected_topics")
         .eq("meeting_id", id)
         .single(),
-      confirmedOnly
+      isViewer
         ? actionItemsQuery.eq("review_state", "confirmed")
         : actionItemsQuery,
       supabase
@@ -136,6 +142,15 @@ export async function GET(
           .eq("id", access.projectId)
           .maybeSingle()
         : Promise.resolve({ data: null }),
+      // AC-70v: no transcript query at all for a Viewer.
+      isViewer
+        ? Promise.resolve({ data: null })
+        : supabase
+          .from("transcripts")
+          .select("raw_text")
+          .eq("meeting_id", id)
+          .maybeSingle(),
+      lookupProfiles([meeting.user_id]),
     ]);
 
     const meetingData: MeetingDetailData = {
@@ -148,6 +163,11 @@ export async function GET(
       createdAt: meeting.created_at,
       user_id: meeting.user_id,
       guestAdmissionMode: (meeting.guest_admission_mode ?? "approval") as GuestAdmissionMode,
+      description: meeting.description ?? null,
+      scheduledEndAt: meeting.scheduled_end_at ?? null,
+      meetingType: (meeting.meeting_type ?? null) as ProjectMeetingType | null,
+      organizerName: profiles.get(meeting.user_id)?.name ?? "Unknown member",
+      invitedUserIds: meeting.invited_user_ids ?? [],
     };
 
     const insightsData: MeetingInsights | null = insights
@@ -169,6 +189,7 @@ export async function GET(
         title: row.title,
         assignee: row.assignee ?? null,
         dueDate: row.due_date ?? null,
+        reviewState: row.review_state,
       }),
     );
 
@@ -181,6 +202,12 @@ export async function GET(
       projectName: (project as { name?: string } | null)?.name ?? null,
       role: access.role,
       canManage,
+      ...(isViewer
+        ? {}
+        : {
+          transcriptText:
+            (transcript as { raw_text?: string | null } | null)?.raw_text ?? null,
+        }),
     };
 
     return NextResponse.json(response);

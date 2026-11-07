@@ -10,23 +10,45 @@ import type {
   InviteKind,
   InviteRole,
   JoinRequestListResponse,
+  MyInvitationDecision,
+  MyInvitationDecisionResponse,
+  MyInvitationsResponse,
   ProjectDetailResponse,
   ProjectListResponse,
   ProjectMembersResponse,
   ProjectRole,
-  ProjectSummary,
+  ProjectCard,
+  ProjectInput,
+  ProjectPatch,
+  ResendInvitationResponse,
 } from "@/lib/project-types";
 import type {
+  MyTasksResponse,
   ProposalsResponse,
   ReviewProposalInput,
   ReviewProposalResponse,
+  TaskCommentResponse,
+  TaskCommitsResponse,
   TaskDetailResponse,
   TaskPatchInput,
   TaskResponse,
   TasksResponse,
 } from "@/lib/task-types";
-import type { GitHubReposResponse, GitHubSyncResult } from "@/lib/github-types";
-import type { ActivityResponse, ProjectLedgerResponse } from "@/lib/proof-types";
+import type { TaskPriority } from "@/lib/tasks";
+import type {
+  GitHubReposResponse,
+  GitHubSummaryResponse,
+  GitHubSyncResult,
+} from "@/lib/github-types";
+import type {
+  ActivityResponse,
+  ProjectLedgerResponse,
+} from "@/lib/proof-types";
+import type {
+  MeetingListItem,
+  MeetingPrepSuggestions,
+  PrepLedgerItem,
+} from "@/lib/meeting-types";
 
 export class ProjectClientError extends Error {
   constructor(
@@ -64,10 +86,10 @@ export function listProjects(signal?: AbortSignal) {
   return request<ProjectListResponse>("/api/projects", { signal });
 }
 
-export function createProject(name: string, taskPrefix: string) {
-  return request<{ project: ProjectSummary }>("/api/projects", {
+export function createProject(input: ProjectInput) {
+  return request<{ project: ProjectCard }>("/api/projects", {
     method: "POST",
-    body: JSON.stringify({ name, taskPrefix }),
+    body: JSON.stringify(input),
   });
 }
 
@@ -82,11 +104,22 @@ export function renameProject(id: string, name: string) {
   });
 }
 
+export function updateProject(id: string, patch: ProjectPatch) {
+  return request<{ ok: true }>(base(id), {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
 export function deleteProject(id: string, confirmName: string) {
   return request<{ ok: true }>(base(id), {
     method: "DELETE",
     body: JSON.stringify({ confirmName }),
   });
+}
+
+export function listMyTasks(signal?: AbortSignal) {
+  return request<MyTasksResponse>("/api/my-tasks", { signal });
 }
 
 export function listMembers(id: string, signal?: AbortSignal) {
@@ -141,6 +174,13 @@ export function revokeInvitation(id: string, invitationId: string) {
   );
 }
 
+export function resendInvitation(id: string, invitationId: string) {
+  return request<ResendInvitationResponse>(
+    `${base(id)}/invitations/${encodeURIComponent(invitationId)}/resend`,
+    { method: "POST" },
+  );
+}
+
 export function listJoinRequests(id: string, signal?: AbortSignal) {
   return request<JoinRequestListResponse>(`${base(id)}/join-requests`, {
     signal,
@@ -172,6 +212,17 @@ export function acceptInvitation(token: string) {
   });
 }
 
+export function listMyInvitations(signal?: AbortSignal) {
+  return request<MyInvitationsResponse>("/api/invitations/mine", { signal });
+}
+
+export function decideMyInvitation(id: string, decision: MyInvitationDecision) {
+  return request<MyInvitationDecisionResponse>(
+    `/api/invitations/mine/${encodeURIComponent(id)}`,
+    { method: "POST", body: JSON.stringify({ decision }) },
+  );
+}
+
 // ---- W4: proposals, tasks, moving a meeting in ----
 
 export function listProposals(id: string, signal?: AbortSignal) {
@@ -185,7 +236,12 @@ export function reviewProposal(proposalId: string, input: ReviewProposalInput) {
   );
 }
 
-export type TaskFilters = { status?: string; assigneeId?: string; q?: string };
+export type TaskFilters = {
+  status?: string;
+  priority?: string;
+  assigneeId?: string;
+  q?: string;
+};
 
 export function listTasks(
   id: string,
@@ -207,6 +263,7 @@ export function createTask(
     description?: string | null;
     assigneeId?: string | null;
     dueDate?: string | null;
+    priority?: TaskPriority;
   },
 ) {
   return request<TaskResponse>(`${base(id)}/tasks`, {
@@ -218,6 +275,27 @@ export function createTask(
 export function getTask(taskId: string, signal?: AbortSignal) {
   return request<TaskDetailResponse>(
     `/api/tasks/${encodeURIComponent(taskId)}`,
+    { signal },
+  );
+}
+
+export function addTaskComment(taskId: string, body: string) {
+  return request<TaskCommentResponse>(
+    `/api/tasks/${encodeURIComponent(taskId)}/comments`,
+    { method: "POST", body: JSON.stringify({ body }) },
+  );
+}
+
+export function deleteTaskComment(taskId: string, commentId: string) {
+  return request<{ ok: true }>(
+    `/api/tasks/${encodeURIComponent(taskId)}/comments/${encodeURIComponent(commentId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function getTaskCommits(taskId: string, signal?: AbortSignal) {
+  return request<TaskCommitsResponse>(
+    `/api/tasks/${encodeURIComponent(taskId)}/commits`,
     { signal },
   );
 }
@@ -255,6 +333,12 @@ export function unlinkGitHubRepo(id: string, repoId: number) {
   });
 }
 
+export function getGitHubSummary(id: string, signal?: AbortSignal) {
+  return request<GitHubSummaryResponse>(`${base(id)}/github/summary`, {
+    signal,
+  });
+}
+
 export function syncGitHub(id: string) {
   return request<GitHubSyncResult>(`${base(id)}/github/sync`, {
     method: "POST",
@@ -263,14 +347,39 @@ export function syncGitHub(id: string) {
 
 // ===== W6: Proof Chain =====
 
+export function listProjectMeetings(id: string, signal?: AbortSignal) {
+  return request<{ meetings: MeetingListItem[] }>(
+    `/api/meetings?projectId=${encodeURIComponent(id)}`,
+    { signal },
+  );
+}
+
+/** Runs the AI only when you ask (AC-70b): call this from a click, never on load. */
+export function prepareMeeting(title: string) {
+  return request<{
+    suggestions: MeetingPrepSuggestions;
+    ledgerItems?: PrepLedgerItem[];
+  }>("/api/prep", { method: "POST", body: JSON.stringify({ title }) });
+}
+
 export function getProjectLedger(
   id: string,
-  filters: { kind?: string; status?: string; cursor?: string | null },
+  filters: {
+    kind?: string;
+    status?: string;
+    meetingId?: string;
+    q?: string;
+    tag?: string;
+    cursor?: string | null;
+  },
   signal?: AbortSignal,
 ) {
   const params = new URLSearchParams();
   if (filters.kind) params.set("kind", filters.kind);
   if (filters.status) params.set("status", filters.status);
+  if (filters.meetingId) params.set("meetingId", filters.meetingId);
+  if (filters.q) params.set("q", filters.q);
+  if (filters.tag) params.set("tag", filters.tag);
   if (filters.cursor) params.set("cursor", filters.cursor);
   const query = params.toString();
   return request<ProjectLedgerResponse>(
@@ -283,7 +392,15 @@ export function listActivity(
   id: string,
   before: string | null,
   signal?: AbortSignal,
+  filters: { category?: string; actorId?: string } = {},
 ) {
-  const query = before ? `?before=${encodeURIComponent(before)}` : "";
-  return request<ActivityResponse>(`${base(id)}/activity${query}`, { signal });
+  const params = new URLSearchParams();
+  if (before) params.set("before", before);
+  if (filters.category) params.set("category", filters.category);
+  if (filters.actorId) params.set("actorId", filters.actorId);
+  const query = params.toString();
+  return request<ActivityResponse>(
+    `${base(id)}/activity${query ? `?${query}` : ""}`,
+    { signal },
+  );
 }

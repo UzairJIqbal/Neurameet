@@ -5,8 +5,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import DashboardContent from "./DashboardContent";
 
 // jsdom has no layout engine, so these assert the responsive tokens are present
-// on the dashboard inline rows and the mobile search bar (a revert would drop
-// them). The actual visual reflow at 375/768 is verified manually via /check verify.
+// on the dashboard inline rows (a revert would drop them). The actual visual reflow at 375/768 is verified manually via /check verify.
 
 const meetings = [
   {
@@ -37,14 +36,16 @@ vi.mock("@clerk/nextjs", () => ({
 // modules pull in Stream + server-only code, so stub them so the suite loads in jsdom.
 vi.mock("./MeetingModel", () => ({ default: () => null }));
 vi.mock("./UploadTranscriptModal", () => ({ default: () => null }));
+vi.mock("@/components/projects/TaskDrawer", () => ({ default: () => null }));
+vi.mock("@/components/projects/CreateProjectDialog", () => ({
+  default: () => null,
+}));
 
 beforeEach(() => {
   global.fetch = vi.fn(async (url: string) => ({
     ok: true,
     json: async () =>
-      url.includes("follow-ups")
-        ? { followUps }
-        : { meetings },
+      url.includes("follow-ups") ? { followUps } : { meetings },
   })) as unknown as typeof fetch;
 });
 
@@ -53,25 +54,51 @@ afterEach(() => {
 });
 
 describe("Dashboard inline rows responsive (P13.3)", () => {
-  it("renders a mobile-only search bar bound to the query state", async () => {
+  it("has no dead Bell and no local search box (AC-77b)", async () => {
     render(<DashboardContent />);
-    // The header search shares this aria-label; the mobile one lives inside the
-    // sm:hidden wrapper div (the input itself carries w-full, not sm:hidden).
-    const inputs = screen.getAllByLabelText(
-      "Search meetings and follow-ups",
-    ) as HTMLInputElement[];
-    const mobile = inputs.find(
-      (i) => (i.parentElement?.className ?? "").includes("sm:hidden"),
-    );
-    expect(mobile).toBeTruthy();
-    const tokens = (mobile as HTMLInputElement).className.split(" ");
-    expect(tokens).toContain("w-full");
+    await screen.findAllByText("Weekly Sync");
+    expect(
+      screen.queryByLabelText("Search meetings and follow-ups"),
+    ).toBeNull();
+    expect(screen.queryByPlaceholderText(/search anything/i)).toBeNull();
+    expect(document.querySelector(".bg-error")).toBeNull();
+  });
+
+  it("shows the date, chips, and the four quick actions with the Review PRs link", async () => {
+    render(<DashboardContent />);
+    expect(await screen.findByText("open tasks")).toBeTruthy();
+    expect(screen.getByText("due this week")).toBeTruthy();
+    expect(screen.getByText("upcoming meetings")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /New Project/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /New Meeting/i })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /AI Assistant/i }).getAttribute("href"),
+    ).toBe("/ai-chat");
+    const review = screen.getByRole("link", { name: /Review PRs/i });
+    expect(review.getAttribute("href")).toBe("/notifications?filter=github");
+    expect(review.textContent).toContain("0 waiting for you");
+  });
+
+  it("keeps Join, Schedule, and Upload reachable and has no activity feed", async () => {
+    render(<DashboardContent />);
+    expect(
+      await screen.findByRole("button", { name: /Join Meeting/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Schedule Meeting/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole("button", { name: /Upload Transcript/i }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/activity/i)).toBeNull();
   });
 
   it("hides the list header Action column on mobile (shown at md+)", async () => {
     render(<DashboardContent />);
     // The Action header column is static markup, so it is present on mount.
-    const actionHeaders = (await screen.findAllByText("Action")) as HTMLElement[];
+    const actionHeaders = (await screen.findAllByText(
+      "Action",
+    )) as HTMLElement[];
     const actionHeader = actionHeaders[0];
     const tokens = actionHeader.className.split(" ");
     expect(tokens).toContain("hidden");

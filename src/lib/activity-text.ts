@@ -22,6 +22,8 @@ export function activitySentence(row: ActivityRow): string {
   switch (row.kind) {
     case "task.created":
       return `${actor} created ${key}`;
+    case "task.commented":
+      return `${actor} commented on ${key}`;
     case "task.edited":
       return `${actor} changed the ${row.field ?? "details"} on ${key}`;
     case "task.status_changed":

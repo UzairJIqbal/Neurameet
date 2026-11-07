@@ -7,6 +7,11 @@ const { mockAuth, mockGetUserList, mockEmbedTexts } = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// after() throws outside a request; the notices it runs are tested on their own.
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: () => {},
+}));
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mockAuth,
   clerkClient: async () => ({ users: { getUserList: mockGetUserList } }),
@@ -230,6 +235,77 @@ describe("GET /api/tasks/[id]", () => {
     expect(callsOf("tasks", "select")[1].args[0]).not.toMatch(/quote/);
   });
 
+  const COMMENT = {
+    id: "c1",
+    author_id: "gone",
+    body: "Looks good",
+    created_at: "2026-11-05",
+  };
+  const COMMENTED = {
+    id: "e2",
+    kind: "commented",
+    actor_id: "u1",
+    from_value: null,
+    to_value: null,
+    detail: {},
+    created_at: "2026-11-05",
+  };
+
+  it("gives a Developer the comments, with a removed author as Former member", async () => {
+    queue("tasks", ok(head()));
+    role("developer");
+    queueReadTask();
+    queueOutcomeTask();
+    queue("task_events", ok([COMMENTED]));
+    queue("task_comments", ok([COMMENT]));
+    const body = await (
+      await getTask(req(undefined, undefined, "GET"), params(T))
+    ).json();
+    expect(body.comments).toEqual([
+      {
+        id: "c1",
+        authorId: "gone",
+        authorName: "Former member",
+        body: "Looks good",
+        createdAt: "2026-11-05",
+      },
+    ]);
+    expect(body.commentsTruncated).toBe(false);
+    expect(body.projectId).toBe(P);
+  });
+
+  it("says when older comments were left out", async () => {
+    queue("tasks", ok(head()));
+    role("developer");
+    queueReadTask();
+    queueOutcomeTask();
+    queue("task_events", ok([]));
+    queue(
+      "task_comments",
+      ok(Array.from({ length: 51 }, (_, i) => ({ ...COMMENT, id: `c${i}` }))),
+    );
+    const body = await (
+      await getTask(req(undefined, undefined, "GET"), params(T))
+    ).json();
+    expect(body.comments).toHaveLength(50);
+    expect(body.commentsTruncated).toBe(true);
+  });
+
+  it("never gives a Viewer comments, the flag, or a commented event", async () => {
+    queue("tasks", ok(head()));
+    role("viewer");
+    queueReadTask();
+    queueOutcomeTask();
+    queue("task_events", ok([COMMENTED]));
+    const body = await (
+      await getTask(req(undefined, undefined, "GET"), params(T))
+    ).json();
+    expect(body).not.toHaveProperty("comments");
+    expect(body).not.toHaveProperty("commentsTruncated");
+    expect(body.events).toEqual([]);
+    expect(callsOf("task_comments", "select")).toEqual([]);
+  });
+
   const LINK = {
     id: "l1",
     state: "merged",
@@ -256,31 +332,51 @@ describe("GET /api/tasks/[id]", () => {
     expect(callsOf("task_links", "select")[0].args[0]).not.toMatch(
       /repo_full_name|pr_title|pr_url|pr_number/,
     );
-    expect(callsOf("tasks", "select")[1].args[0]).not.toMatch(/completion_evidence/);
+    expect(callsOf("tasks", "select")[1].args[0]).not.toMatch(
+      /completion_evidence/,
+    );
     expect(JSON.stringify(body)).not.toMatch(/secret/i);
   });
 
   it("passes the Viewer walk with an outcome, and never reads a hidden column", async () => {
     queue("tasks", ok(head()));
     role("viewer");
-    queueReadTask({ completion_kind: "merge", source_action_item_id: "a1", source_meeting_id: "m1" });
+    queueReadTask({
+      completion_kind: "merge",
+      source_action_item_id: "a1",
+      source_meeting_id: "m1",
+    });
     queue("tasks", ok({ project_id: P, source_action_item_id: "a1" }));
     queue("task_events", ok([]));
     queue("task_links", ok([LINK]));
     queue("action_items", ok([]));
     queue(
       "task_links",
-      ok([{ task_id: T, state: "merged", closes: true, base_ref: "main", repo_id: 1, merged_at: "2026-11-03", reverted_at: null }]),
+      ok([
+        {
+          task_id: T,
+          state: "merged",
+          closes: true,
+          base_ref: "main",
+          repo_id: 1,
+          merged_at: "2026-11-03",
+          reverted_at: null,
+        },
+      ]),
     );
     queue("github_repos", ok([{ repo_id: 1, default_branch: "main" }]));
-    const body = await (await getTask(req(undefined, undefined, "GET"), params(T))).json();
+    const body = await (
+      await getTask(req(undefined, undefined, "GET"), params(T))
+    ).json();
     expect(viewerLeaks(body)).toEqual([]);
     expect(body.outcome).toMatchObject({
       said: { state: "hidden" },
       shipped: { state: "merged" },
     });
     for (const table of ["tasks", "task_links"]) {
-      for (const call of callsOf(table, "select").slice(table === "tasks" ? 1 : 0)) {
+      for (const call of callsOf(table, "select").slice(
+        table === "tasks" ? 1 : 0,
+      )) {
         expect(String(call.args[0])).not.toMatch(HIDDEN_COLUMNS);
       }
     }
@@ -437,6 +533,105 @@ describe("GET /api/projects/[id]/proposals", () => {
   });
 });
 
+describe("task priority and board fields", () => {
+  const board = (url = "http://localhost/api/x") =>
+    listTasks(req(undefined, url, "GET"), params(P));
+  const queueEmptyColumns = (rows: Record<string, unknown>[] = []) => {
+    queue("projects", ok({ task_prefix: "NM" }));
+    queue(
+      "tasks",
+      ok(rows),
+      ok([]),
+      ok([]),
+      ok([]),
+      ok([]),
+      ok([{ id: T, task_comments: [{ count: 2 }] }]),
+    );
+  };
+
+  it("refuses a bad priority or status filter with 422", async () => {
+    role("viewer");
+    expect((await board("http://localhost/api/x?priority=soon")).status).toBe(
+      422,
+    );
+    role("viewer");
+    expect((await board("http://localhost/api/x?status=later")).status).toBe(
+      422,
+    );
+  });
+
+  it("filters on priority inside the query", async () => {
+    role("developer");
+    queueEmptyColumns();
+    const res = await board("http://localhost/api/x?priority=high");
+    expect(res.status).toBe(200);
+    expect(
+      callsOf("tasks", "eq").some(
+        (call) => call.args[0] === "priority" && call.args[1] === "high",
+      ),
+    ).toBe(true);
+  });
+
+  it("gives a Developer comment counts and PR refs, a Viewer neither", async () => {
+    role("developer");
+    queueEmptyColumns([taskRow()]);
+    queue(
+      "task_links",
+      ok([
+        {
+          task_id: T,
+          repo_full_name: "acme/app",
+          pr_number: 7,
+          pr_url: "https://github.com/acme/app/pull/7",
+          state: "merged",
+          reverted_at: null,
+        },
+      ]),
+    );
+    const dev = await (await board()).json();
+    expect(dev.tasks[0].commentCount).toBe(2);
+    expect(dev.tasks[0].prRefs[0].prNumber).toBe(7);
+
+    resetQueues();
+    role("viewer");
+    queueEmptyColumns([taskRow()]);
+    const viewer = await (await board()).json();
+    expect(viewer.tasks[0]).not.toHaveProperty("commentCount");
+    expect(viewer.tasks[0]).not.toHaveProperty("prRefs");
+  });
+
+  it("saves a chosen priority on create and refuses a bad one", async () => {
+    role("developer");
+    queue("rpc:create_project_task", ok({ id: T }));
+    queue("tasks", ok(null));
+    queueReadTask({ priority: "low" });
+    const res = await createTask(
+      req({ title: "New", priority: "low" }),
+      params(P),
+    );
+    expect((await res.json()).task.priority).toBe("low");
+    expect(callsOf("tasks", "update")[0].args[0]).toEqual({ priority: "low" });
+
+    role("developer");
+    expect(
+      (await createTask(req({ title: "New", priority: "soon" }), params(P)))
+        .status,
+    ).toBe(422);
+  });
+
+  it("refuses a bad priority on PATCH", async () => {
+    const res = await patchTask(
+      req(
+        { priority: "soon", ifVersion: 2 },
+        "http://localhost/api/x",
+        "PATCH",
+      ),
+      params(T),
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
 describe("POST /api/proposals/[id]/review", () => {
   const review = (body: unknown) => reviewProposal(req(body), params("a1"));
   const proposal = () => {
@@ -498,6 +693,32 @@ describe("POST /api/proposals/[id]/review", () => {
       p_embedding: [0.1, 0.2],
       p_confirm_without_quote: false,
     });
+  });
+
+  it("sets a chosen priority on the new task, and refuses an unknown one", async () => {
+    proposal();
+    role("owner");
+    queue("rpc:review_proposal", ok({ taskId: T }));
+    queue("tasks", ok(null));
+    queueReadTask({ priority: "urgent" });
+    const res = await review({ decision: "confirm", priority: "urgent" });
+    expect((await res.json()).task.priority).toBe("urgent");
+    expect(callsOf("tasks", "update")[0].args[0]).toEqual({
+      priority: "urgent",
+    });
+
+    expect(
+      (await review({ decision: "confirm", priority: "soon" })).status,
+    ).toBe(422);
+  });
+
+  it("leaves a task at Medium without a write when no priority is chosen", async () => {
+    proposal();
+    role("owner");
+    queue("rpc:review_proposal", ok({ taskId: T }));
+    queueReadTask();
+    await review({ decision: "confirm" });
+    expect(callsOf("tasks", "update")).toHaveLength(0);
   });
 
   it("reuses the stored vector when the title is unchanged", async () => {

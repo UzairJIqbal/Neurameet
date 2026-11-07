@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getProjectRole } from "@/lib/project-auth";
-import { readInstallState, userInstallations, userToken } from "@/lib/github";
+import {
+  githubUser,
+  isAccountState,
+  readAccountState,
+  readInstallState,
+  userInstallations,
+  userToken,
+} from "@/lib/github";
 import type { GitHubInstallationListing } from "@/lib/github-types";
 
 export const runtime = "nodejs";
@@ -65,6 +72,59 @@ async function connect(
   return "connected";
 }
 
+type AccountOutcome = "connected" | "already_linked" | "failed" | "expired";
+
+// AC-77g: stores who you are on GitHub and nothing else. The token ends here,
+// and this path grants no repo access and changes no task.
+async function connectAccount(
+  supabase: Supabase,
+  userId: string,
+  code: string,
+): Promise<AccountOutcome> {
+  const { id, login } = await githubUser(await userToken(code));
+  const { data, error } = await supabase
+    .from("user_settings")
+    .select("user_id")
+    .eq("github_user_id", id)
+    .neq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return "already_linked";
+
+  const { error: writeError } = await supabase.from("user_settings").upsert(
+    {
+      user_id: userId,
+      github_login: login,
+      github_user_id: id,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  // Someone else claimed this id between the read and the write.
+  if (writeError?.code === "23505") return "already_linked";
+  if (writeError) throw writeError;
+  return "connected";
+}
+
+async function accountOutcome(
+  userId: string,
+  params: URLSearchParams,
+): Promise<AccountOutcome> {
+  const state = readAccountState(params.get("state"));
+  if (!state || state.userId !== userId) return "expired";
+  const code = params.get("code");
+  if (!code) return "failed";
+  try {
+    return await connectAccount(supabaseServer(), userId, code);
+  } catch (err) {
+    console.error(
+      "[github] account callback failed:",
+      err instanceof Error ? err.message : "unknown error",
+    );
+    return "failed";
+  }
+}
+
 // Every outcome redirects, so nobody lands on raw JSON (AC-43a).
 export async function GET(request: Request) {
   const redirect = (path: string) =>
@@ -76,6 +136,11 @@ export async function GET(request: Request) {
   }
 
   const params = new URL(request.url).searchParams;
+  if (isAccountState(params.get("state"))) {
+    const outcome = await accountOutcome(userId, params);
+    return redirect(`/settings?tab=connected&github=${outcome}`);
+  }
+
   const state = readInstallState(params.get("state"));
   if (!state || state.userId !== userId) {
     return redirect("/projects?github=expired");

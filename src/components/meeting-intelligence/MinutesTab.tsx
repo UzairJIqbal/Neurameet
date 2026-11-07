@@ -216,7 +216,7 @@ const MinutesTab = ({ meetingId }: { meetingId: string }) => {
 
   if (data.state === "no_draft") {
     return (
-      <TabEmptyState message="These minutes were made before Verified Minutes. Reprocess the meeting from the Summary tab to create them." />
+      <TabEmptyState message="These minutes were made before Verified Minutes. Reprocess the meeting from the AI Summary tab to create them." />
     );
   }
 

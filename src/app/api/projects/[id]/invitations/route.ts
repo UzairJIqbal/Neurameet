@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -14,11 +14,10 @@ import {
   inviteLink,
   newInviteToken,
   parseInviteEmail,
-  sendInviteEmailWithinBudget,
 } from "@/lib/invitations";
-import { sendProjectInviteEmail, workspaceEmailConfigured } from "@/lib/email";
+import { emailInvite } from "@/lib/invite-email";
+import { notifyProjectInvitation } from "@/lib/notification-events";
 import {
-  ROLE_LABELS,
   type CreateInvitationResponse,
   type InvitationSummary,
   type InviteKind,
@@ -123,6 +122,17 @@ export async function POST(request: Request, { params }: Params) {
           })
         : false;
 
+    if (kind === "email" && email) {
+      after(() =>
+        notifyProjectInvitation(supabase, {
+          projectId: id,
+          invitationId: row.id,
+          email,
+          role,
+        }),
+      );
+    }
+
     const response: CreateInvitationResponse = {
       invitation: {
         id: row.id,
@@ -146,41 +156,6 @@ export async function POST(request: Request, { params }: Params) {
   }
 }
 
-async function emailInvite(
-  supabase: ReturnType<typeof supabaseServer>,
-  input: {
-    projectId: string;
-    invitationId: string;
-    actorId: string;
-    to: string;
-    role: InviteRole;
-    link: string;
-  },
-): Promise<boolean> {
-  return sendInviteEmailWithinBudget(supabase, workspaceEmailConfigured(), {
-    projectId: input.projectId,
-    invitationId: input.invitationId,
-    actorId: input.actorId,
-    send: async () => {
-      const [{ data: project }, profiles] = await Promise.all([
-        supabase
-          .from("projects")
-          .select("name")
-          .eq("id", input.projectId)
-          .maybeSingle(),
-        lookupProfiles([input.actorId]),
-      ]);
-      return sendProjectInviteEmail({
-        to: input.to,
-        projectName: (project as { name?: string } | null)?.name ?? "a project",
-        inviterName: profiles.get(input.actorId)?.name ?? "A teammate",
-        roleLabel: ROLE_LABELS[input.role],
-        link: input.link,
-      });
-    },
-  });
-}
-
 // Owner or Admin: active invites, never a token or hash.
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -198,6 +173,7 @@ export async function GET(_request: Request, { params }: Params) {
       .eq("project_id", id)
       .is("revoked_at", null)
       .is("used_at", null)
+      .is("declined_at", null)
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
     if (error) throw error;

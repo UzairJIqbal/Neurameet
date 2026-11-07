@@ -16,18 +16,25 @@ import AiChatTab from "./AiChatTab";
 import EngagementTab from "./EngagementTab";
 import LedgerTab from "./LedgerTab";
 import MinutesTab from "./MinutesTab";
+import TranscriptTab from "./TranscriptTab";
+import ProposalsPanel from "@/components/projects/ProposalsPanel";
 import { fetchLedger } from "@/lib/ledger-client";
+import type { ProjectRole } from "@/lib/project-types";
 
+const LEDGER_TAB = "Decisions and Promises";
+
+// AC-70v: every shipped tab stays, in this order.
 const TABS = [
   "Overview",
-  "Summary",
+  "AI Summary",
+  "Transcript",
+  LEDGER_TAB,
   "Action Items",
   "Recording",
   "Category",
-  "AI Chat",
-  "Engagement",
-  "Ledger",
   "Minutes",
+  "Engagement",
+  "AI Chat",
 ] as const;
 
 type TabKey = (typeof TABS)[number];
@@ -35,10 +42,12 @@ type TabKey = (typeof TABS)[number];
 // D3.4: the Recording tab is owner-only. Non-owners never see it.
 // Spec 0001 AC-12: the Ledger tab is owner-only on a personal meeting. On a project
 // meeting every member reads it, and `canManage` decides the controls (AC-58b).
-const VISIBLE_TABS = (isOwner: boolean, ledgerOpen: boolean): readonly TabKey[] =>
+// AC-70v: a Viewer never sees the Transcript tab.
+const VISIBLE_TABS = (isOwner: boolean, ledgerOpen: boolean, isViewer: boolean): readonly TabKey[] =>
   TABS.filter((t) => {
     if (t === "Recording") return isOwner;
-    if (t === "Ledger") return ledgerOpen;
+    if (t === LEDGER_TAB) return ledgerOpen;
+    if (t === "Transcript") return !isViewer;
     return true;
   });
 
@@ -54,6 +63,9 @@ const MeetingTabs = ({
   ledgerVersion = 0,
   projectId = null,
   canManage,
+  role = null,
+  transcriptText,
+  onProposalsChanged,
 }: {
   meeting: MeetingDetailData;
   insights: MeetingInsights | null;
@@ -66,11 +78,19 @@ const MeetingTabs = ({
   ledgerVersion?: number;
   projectId?: string | null;
   canManage?: boolean;
+  role?: ProjectRole | null;
+  transcriptText?: string | null;
+  onProposalsChanged?: () => void;
 }) => {
   const [active, setActive] = useState<TabKey>("Overview");
   const [reversalCount, setReversalCount] = useState(0);
   const ledgerOpen = isOwner || !!projectId;
-  const visibleTabs = VISIBLE_TABS(isOwner, ledgerOpen);
+  const isViewer = role === "viewer";
+  const visibleTabs = VISIBLE_TABS(isOwner, ledgerOpen, isViewer);
+  // AC-70w: unreviewed and dismissed rows live in the review panel, not the list.
+  const listedItems = projectId
+    ? actionItems.filter((item) => item.reviewState !== "proposed" && item.reviewState !== "rejected")
+    : actionItems;
 
   // Spec 0001 AC-11: the Ledger tab badge. No spinner, so a failure only hides it.
   useEffect(() => {
@@ -100,7 +120,7 @@ const MeetingTabs = ({
             }`}
           >
             {tab}
-            {tab === "Ledger" && reversalCount > 0 && (
+            {tab === LEDGER_TAB && reversalCount > 0 && (
               <span
                 aria-label={`${reversalCount} reversed`}
                 className="ml-2 rounded-full bg-error-container px-2 py-0.5 text-label-caps text-error"
@@ -117,20 +137,26 @@ const MeetingTabs = ({
           <OverviewTab
             meeting={meeting}
             insights={insights}
-            actionItems={actionItems}
+            actionItems={listedItems}
             attendanceCount={attendanceCount}
             isOwner={isOwner}
             onMoved={onMoved}
           />
         )}
-        {active === "Summary" && (
+        {active === "AI Summary" && (
           <SummaryTab
             insights={insights}
             onRetry={isOwner ? onRetry : undefined}
           />
         )}
+        {!isViewer && active === "Transcript" && <TranscriptTab text={transcriptText} />}
         {active === "Action Items" && (
-          <ActionItemsTab insights={insights} actionItems={actionItems} />
+          <div className="flex flex-col gap-6">
+            {projectId && role && !isViewer && (
+              <ProposalsPanel project={{ id: projectId }} meetingId={meetingId} onChanged={onProposalsChanged} />
+            )}
+            <ActionItemsTab insights={insights} actionItems={listedItems} />
+          </div>
         )}
         {isOwner && active === "Recording" && <RecordingTab meeting={meeting} />}
         {active === "Category" && (
@@ -138,7 +164,7 @@ const MeetingTabs = ({
         )}
         {active === "AI Chat" && <AiChatTab meetingId={meetingId} />}
         {active === "Engagement" && <EngagementTab meetingId={meetingId} />}
-        {ledgerOpen && active === "Ledger" && <LedgerTab meetingId={meetingId} canManage={canManage ?? isOwner} refreshKey={ledgerVersion} onReversalCount={setReversalCount} />}
+        {ledgerOpen && active === LEDGER_TAB && <LedgerTab meetingId={meetingId} canManage={canManage ?? isOwner} refreshKey={ledgerVersion} onReversalCount={setReversalCount} />}
         {active === "Minutes" && <MinutesTab meetingId={meetingId} />}
       </div>
     </div>

@@ -55,6 +55,7 @@ const KNOWN_KINDS = new Set([
   "task.pr_linked",
   "task.pr_state_changed",
   "task.proposal_merged",
+  "task.commented",
   "meeting.created",
   "meeting.moved",
   "ledger.kept_confirmed",

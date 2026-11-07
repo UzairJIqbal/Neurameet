@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase-server";
+import { isUuid } from "@/lib/invitations";
+import { lookupProfiles } from "@/lib/projects";
 import {
   NEED_ROLES,
   accessErrorResponse,
@@ -10,6 +12,7 @@ import {
 import {
   PAGE_SIZE,
   cursorFilter,
+  likePattern,
   ledgerItemSelectFor,
   ledgerLinkSelectFor,
   meetingsInProject,
@@ -22,7 +25,8 @@ import {
 } from "@/lib/project-select";
 import { outcomesForItems } from "@/lib/proof-chain";
 import { deriveLedgerStatus } from "@/agent/ledger";
-import type { ProjectRole } from "@/lib/project-types";
+import { MEETING_CATEGORIES, type MeetingCategory } from "@/lib/meeting-types";
+import type { ProjectAvatar, ProjectRole } from "@/lib/project-types";
 import type {
   ProjectLedgerItem,
   ProjectLedgerLink,
@@ -36,8 +40,57 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
 
 type ItemWithMeeting = LedgerItemRow & {
-  meetings: { id: string; title: string | null; started_at: string };
+  meetings: {
+    id: string;
+    title: string | null;
+    started_at: string;
+    // One to one, as `meeting_id` is unique, but the embed's shape isn't typed.
+    meeting_insights:
+      { category: string | null } | { category: string | null }[] | null;
+  };
 };
+
+const PARTICIPANTS_SHOWN = 5;
+const SEARCH_MAX = 100;
+
+const tagOf = (insights: ItemWithMeeting["meetings"]["meeting_insights"]) =>
+  (Array.isArray(insights) ? insights[0] : insights)?.category ?? null;
+
+/** First 5 people recorded on each meeting, as avatars (AC-70l). */
+async function loadParticipants(
+  supabase: SupabaseClient,
+  meetingIds: string[],
+): Promise<Map<string, ProjectAvatar[]>> {
+  const byMeeting = new Map<string, ProjectAvatar[]>();
+  if (meetingIds.length === 0) return byMeeting;
+  const { data, error } = await supabase
+    .from("meeting_participants")
+    .select("meeting_id, user_id")
+    .in("meeting_id", meetingIds)
+    .order("consented_at", { ascending: true });
+  if (error) throw error;
+
+  const shown = new Map<string, string[]>();
+  for (const row of (data ?? []) as { meeting_id: string; user_id: string }[]) {
+    const ids = shown.get(row.meeting_id) ?? [];
+    if (ids.length < PARTICIPANTS_SHOWN) ids.push(row.user_id);
+    shown.set(row.meeting_id, ids);
+  }
+  const userIds = [...new Set([...shown.values()].flat())];
+  const profiles = userIds.length > 0 ? await lookupProfiles(userIds) : null;
+  for (const [meetingId, ids] of shown) {
+    byMeeting.set(
+      meetingId,
+      ids.flatMap((userId) => {
+        const profile = profiles?.get(userId);
+        return profile
+          ? [{ name: profile.name, imageUrl: profile.imageUrl }]
+          : [];
+      }),
+    );
+  }
+  return byMeeting;
+}
 
 type ReviewLinkRow = {
   id: string;
@@ -201,11 +254,20 @@ export async function GET(request: Request, { params }: Params) {
   const kind = search.get("kind");
   const status = search.get("status");
   const rawCursor = search.get("cursor");
+  const meetingId = search.get("meetingId");
+  const tag = search.get("tag");
+  const q = search.get("q")?.trim().slice(0, SEARCH_MAX) ?? "";
   if (kind && !KINDS.includes(kind)) {
     return NextResponse.json({ error: "Unknown kind" }, { status: 422 });
   }
   if (status && !STATUSES.includes(status)) {
     return NextResponse.json({ error: "Unknown status" }, { status: 422 });
+  }
+  if (meetingId && !isUuid(meetingId)) {
+    return NextResponse.json({ error: "Unknown meeting" }, { status: 422 });
+  }
+  if (tag && !MEETING_CATEGORIES.includes(tag as MeetingCategory)) {
+    return NextResponse.json({ error: "Unknown tag" }, { status: 422 });
   }
   const cursor = rawCursor ? parseCursor(rawCursor, "ledger") : null;
   if (rawCursor && !cursor) {
@@ -226,10 +288,14 @@ export async function GET(request: Request, { params }: Params) {
     let query = supabase
       .from("ledger_items")
       .select(
-        `${ledgerItemSelectFor(role)}, meetings!inner(id, title, started_at, project_id)`,
+        `${ledgerItemSelectFor(role)}, meetings!inner(id, title, started_at, project_id, meeting_insights${tag ? "!inner" : ""}(category))`,
       )
       .eq("meetings.project_id", id);
     if (kind) query = query.eq("kind", kind);
+    if (meetingId) query = query.eq("meeting_id", meetingId);
+    if (tag) query = query.eq("meetings.meeting_insights.category", tag);
+    // The statement only, never the quote, so a Viewer can't probe a hidden quote.
+    if (q) query = query.ilike("statement", likePattern(q));
     if (status === "overdue") {
       query = query.eq("status", "open").lt("due_date", today);
     } else if (status === "open") {
@@ -269,6 +335,9 @@ export async function GET(request: Request, { params }: Params) {
     const review = canReview
       ? await loadNeedsReview(supabase, id)
       : { rows: [], total: 0 };
+    const participants = await loadParticipants(supabase, [
+      ...new Set(page.map((row) => row.meetings.id)),
+    ]);
 
     const items: ProjectLedgerItem[] = page.map((row) => {
       const item = toLedgerItem(row, role);
@@ -282,6 +351,8 @@ export async function GET(request: Request, { params }: Params) {
         },
         links: links.get(row.id) ?? [],
         outcome: outcomes.get(row.id) as ProjectLedgerItem["outcome"],
+        tag: tagOf(row.meetings.meeting_insights),
+        participants: participants.get(row.meetings.id) ?? [],
       };
     });
 

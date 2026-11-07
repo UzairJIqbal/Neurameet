@@ -1,18 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { generateAttendancePdf } from "./attendance-pdf";
-import type { AttendanceRow, MeetingDetailData } from "./meeting-types";
+import { generateAttendancePdf, type ReportMeeting } from "./attendance-pdf";
+import type { AttendanceRow } from "./meeting-types";
 
-const meeting: MeetingDetailData = {
-  id: "m1",
+const meeting: ReportMeeting = {
   title: "ملاقات — Weekly sync",
   status: "ended",
-  streamCallId: "call_1",
   startedAt: "2026-01-01T10:00:00Z",
-  endedAt: "2026-01-01T11:00:00Z",
   createdAt: "2026-01-01T10:00:00Z",
-  user_id: "owner",
-  guestAdmissionMode: "approval",
 };
 
 const row = (participantName: string): AttendanceRow => ({

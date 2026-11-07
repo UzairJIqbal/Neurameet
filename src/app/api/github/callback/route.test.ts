@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockAuth, mockUserToken, mockUserInstallations } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
-  mockUserToken: vi.fn(),
-  mockUserInstallations: vi.fn(),
-}));
+const { mockAuth, mockUserToken, mockUserInstallations, mockGithubUser } =
+  vi.hoisted(() => ({
+    mockAuth: vi.fn(),
+    mockUserToken: vi.fn(),
+    mockUserInstallations: vi.fn(),
+    mockGithubUser: vi.fn(),
+  }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
@@ -16,6 +18,7 @@ vi.mock("@/lib/github", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/github")>()),
   userToken: mockUserToken,
   userInstallations: mockUserInstallations,
+  githubUser: mockGithubUser,
 }));
 
 import {
@@ -25,7 +28,7 @@ import {
   queue,
   resetQueues,
 } from "@/test/supabase-queue-mock";
-import { signInstallState } from "@/lib/github";
+import { signAccountState, signInstallState } from "@/lib/github";
 import { GET } from "./route";
 
 const installation = (id: number) => ({
@@ -64,6 +67,7 @@ beforeEach(() => {
   mockAuth.mockResolvedValue({ userId: "u1" });
   mockUserToken.mockResolvedValue("user-token");
   mockUserInstallations.mockResolvedValue([installation(1), installation(2)]);
+  mockGithubUser.mockResolvedValue({ id: 7, login: "octo" });
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -190,6 +194,97 @@ describe("GET /api/github/callback", () => {
     );
     const { search } = await visit(valid());
     expect(search).toBe("?tab=github&github=failed");
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
+      "the-code",
+    );
+  });
+});
+
+describe("GET /api/github/callback, connecting an account (AC-77g)", () => {
+  const account = (extra: Record<string, string> = {}) => ({
+    state: signAccountState("u1"),
+    code: "the-code",
+    ...extra,
+  });
+  const TO_SETTINGS = "/settings";
+
+  it("stores your login and id, and nothing else", async () => {
+    const { path, search } = await visit(account());
+    expect(path).toBe(TO_SETTINGS);
+    expect(search).toBe("?tab=connected&github=connected");
+    const [row, options] = callsOf("user_settings", "upsert")[0].args as [
+      Record<string, unknown>,
+      unknown,
+    ];
+    expect(Object.keys(row).sort()).toEqual([
+      "github_login",
+      "github_user_id",
+      "updated_at",
+      "user_id",
+    ]);
+    expect(row).toMatchObject({
+      user_id: "u1",
+      github_login: "octo",
+      github_user_id: 7,
+    });
+    expect(options).toEqual({ onConflict: "user_id" });
+    expect(JSON.stringify(calls)).not.toContain("user-token");
+    expect(stored()).toEqual([]);
+  });
+
+  it("refuses an account someone else already linked", async () => {
+    queue("user_settings", ok({ user_id: "u2" }));
+    const { search } = await visit(account());
+    expect(search).toBe("?tab=connected&github=already_linked");
+    expect(callsOf("user_settings", "upsert")).toEqual([]);
+  });
+
+  it("reports the race on the unique index the same way", async () => {
+    queue("user_settings", ok(null), {
+      data: null,
+      error: { code: "23505", message: "duplicate" },
+    });
+    const { search } = await visit(account());
+    expect(search).toBe("?tab=connected&github=already_linked");
+  });
+
+  it("refuses a state made for another user", async () => {
+    const { search } = await visit(account({ state: signAccountState("u2") }));
+    expect(search).toBe("?tab=connected&github=expired");
+    expect(mockUserToken).not.toHaveBeenCalled();
+  });
+
+  it("refuses an expired state", async () => {
+    const old = signAccountState("u1", Date.now() - 11 * 60 * 1000);
+    const { search } = await visit(account({ state: old }));
+    expect(search).toBe("?tab=connected&github=expired");
+  });
+
+  it("refuses an install state dressed up with the account prefix", async () => {
+    const { path, search } = await visit(
+      account({ state: `acct.${signInstallState("p1", "u1")}` }),
+    );
+    expect(path).toBe(TO_SETTINGS);
+    expect(search).toBe("?tab=connected&github=expired");
+    expect(mockUserToken).not.toHaveBeenCalled();
+  });
+
+  it("refuses an account state with the prefix removed on the install path", async () => {
+    const { path, search } = await visit(
+      account({ state: signAccountState("u1").slice("acct.".length) }),
+    );
+    expect(path).toBe("/projects");
+    expect(search).toBe("?github=expired");
+    expect(mockUserToken).not.toHaveBeenCalled();
+  });
+
+  it("fails with no code, and on a GitHub failure logs no code", async () => {
+    const { search } = await visit({ state: signAccountState("u1") });
+    expect(search).toBe("?tab=connected&github=failed");
+
+    mockUserToken.mockRejectedValue(new Error("refused"));
+    const second = await visit(account());
+    expect(second.search).toBe("?tab=connected&github=failed");
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain(
       "the-code",
     );

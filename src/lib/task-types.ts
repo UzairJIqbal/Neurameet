@@ -1,8 +1,17 @@
 // Task and proposal shapes for the routes and the UI (no server-only imports).
 
-import type { TaskStatus } from "@/lib/tasks";
-import type { TaskPrLink } from "@/lib/github-types";
+import type { TaskPriority, TaskStatus } from "@/lib/tasks";
+import type { PrState, TaskPrLink } from "@/lib/github-types";
 import type { Outcome } from "@/lib/proof-types";
+
+/** One PR on a board card. Never sent to a Viewer. */
+export interface TaskPrRef {
+  repoFullName: string;
+  prNumber: number;
+  prUrl: string;
+  state: PrState;
+  reverted: boolean;
+}
 
 export interface Task {
   id: string;
@@ -11,6 +20,7 @@ export interface Task {
   title: string;
   description: string | null;
   status: TaskStatus;
+  priority: TaskPriority;
   position: number;
   assigneeId: string | null;
   assigneeName: string | null;
@@ -26,6 +36,25 @@ export interface Task {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** Board rows only. */
+  meetingTitle?: string | null;
+  /** Board rows only, and never for a Viewer. */
+  commentCount?: number;
+  prRefs?: TaskPrRef[];
+}
+
+/** A row on My Tasks: your own task, with the project it lives in. */
+export interface MyTask extends Task {
+  projectId: string;
+  projectName: string;
+}
+
+export interface MyTasksResponse {
+  /** The server's date, so Overdue never depends on the browser's clock. */
+  today: string;
+  tasks: MyTask[];
+  /** True when you have more open tasks than the cap. */
+  truncated: boolean;
 }
 
 export type TaskEventKind =
@@ -39,7 +68,8 @@ export type TaskEventKind =
   | "reopened_by_revert"
   | "pr_linked"
   | "pr_state_changed"
-  | "proposal_merged";
+  | "proposal_merged"
+  | "commented";
 
 export interface TaskEvent {
   id: string;
@@ -60,12 +90,48 @@ export interface TaskProofChain {
   quoteLine?: number | null;
 }
 
+/** Plain text. Never sent to a Viewer. */
+export interface TaskComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface TaskCommit {
+  /** The first 7 characters of the sha. */
+  sha: string;
+  /** The first line of the commit message. */
+  message: string;
+  authorLogin: string | null;
+  url: string;
+}
+
+export interface TaskPrCommits {
+  repoFullName: string;
+  prNumber: number;
+  commits: TaskCommit[];
+}
+
+export interface TaskCommitsResponse {
+  pullRequests: TaskPrCommits[];
+}
+
+export interface TaskCommentResponse {
+  comment: TaskComment;
+}
+
 export interface TaskDetailResponse {
+  projectId: string;
   task: Task;
   events: TaskEvent[];
   prLinks: TaskPrLink[];
   proofChain: TaskProofChain;
   outcome?: Outcome;
+  /** Latest first. Both absent for a Viewer. */
+  comments?: TaskComment[];
+  commentsTruncated?: boolean;
 }
 
 export interface TasksResponse {
@@ -114,6 +180,7 @@ export interface ReviewProposalInput {
   dueDate?: string | null;
   mergeIntoTaskId?: string;
   confirmWithoutQuote?: boolean;
+  priority?: TaskPriority;
 }
 
 export interface ReviewProposalResponse {
@@ -128,6 +195,7 @@ export interface TaskPatchInput {
   title?: string;
   description?: string | null;
   dueDate?: string | null;
+  priority?: TaskPriority;
   completionEvidence?: string;
   ifVersion: number;
 }

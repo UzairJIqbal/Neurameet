@@ -15,6 +15,11 @@ const isProtectedRoute = createRouteMatcher([
 	"/invite(.*)",
 	"/ai-chat",
 	"/settings",
+	"/my-tasks(.*)",
+	"/notifications(.*)",
+	"/search(.*)",
+	"/prep(.*)",
+	"/profile(.*)",
 ]);
 
 const isPublicRoute = createRouteMatcher([

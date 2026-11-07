@@ -2,6 +2,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getTaskPrefix } from "@/lib/project-select";
 import {
+  notifyKeptSuggestions,
+  notifyMergeCompleted,
+  notifyPrReviewRequested,
+  notifyRevertReopened,
+} from "@/lib/notification-events";
+import {
   closingKeys,
   findKeys,
   isRevert,
@@ -106,6 +112,7 @@ function snapshotFromPull(pr: GitHubPull, repoId: number): PrSnapshot {
     // A null head repo means the fork was deleted, so it counts as a fork.
     fromFork: pr.head.repo?.id !== repoId,
     updatedAt: pr.updated_at,
+    authorLogin: pr.user?.login ?? null,
   };
 }
 
@@ -156,7 +163,10 @@ async function applyRevert(
       p_by_pr: pr.number,
     });
     if (error) throw error;
-    if (data === "reopened") result.reopened++;
+    if (data === "reopened") {
+      result.reopened++;
+      await notifyRevertReopened(supabase, link.task_id, pr.number);
+    }
   }
 }
 
@@ -238,6 +248,7 @@ async function refreshMergedLink(
         repo_full_name: repo.full_name,
         pr_title: pr.title,
         pr_url: pr.url,
+        pr_author_login: pr.authorLogin,
         pr_updated_at: pr.updatedAt,
         last_synced_at: new Date().toISOString(),
       })
@@ -269,6 +280,7 @@ async function refreshOpenLink(
       repo_full_name: repo.full_name,
       pr_title: pr.title,
       pr_url: pr.url,
+      pr_author_login: pr.authorLogin,
       state: pr.state,
       closes,
       from_fork: pr.fromFork,
@@ -312,6 +324,7 @@ async function insertLink(
         pr_number: pr.number,
         pr_title: pr.title,
         pr_url: pr.url,
+        pr_author_login: pr.authorLogin,
         state: pr.state,
         closes,
         from_fork: pr.fromFork,
@@ -474,7 +487,13 @@ async function completeTasks(
       p_task: taskId,
     });
     if (error) throw error;
-    if (data === "completed") result.completed++;
+    if (data === "completed") {
+      result.completed++;
+      await notifyMergeCompleted(supabase, taskId);
+    }
+    if (data === "completed" || data === "already_completed") {
+      await notifyKeptSuggestions(supabase, taskId);
+    }
   }
 }
 
@@ -538,7 +557,7 @@ async function loadPayloadRepo(
   return live.has(repo.installation_id) ? repo : null;
 }
 
-async function liveInstallationIds(
+export async function liveInstallationIds(
   supabase: SupabaseClient,
   ids: number[],
 ): Promise<Set<number>> {
@@ -563,12 +582,40 @@ export type WebhookPayload = {
   pull_request?: GitHubPull;
   repository?: { id: number; full_name: string; default_branch: string };
   repositories_removed?: Array<{ id: number }>;
+  // Only on `review_requested` for a person; a team request has `requested_team`.
+  requested_reviewer?: { id?: number } | null;
 };
+
+// AC-71b: tells the reviewer and returns. It moves no task and needs no link.
+async function handleReviewRequested(
+  supabase: SupabaseClient,
+  payload: WebhookPayload,
+): Promise<"processed" | "ignored"> {
+  const {
+    pull_request: pr,
+    repository,
+    requested_reviewer: reviewer,
+  } = payload;
+  if (!pr || !repository || !reviewer?.id) return "ignored";
+  const row = await loadPayloadRepo(supabase, repository.id);
+  if (!row) return "ignored";
+  await notifyPrReviewRequested(supabase, {
+    projectId: row.project_id,
+    repoId: row.repo_id,
+    repoFullName: repository.full_name,
+    prNumber: pr.number,
+    githubUserId: reviewer.id,
+  });
+  return "processed";
+}
 
 async function handlePullRequest(
   supabase: SupabaseClient,
   payload: WebhookPayload,
 ): Promise<"processed" | "ignored"> {
+  if (payload.action === "review_requested") {
+    return handleReviewRequested(supabase, payload);
+  }
   const { action, pull_request: pr, repository } = payload;
   if (!action || !HANDLED_PR_ACTIONS.has(action) || !pr || !repository) {
     return "ignored";
@@ -674,6 +721,7 @@ type SyncRun = {
   seen: Set<string>;
   now: () => number;
   startedAt: number;
+  maxMs: number;
 };
 
 const prId = (repoId: number, number: number): string => `${repoId}#${number}`;
@@ -682,7 +730,7 @@ const prId = (repoId: number, number: number): string => `${repoId}#${number}`;
 function outOfBudget(run: SyncRun): boolean {
   if (
     run.result.prsRead < SYNC_MAX_PRS &&
-    run.now() - run.startedAt < SYNC_MAX_MS
+    run.now() - run.startedAt < run.maxMs
   ) {
     return false;
   }
@@ -816,12 +864,14 @@ async function syncOpenLinks(
 export async function syncProject(
   supabase: SupabaseClient,
   projectId: string,
-  now: () => number = Date.now,
+  opts: { now?: () => number; maxMs?: number } = {},
 ): Promise<GitHubSyncResult> {
+  const now = opts.now ?? Date.now;
   const run: SyncRun = {
     supabase,
     now,
     startedAt: now(),
+    maxMs: opts.maxMs ?? SYNC_MAX_MS,
     seen: new Set(),
     result: {
       repos: 0,

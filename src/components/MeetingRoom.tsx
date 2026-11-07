@@ -29,6 +29,7 @@ import {
   LayoutList,
   ListVideo,
   RefreshCw,
+  Hand,
   Smile,
   Users,
   User,
@@ -1149,6 +1150,27 @@ const MeetingRoom = ({
               </span>
             </button>
           )}
+
+          {/* AC-70x: Raise hand is call.sendReaction with Stream's own raised-hand
+              type and :raise-hand: code; each tile shows it through the same
+              ParticipantView overlay as the emoji reactions. The project call
+              type copies the default grants, so members keep create-call-reaction. */}
+          <button
+            type="button"
+            onClick={() =>
+              call?.sendReaction({
+                type: "raised-hand",
+                emoji_code: ":raise-hand:",
+              })
+            }
+            aria-label="Raise hand"
+            className="flex cursor-pointer items-center gap-2 rounded-xl bg-inverse-surface px-3 py-2 text-inverse-on-surface hover:bg-inverse-on-surface/10 sm:px-4"
+          >
+            <Hand size={20} className="text-inverse-on-surface" aria-hidden />
+            <span className="hidden text-body-md text-inverse-on-surface sm:inline">
+              Raise hand
+            </span>
+          </button>
 
           {/* Reactions: tokened control opening an emoji picker that sends via
               call.sendReaction. Reuses Stream's defaultEmojiReactionMap for the

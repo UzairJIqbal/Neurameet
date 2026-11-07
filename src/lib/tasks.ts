@@ -11,6 +11,7 @@ export const EMBED_TIMEOUT_MS = 10_000;
 
 export const TASK_TITLE_MAX = 200;
 export const TASK_DESCRIPTION_MAX = 5000;
+export const TASK_COMMENT_MAX = 2000;
 /** A drop gap smaller than this makes the server renumber the column. */
 export const POSITION_MIN_GAP = 1e-6;
 
@@ -25,9 +26,9 @@ export const TASK_STATUSES = [
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: "To do",
-  in_progress: "In progress",
-  in_review: "In review",
+  todo: "To Do",
+  in_progress: "In Progress",
+  in_review: "In Review",
   completed: "Completed",
   blocked: "Blocked",
 };
@@ -35,6 +36,24 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 export function isTaskStatus(value: unknown): value is TaskStatus {
   return (
     typeof value === "string" && TASK_STATUSES.includes(value as TaskStatus)
+  );
+}
+
+// AC-70o: a person sets priority. The AI never guesses one.
+export const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  urgent: "Urgent",
+};
+
+export function isTaskPriority(value: unknown): value is TaskPriority {
+  return (
+    typeof value === "string" && TASK_PRIORITIES.includes(value as TaskPriority)
   );
 }
 

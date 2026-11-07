@@ -11,6 +11,8 @@ type LoadErrorProps = {
   onBack?: () => void;
   listHref?: string;
   listLabel?: string;
+  /** For a small card: no large padding or icon, and Retry only. */
+  compact?: boolean;
 };
 
 /**
@@ -25,9 +27,27 @@ export const LoadError = ({
   onBack,
   listHref,
   listLabel,
+  compact = false,
 }: LoadErrorProps) => {
   const router = useRouter();
   const back = onBack ?? (() => router.push("/dashboard"));
+
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-error-container bg-error-container/40 px-3 py-2">
+        <p className="text-body-md text-on-error-container">{message}</p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container"
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-error-container bg-error-container/40 px-6 py-16 text-center">

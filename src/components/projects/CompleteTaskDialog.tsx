@@ -25,7 +25,10 @@ const CompleteTaskDialog = ({ taskKey, busy, onCancel, onConfirm }: Props) => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onCancel();
+      if (e.key !== "Escape") return;
+      // The task drawer behind this dialog closes on Escape too.
+      e.stopPropagation();
+      if (!busy) onCancel();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);

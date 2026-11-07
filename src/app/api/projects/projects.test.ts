@@ -7,6 +7,10 @@ const { mockAuth, mockGetUserList, mockOffboard } = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: vi.fn(),
+}));
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mockAuth,
   clerkClient: async () => ({ users: { getUserList: mockGetUserList } }),
@@ -93,6 +97,10 @@ describe("POST /api/projects", () => {
     [{ name: "x".repeat(81), taskPrefix: "NM" }],
     [{ name: "Core", taskPrefix: "nm1" }],
     [{ name: "Core", taskPrefix: "ABCDEF" }],
+    [{ name: "Core", taskPrefix: "NM", color: "#ff0000" }],
+    [{ name: "Core", taskPrefix: "NM", icon: "skull" }],
+    [{ name: "Core", taskPrefix: "NM", projectType: "game" }],
+    [{ name: "Core", taskPrefix: "NM", description: "x".repeat(501) }],
   ])("rejects %j with 422 and creates nothing", async (body) => {
     const res = await createProject(req(body));
     expect(res.status).toBe(422);
@@ -107,26 +115,124 @@ describe("POST /api/projects", () => {
   });
 });
 
+describe("POST /api/projects details", () => {
+  const created = {
+    id: P,
+    name: "Core",
+    task_prefix: "NM",
+    created_at: "2026-11-03",
+  };
+
+  it("gives a name only project the defaults, with no second write", async () => {
+    queue("rpc:create_project", ok(created));
+    const res = await createProject(req({ name: "Core", taskPrefix: "NM" }));
+    expect((await res.json()).project).toMatchObject({
+      status: "active",
+      projectType: "other",
+      icon: "folder",
+      color: "primary",
+      description: null,
+    });
+    expect(callsOf("projects", "update")).toHaveLength(0);
+  });
+
+  it("stores the details and never takes a status", async () => {
+    queue("rpc:create_project", ok(created));
+    const res = await createProject(
+      req({
+        name: "Core",
+        taskPrefix: "NM",
+        description: " Web work ",
+        projectType: "web",
+        icon: "rocket",
+        color: "warning",
+        status: "completed",
+      }),
+    );
+    expect(res.status).toBe(201);
+    expect((await res.json()).project).toMatchObject({
+      status: "active",
+      projectType: "web",
+      icon: "rocket",
+      color: "warning",
+      description: "Web work",
+    });
+    expect(callsOf("projects", "update")[0].args[0]).toEqual({
+      description: "Web work",
+      project_type: "web",
+      icon: "rocket",
+      color: "warning",
+    });
+  });
+
+  it("still returns 201 with the defaults when the details fail", async () => {
+    queue("rpc:create_project", ok(created));
+    queue("projects", { data: null, error: { message: "boom" } });
+    const res = await createProject(
+      req({ name: "Core", taskPrefix: "NM", icon: "rocket" }),
+    );
+    expect(res.status).toBe(201);
+    expect((await res.json()).project.icon).toBe("folder");
+  });
+});
+
 describe("GET /api/projects", () => {
-  it("lists your active projects with role and member count", async () => {
+  const membership = {
+    role: "developer",
+    projects: {
+      id: P,
+      name: "Core",
+      task_prefix: "NM",
+      created_at: "2026-11-01",
+      updated_at: "2026-11-02",
+      description: "The core",
+      status: "planning",
+      project_type: "web",
+      icon: "code",
+      color: "success",
+    },
+  };
+  const members = [
+    { project_id: P, user_id: "o1", role: "owner", joined_at: "2026-11-01" },
+    {
+      project_id: P,
+      user_id: "u1",
+      role: "developer",
+      joined_at: "2026-11-02",
+    },
+    { project_id: P, user_id: "u2", role: "viewer", joined_at: "2026-11-03" },
+  ];
+
+  it("lists your active projects as cards, one query per concern", async () => {
+    queue("project_members", ok([membership]), ok(members));
     queue(
-      "project_members",
+      "rpc:project_task_counts",
+      ok([
+        { project_id: P, status: "todo", total: "3", overdue: "1" },
+        { project_id: P, status: "completed", total: "1", overdue: "0" },
+      ]),
+    );
+    queue(
+      "github_repos",
       ok([
         {
-          role: "developer",
-          projects: {
-            id: P,
-            name: "Core",
-            task_prefix: "NM",
-            created_at: "2026-11-01",
-          },
+          project_id: P,
+          full_name: "acme/secret",
+          private: true,
+          linked_at: "2026-11-01",
         },
       ]),
-      ok([{ project_id: P }, { project_id: P }, { project_id: P }]),
+    );
+    queue(
+      "meetings",
+      ok([
+        { project_id: P, title: "Soonest", started_at: "2026-12-01T10:00:00Z" },
+        { project_id: P, title: "Later", started_at: "2026-12-02T10:00:00Z" },
+      ]),
     );
     const res = await listProjects();
     expect(res.status).toBe(200);
-    expect((await res.json()).projects).toEqual([
+    expect((await res.json()).projects).toMatchObject([
       {
         id: P,
         name: "Core",
@@ -134,29 +240,116 @@ describe("GET /api/projects", () => {
         role: "developer",
         memberCount: 3,
         createdAt: "2026-11-01",
+        status: "planning",
+        projectType: "web",
+        icon: "code",
+        color: "success",
+        repo: { connected: true, name: "acme/secret" },
+        taskTotal: 4,
+        taskCompleted: 1,
+        nextMeeting: { title: "Soonest" },
       },
     ]);
     expect(callsOf("project_members", "is")[0].args).toEqual([
       "removed_at",
       null,
     ]);
+    expect(callsOf("rpc:project_task_counts", "rpc")).toHaveLength(1);
+  });
+
+  it("hides a private repo name from a Viewer's card", async () => {
+    queue(
+      "project_members",
+      ok([{ ...membership, role: "viewer" }]),
+      ok(members),
+    );
+    queue(
+      "github_repos",
+      ok([
+        {
+          project_id: P,
+          full_name: "acme/secret",
+          private: true,
+          linked_at: "2026-11-01",
+        },
+      ]),
+    );
+    const res = await listProjects();
+    const body = await res.json();
+    expect(body.projects[0].repo).toEqual({ connected: true, name: null });
+    expect(JSON.stringify(body)).not.toContain("acme/secret");
+  });
+
+  it("returns an empty list without counting anything", async () => {
+    queue("project_members", ok([]));
+    const res = await listProjects();
+    expect((await res.json()).projects).toEqual([]);
+    expect(callsOf("rpc:project_task_counts", "rpc")).toHaveLength(0);
   });
 });
 
 describe("GET /api/projects/[id]", () => {
+  const row = {
+    id: P,
+    name: "Core",
+    task_prefix: "NM",
+    created_at: "2026-11-01",
+  };
+
   it("returns the project to a member with counts", async () => {
     role("viewer");
+    queue("projects", ok(row));
     queue(
-      "projects",
-      ok({ id: P, name: "Core", task_prefix: "NM", created_at: "2026-11-01" }),
+      "project_members",
+      ok([
+        { project_id: P, user_id: "o1", role: "owner", joined_at: "1" },
+        { project_id: P, user_id: "u1", role: "viewer", joined_at: "2" },
+      ]),
     );
-    queue("project_members", { data: null, error: null, count: 4 });
     queue("meetings", { data: null, error: null, count: 2 });
     const res = await getProject(req(undefined, "GET"), idParams);
     expect(res.status).toBe(200);
     expect((await res.json()).project).toMatchObject({
       role: "viewer",
-      memberCount: 4,
+      memberCount: 2,
+      meetingCount: 2,
+      status: "active",
+      linkedPrCount: null,
+      github: { connected: false, repos: [] },
+    });
+  });
+
+  it("gives a Viewer public repos only, and connected stays true", async () => {
+    role("viewer");
+    queue("projects", ok(row));
+    queue(
+      "github_repos",
+      ok([
+        { project_id: P, full_name: "a/secret", private: true, linked_at: "1" },
+        { project_id: P, full_name: "a/open", private: false, linked_at: "2" },
+      ]),
+    );
+    const res = await getProject(req(undefined, "GET"), idParams);
+    const body = await res.json();
+    expect(body.project.github.connected).toBe(true);
+    expect(body.project.github.repos).toEqual([
+      { fullName: "a/open", private: false },
+    ]);
+    expect(JSON.stringify(body)).not.toContain("a/secret");
+  });
+
+  it("blanks only the task counts when they fail", async () => {
+    role("owner");
+    queue("projects", ok(row));
+    queue("rpc:project_task_counts", {
+      data: null,
+      error: { message: "boom" },
+    });
+    queue("meetings", { data: null, error: null, count: 2 });
+    const res = await getProject(req(undefined, "GET"), idParams);
+    expect(res.status).toBe(200);
+    expect((await res.json()).project).toMatchObject({
+      taskTotals: null,
       meetingCount: 2,
     });
   });
@@ -180,6 +373,30 @@ describe("PATCH /api/projects/[id]", () => {
     expect(callsOf("projects", "update")[0].args[0]).toMatchObject({
       name: "New name",
     });
+  });
+
+  it("updates only the details you send", async () => {
+    role("owner");
+    const res = await renameProject(
+      req({ status: "on_hold", color: "tertiary" }, "PATCH"),
+      idParams,
+    );
+    expect(res.status).toBe(200);
+    const update = callsOf("projects", "update")[0].args[0];
+    expect(update).toMatchObject({ status: "on_hold", color: "tertiary" });
+    expect(update).not.toHaveProperty("name");
+  });
+
+  it.each([
+    [{ status: "paused" }],
+    [{ color: "#123456" }],
+    [{ icon: "skull" }],
+    [{}],
+  ])("rejects %j with 422", async (body) => {
+    role("owner");
+    const res = await renameProject(req(body, "PATCH"), idParams);
+    expect(res.status).toBe(422);
+    expect(callsOf("projects", "update")).toHaveLength(0);
   });
 
   it("refuses a prefix change with 422", async () => {
@@ -271,10 +488,13 @@ describe("GET /api/projects/[id]/members", () => {
         { user_id: "u1", role: "owner", joined_at: "2026-11-01" },
       ]),
     );
+    queue("tasks", ok([{ assignee_id: "u1" }, { assignee_id: "u1" }]));
+    queue("user_settings", ok([{ user_id: "u1", github_login: "ada-k" }]));
     mockGetUserList.mockResolvedValue({
       data: [
         {
           id: "u1",
+          imageUrl: "https://img/ada.png",
           firstName: "Ada",
           lastName: "Khan",
           username: null,
@@ -292,6 +512,9 @@ describe("GET /api/projects/[id]/members", () => {
         joinedAt: "2026-11-01",
         name: "Ada Khan",
         email: "ada@x.io",
+        imageUrl: "https://img/ada.png",
+        githubLogin: "ada-k",
+        openTaskCount: 2,
       },
       {
         userId: "u2",
@@ -299,6 +522,9 @@ describe("GET /api/projects/[id]/members", () => {
         joinedAt: "2026-11-02",
         name: "Unknown member",
         email: null,
+        imageUrl: null,
+        githubLogin: null,
+        openTaskCount: 0,
       },
     ]);
   });
@@ -409,7 +635,10 @@ describe("DELETE /api/projects/[id]/members/[userId]", () => {
   it("removes a member from live project calls after the removal is saved", async () => {
     role("admin");
     role("developer");
-    const res = await removeMember(req(undefined, "DELETE"), memberParams("u2"));
+    const res = await removeMember(
+      req(undefined, "DELETE"),
+      memberParams("u2"),
+    );
     expect(res.status).toBe(200);
     expect(mockOffboard).toHaveBeenCalledWith(expect.anything(), P, "u2");
   });

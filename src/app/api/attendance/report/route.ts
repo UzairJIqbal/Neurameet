@@ -2,8 +2,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import type { AttendanceRow, MeetingDetailData } from "@/lib/meeting-types";
-import { generateAttendancePdf } from "@/lib/attendance-pdf";
+import type { AttendanceRow } from "@/lib/meeting-types";
+import { generateAttendancePdf, type ReportMeeting } from "@/lib/attendance-pdf";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 
 export const runtime = "nodejs";
@@ -95,16 +95,11 @@ export async function GET(request: Request) {
     }
 
     const m = meeting as MeetingRow;
-    const meetingData: MeetingDetailData = {
-      id: m.id,
+    const meetingData: ReportMeeting = {
       title: m.title,
       status: m.status,
-      streamCallId: "",
       startedAt: m.started_at,
-      endedAt: m.ended_at,
       createdAt: m.created_at,
-      user_id: m.user_id,
-      guestAdmissionMode: "approval",
     };
 
     const attendance: AttendanceRow[] = (rows as AttendanceDbRow[]).map((r) => ({

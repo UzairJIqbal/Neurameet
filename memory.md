@@ -1,50 +1,48 @@
-# Memory — Phase W, Step W2 invitations (done, on main)
+# Memory — Phase W Step W8, workspace shell
 
-Last updated: 2026-11-03
+Last updated: 2026-11-08
 
 ## What was built
 
-- W2 built from `prompts/step-W2-invitations.md` (approved). Commit `05fca83`, pushed straight to `main`. Working tree clean.
-  - SQL `supabase/schema.sql` (W2 block): tables `project_invitations`, `project_join_requests`; 4 indexes; rpc `upsert_project_member`, `create_project_invitation`, `accept_email_invitation`, `request_project_join`, `revoke_project_invitation`, `decide_join_request`.
-  - Server lib `src/lib/invitations.ts` (token hashing, expiry, email binding, rate limit, email budget, Clerk caller profile).
-  - Routes: `src/app/api/projects/[id]/invitations/` (POST, GET, `[invitationId]` DELETE), `src/app/api/invitations/preview` (GET), `src/app/api/invitations/accept` (POST), `src/app/api/projects/[id]/join-requests/` (GET, `[requestId]` POST).
-  - Email: `sendProjectInviteEmail` + `workspaceEmailConfigured` in `src/lib/email.ts`, gated on `RESEND_WORKSPACE_FROM`.
-  - UI: `src/components/projects/InviteDialog.tsx`, `InvitesPanel.tsx` (inside MembersTab, Owner/Admin only), `InviteView.tsx`, page `src/app/(root)/(home)/invite/[token]/page.tsx`.
-  - `/invite(.*)` added to `isProtectedRoute` in `src/middleware.ts`; `headers()` in `next.config.ts` sets `Referrer-Policy: no-referrer` on `/invite/:path*`.
-  - Client functions in `src/lib/project-client.ts`; types and `inviteRoleOptions` / `canManageInvites` in `project-types.ts`.
-  - Tests: `src/lib/invitations.test.ts`, `src/app/api/invitations/invitations.test.ts`, `src/components/projects/invites-ui.test.tsx`.
-- AGENTS.md API Contracts gained `GET /api/invitations/preview` (returns projectId only when already a member).
-- Docs updated: progress-tracker (W2 DONE), build-plan (W2 ✅), scope (W2 ticked), ui-registry (Invitations section).
+W8 code is built in 21 slices (all uncommitted), spec `docs/specs/0004-conversations-to-code/0004-workspace-shell.md` (still In Progress), prompt `prompts/step-W8-workspace-shell.md`.
+
+- Data and server: notifications migration (applied live to the NeuraMeet Supabase project), `notify` library and routes (`/api/notifications`, `/api/notifications/read`), `/api/my-counts`, `/api/my-tasks`, `/api/settings/notifications`, `/api/settings/github`, `/api/cron/daily` with `vercel.json`, `/api/projects/search`, task comments and commits routes, invitations mine routes.
+- Shell: new Sidebar and Navbar header (breadcrumbs, bell, Help, profile menu), `src/components/shell/` (CommandPalette, DashboardCards, MyTasksPage, NotificationsPage, NotificationBell, HelpDialog, ShellContext), success and warning tokens.
+- Projects: My Projects, project header and tabs (Overview, Tasks Board and List, Members with `AddMembersDialog`, Meetings, GitHub, Decisions, Activity, AI Assistant, Settings), invite page, task drawer with comments.
+- Personal views: My Tasks, My Dashboard (`DashboardContent` rewrite), My Meetings (`MeetingList` with project filter), `/search?q=`.
+- Meeting room: Raise hand (one shot reaction). Auth: shared `AuthLayout` redesign (50/50 split, Proof Chain staircase).
+- Docs: `context/ui-registry.md` (AddMembersDialog replaces InviteDialog, shell rows, AuthLayout row), `context/progress-tracker.md` W8 line, `docs/scope/scope.md` feature 26 build boxes ticked. `tests/w-test/w2-invitations.spec.ts` rewritten for `AddMembersDialog`.
 
 ## Decisions made
 
-- W2 SQL functions are invoker (like W1), not security definer; execute granted to service_role only.
-- A pending join request short circuits only for link invites.
-- Default invite role in the dialog is Developer; Admin only for the Owner on email invites; links never grant Admin.
-- Audit names for joining: `member.joined` / `member.restored`. Email budget counts `invite.emailed` audit rows (60 a day) until W8 adds notifications.
+- Projects, members, roles and invites stay in our own Supabase tables, not Clerk Organizations. The PDF is layout only; locked Stitch tokens stay.
+- Resend invite route returns 403 "Only the owner can invite an Admin". The invited email is never returned. No team names for link or non matching invites.
+- Viewer rules: no quotes, no comment counts, no PR refs, `task.commented` hidden from Viewer activity.
+- My Tasks uses a base select with no quotes for any role. Overdue is judged against the server `today`. "Due this week" is today plus 6 days.
+- Dashboard keeps Join, Schedule and Upload as a secondary row. Scheduled meetings sit under Upcoming in MeetingList. Delete on project meetings is Owner only.
+- Palette Projects match name in memory. Palette meetings and decisions are scoped to active projects plus your own personal rows.
+- Raise hand is a one shot reaction, no persistent hand state. No new `position: fixed` (ui-rules).
+- Auth pages reuse `AuthLayout` and keep existing forms.
 
 ## Problems solved
 
-- `src/middleware.ts` uses CRLF line endings; python rewrites convert them. Restore CRLF after editing or the diff balloons.
-- eslint on bracket paths: run with `-f json` and filter; prettier `--write` fixes the formatting errors.
-- No `timeout` command on this Mac.
-- Smoke testing SQL live: use a `do $$ ... raise exception 'SMOKE_OK' $$` block so everything rolls back (insert a temp project inside it; there are no projects live yet).
+- tsc caught a bug in `MeetingModel.tsx` (instant meeting `details`), fixed.
+- BSD `xargs` has no `-a`; use `tr '\n' '\0' | xargs -0`. `eslint --fix` fixes prettier only in files without the `eslint-disable prettier/prettier` header.
+- Vacuous `callsOf` test assertions replaced with real ones.
 
 ## Current state
 
-- W2 SQL applied live to `lsjiwxohfpzdvenbxpeu` as migration `w2_invitations` and verified (RLS on, anon cannot read tables or run functions, rollback smoke test of every function passed, no data left).
-- Tests 839/839, tsc clean, lint clean on changed files, `npm run build` passes.
-- Not yet done: the two account manual test of W2 (steps at the end of `prompts/step-W2-invitations.md`). Without `RESEND_WORKSPACE_FROM`, every email invite shows "Email not sent, copy the link" (expected).
-- Carried gaps: Viewer sees an empty action item list until W4; guests on project calls until W3; freezeAttesters, seal `owner_id`, live events still use the creator id.
-- LL5 and Tasdeeq live runs still owed (W-pre).
+Checks before the last doc edits: vitest 149 files and 1611 tests pass, `npx tsc --noEmit` clean, `npm run build` passes, eslint 0 errors and 7 warnings (unused vars and one exhaustive-deps, plus unused disable directives). Nothing committed or pushed. Spec W8 not yet Accepted, Verify and Test boxes not ticked. The architect cross check did not run. Earlier open items: Tasdeeq live run needs signing key env values, LL5 live run, W-pre commit.
 
 ## Next session starts with
 
-1. Ask whether the W2 two account manual test passed; fix anything found.
-2. Step W3, project meetings + consent notice: write `prompts/step-W3-...md` from `docs/specs/0004-conversations-to-code/` (W3 child spec), get approval, build.
+1. Ask before committing W8 (and the earlier in flight work), then commit to main (no branches or PRs).
+2. Run `/check verify workspace shell` with a live browser pass against the ACs.
+3. Add `.env.example` lines `RESEND_WORKSPACE_FROM=` and `CRON_SECRET=` (earlier edit was denied) and set both in Vercel at Deploy.
+4. Then Step W9 (security suite and bilingual end to end run).
 
 ## Open questions
 
-- by-call DELETE Owner only on project meetings was confirmed by the user; the by-call GET returning `{ meetingId }` was not explicitly confirmed.
-- When to do the LL5 and Tasdeeq live runs.
-- Rules that hold: work on `main` and push there, no branches or PRs; ask before commit/push; SQL to live Supabase only with explicit OK; never read or touch `.env` files; plain words, no dashes; end reports with a 2 line summary.
+- GitHub App permission for `GET /repos/{owner}/{repo}/pulls/{n}/commits`: if it needs more, hide "Show commits" rather than widen the App.
+- Unverified live: `GET /user` for account connect, `requested_reviewer.id` in `review_requested` payload, and the `project` call type `create-call-reaction` grant for members (run the Stream check).
+- Run the optional architect cross check on the W8 spec?

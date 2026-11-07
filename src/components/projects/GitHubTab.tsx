@@ -64,7 +64,15 @@ const RepoRow = ({
 );
 
 // Owner only: connect the GitHub App and choose which repos feed this project.
-const GitHubTab = ({ project }: { project: ProjectDetail }) => {
+const GitHubTab = ({
+  project,
+  connected = true,
+  onChanged,
+}: {
+  project: ProjectDetail;
+  connected?: boolean;
+  onChanged?: () => void;
+}) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -125,6 +133,7 @@ const GitHubTab = ({ project }: { project: ProjectDetail }) => {
       else await unlinkGitHubRepo(project.id, repo.repoId);
       toast.success(action === "link" ? `Linked ${repo.fullName}` : `Unlinked ${repo.fullName}`);
       reload();
+      onChanged?.();
     } catch (err) {
       toast.error(errorText(err, `Failed to ${action} the repository`));
     } finally {
@@ -141,6 +150,7 @@ const GitHubTab = ({ project }: { project: ProjectDetail }) => {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6">
+        {!connected && <p className="text-body-md text-on-surface">GitHub is not connected.</p>}
         <h2 className="text-headline-sm font-semibold text-on-surface">Connect GitHub</h2>
         <p className="text-body-md text-on-surface-variant">
           Name a task key like {project.taskPrefix}-12 in a pull request and the task follows it. Merging a PR with

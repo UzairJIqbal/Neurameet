@@ -2,6 +2,12 @@
 import { PDFDocument, StandardFonts, PDFFont, rgb } from "pdf-lib";
 import type { AttendanceRow, MeetingDetailData } from "@/lib/meeting-types";
 
+/** Only what the report prints. */
+export type ReportMeeting = Pick<
+  MeetingDetailData,
+  "title" | "status" | "startedAt" | "createdAt"
+>;
+
 const PAGE_W = 612; // US Letter, points
 const PAGE_H = 792;
 const MARGIN = 40;
@@ -69,7 +75,7 @@ function fit(text: string, width: number, font: PDFFont, size: number): string {
  * binary PDF.
  */
 export function buildReportRows(
-  _meeting: MeetingDetailData,
+  _meeting: ReportMeeting,
   rows: AttendanceRow[],
 ): { headers: string[]; lines: string[][] } {
   const headers = COLUMNS.map((c) => c.label);
@@ -97,7 +103,7 @@ function toFontSafe(text: string, supported: ReadonlySet<number>): string {
 }
 
 export async function generateAttendancePdf(
-  meeting: MeetingDetailData,
+  meeting: ReportMeeting,
   rows: AttendanceRow[],
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();

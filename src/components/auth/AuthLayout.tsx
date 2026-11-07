@@ -2,9 +2,10 @@
 
 import React from "react";
 import {
+  IconChecklist,
+  IconCircleCheck,
+  IconGitPullRequest,
   IconVideo,
-  IconSparkles,
-  IconSearch,
 } from "@tabler/icons-react";
 
 interface AuthLayoutProps {
@@ -12,49 +13,57 @@ interface AuthLayoutProps {
   variant: "sign-in" | "sign-up";
 }
 
-interface WalkthroughStep {
+interface ChainCard {
   icon: typeof IconVideo;
+  kind: string;
   title: string;
-  description: string;
+  detail: string;
 }
 
 interface AuthVariantContent {
   heading: string;
   sub: string;
-  steps: WalkthroughStep[];
 }
 
-const steps: WalkthroughStep[] = [
+// The Proof Chain, one card per link. Each card is nudged right a little more
+// than the one above so the stack reads as a staircase (UI Overview, Sign In).
+const chain: ChainCard[] = [
   {
     icon: IconVideo,
-    title: "Host or join a meeting",
-    description:
-      "Start a call in NeuraMeet or join with a link. Video runs on Stream's real-time infrastructure.",
+    kind: "Meeting",
+    title: "Sprint Planning",
+    detail: 'Ali: "I\'ll take the Login API."',
   },
   {
-    icon: IconSparkles,
-    title: "We process it automatically",
-    description:
-      "Groq Whisper transcribes the audio in English and Urdu; Gemini and Groq generate the summary, action items, and category.",
+    icon: IconChecklist,
+    kind: "Task",
+    title: "ECP-15 Implement Login API",
+    detail: "Assigned to Ali Hassan · Issue #42",
   },
   {
-    icon: IconSearch,
-    title: "Explore and act",
-    description:
-      "Browse a searchable history, download attendance, track follow-ups, and chat with any meeting's content.",
+    icon: IconGitPullRequest,
+    kind: "Pull request",
+    title: "PR #51 Add authentication endpoints",
+    detail: "3 commits · review requested",
+  },
+  {
+    icon: IconCircleCheck,
+    kind: "Evidence",
+    title: "Task completed when PR merges",
+    detail: "Issue closed automatically",
   },
 ];
 
+const OFFSETS = ["ml-0", "ml-4", "ml-8", "ml-12"];
+
 const variantContent: Record<"sign-in" | "sign-up", AuthVariantContent> = {
-  "sign-up": {
-    heading: "From call to clarity in three steps",
-    sub: "No manual note taking. NeuraMeet does the work the moment the call ends.",
-    steps,
-  },
   "sign-in": {
-    heading: "Welcome back",
-    sub: "Your meetings, notes, and follow-ups are right where you left them.",
-    steps,
+    heading: "Connect what your team discusses with what it ships.",
+    sub: "Meetings become decisions and tasks. Tasks link to commits and pull requests. The AI remembers all of it.",
+  },
+  "sign-up": {
+    heading: "Start with a meeting. End with merged code.",
+    sub: "Create a project, invite your team, and let every promise made in a call find its way to a pull request.",
   },
 };
 
@@ -63,71 +72,67 @@ const AuthLayout = ({ children, variant }: AuthLayoutProps) => {
 
   return (
     <div className="flex min-h-screen w-full flex-col md:flex-row">
-      {/* Left Panel: Form — bg-surface-container-lowest, 40% on desktop */}
-      <div className="flex-1 md:flex-none md:w-[40%] bg-surface-container-lowest flex flex-col justify-center px-6 py-8 sm:px-10 md:px-10 md:py-8 relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        <div className="mx-auto w-full max-w-[400px]">{children}</div>
+      {/* Left panel: the form, half the width on desktop */}
+      <div className="relative z-10 flex flex-1 flex-col bg-surface-container-lowest px-6 py-8 sm:px-10 md:w-1/2 md:flex-none">
+        <div className="flex flex-1 flex-col justify-center">
+          <div className="mx-auto w-full max-w-[400px]">{children}</div>
+        </div>
+        <p className="mt-8 text-xs text-on-surface-variant">© 2026 NeuraMeet</p>
       </div>
 
-      {/* Right Panel: Walkthrough — bg-inverse-surface, 60% on desktop, hidden on mobile */}
-      <div className="hidden md:flex flex-1 md:w-[60%] bg-inverse-surface relative items-center justify-center p-8 lg:p-10 overflow-hidden">
-        {/* Abstract background blurs */}
+      {/* Right panel: the pitch, hidden on mobile */}
+      <div className="relative hidden flex-1 items-center justify-center overflow-hidden bg-inverse-surface p-8 md:flex md:w-1/2 lg:p-12">
         <div
           aria-hidden="true"
-          className="absolute inset-0 opacity-20 pointer-events-none"
+          className="pointer-events-none absolute inset-0 opacity-20"
         >
-          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary-container rounded-full mix-blend-screen filter blur-[100px]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-secondary rounded-full mix-blend-screen filter blur-[120px]" />
+          <div className="absolute left-[-10%] top-[-10%] h-96 w-96 rounded-full bg-primary-container mix-blend-screen blur-[100px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-secondary mix-blend-screen blur-[120px]" />
         </div>
 
-        {/* Grid overlay */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage:
-              "radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px)",
-            backgroundSize: "24px 24px",
-          }}
-        />
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col gap-10">
+          <div>
+            <p className="text-label-caps uppercase tracking-widest text-inverse-primary">
+              The development workspace
+            </p>
+            <h2 className="mt-3 text-headline-md font-semibold leading-tight text-on-primary">
+              {content.heading}
+            </h2>
+            <p className="mt-3 max-w-md text-body-md text-inverse-on-surface/70">
+              {content.sub}
+            </p>
+          </div>
 
-        {/* Content */}
-        <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-start">
-          {/* Heading + sub */}
-          <h2 className="text-on-primary font-semibold text-2xl md:text-3xl leading-tight">
-            {content.heading}
-          </h2>
-          <p className="text-inverse-on-surface/70 text-base mt-3 max-w-xl">
-            {content.sub}
-          </p>
-
-          {/* Three-step visual walkthrough */}
-          <div className="flex flex-col gap-8 mt-10 w-full">
-            {content.steps.map((step, i) => {
-              const Icon = step.icon;
+          <ul className="mt-auto flex flex-col gap-3">
+            {chain.map((card, i) => {
+              const Icon = card.icon;
               return (
-                <div key={step.title} className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary-container/10 border border-primary-container/20 flex items-center justify-center shrink-0">
+                <li
+                  key={card.kind}
+                  className={`flex items-center gap-3 rounded-xl border border-inverse-on-surface/10 bg-inverse-on-surface/5 p-3 ${OFFSETS[i]}`}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-container/20">
                     <Icon
-                      size={24}
-                      className="text-primary-container"
+                      size={18}
+                      className="text-inverse-primary"
                       stroke={1.5}
                     />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-primary-container font-bold text-sm">
-                      0{i + 1}
-                    </div>
-                    <h3 className="text-on-primary font-semibold text-lg leading-snug">
-                      {step.title}
-                    </h3>
-                    <p className="text-inverse-on-surface/70 text-sm leading-relaxed mt-1">
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-label-caps uppercase tracking-wider text-inverse-on-surface/60">
+                      {card.kind}
+                    </span>
+                    <span className="block truncate text-body-md font-semibold text-on-primary">
+                      {card.title}
+                    </span>
+                    <span className="block truncate text-xs text-inverse-on-surface/60">
+                      {card.detail}
+                    </span>
+                  </span>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
       </div>
     </div>

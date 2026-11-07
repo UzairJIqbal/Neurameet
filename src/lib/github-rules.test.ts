@@ -559,6 +559,45 @@ describe("handleGitHubEvent", () => {
     expect(calls.filter((c) => c.table === "task_links")).toEqual([]);
   });
 
+  it("a review request tells the linked reviewer and moves no task (AC-71b)", async () => {
+    queue("github_repos", ok(row));
+    queue("github_installations", ok([{ installation_id: 1 }]));
+    queue("user_settings", ok({ user_id: "u1" }));
+    queue("project_members", ok({ role: "developer" }));
+    queue("notifications", ok([]));
+    expect(
+      await handleGitHubEvent(db, "pull_request", {
+        action: "review_requested",
+        pull_request: pr(),
+        repository,
+        requested_reviewer: { id: 7 },
+      }),
+    ).toBe("processed");
+    const [rows] = callsOf("notifications", "upsert")[0].args as [
+      Array<Record<string, unknown>>,
+    ];
+    expect(rows[0]).toMatchObject({
+      user_id: "u1",
+      kind: "pr_review_requested",
+      dedupe_key: `pr_review:${REPO_ID}:7:7`,
+    });
+    expect(calls.filter((c) => c.table === "task_links")).toEqual([]);
+    expect(calls.filter((c) => c.table === "tasks")).toEqual([]);
+    expect(calls.filter((c) => c.table.startsWith("rpc:"))).toEqual([]);
+  });
+
+  it("ignores a review request for a team", async () => {
+    expect(
+      await handleGitHubEvent(db, "pull_request", {
+        action: "review_requested",
+        pull_request: pr(),
+        repository,
+        requested_reviewer: null,
+      }),
+    ).toBe("ignored");
+    expect(calls).toEqual([]);
+  });
+
   it("stops processing for a deleted or suspended installation", async () => {
     queue("github_repos", ok(row));
     queue("github_installations", ok([]));
@@ -712,7 +751,7 @@ describe("syncProject", () => {
     repos(REPO_ID);
     gh.recentPulls.mockResolvedValue([pr({ body: null })]);
     const now = vi.fn().mockReturnValueOnce(0).mockReturnValue(SYNC_MAX_MS);
-    const result = await syncProject(db, "p1", now);
+    const result = await syncProject(db, "p1", { now });
     expect(result).toMatchObject({ prsRead: 0, partial: true });
     expect(gh.recentPulls).not.toHaveBeenCalled();
   });
@@ -757,5 +796,19 @@ describe("syncProject", () => {
     gh.installationToken.mockRejectedValue(new Error("nope"));
     const failed = await syncProject(db, "p1");
     expect(failed).toMatchObject({ repos: 0, failed: 1 });
+  });
+});
+
+describe("the PR author", () => {
+  it("comes from user.login in both snapshot shapes, null when absent", () => {
+    const withUser = pr({ user: { login: "ali" } });
+    expect(snapshotFromRest(withUser, REPO_ID).authorLogin).toBe("ali");
+    expect(
+      snapshotFromWebhook({
+        pull_request: withUser,
+        repository: { id: REPO_ID },
+      }).authorLogin,
+    ).toBe("ali");
+    expect(snapshotFromRest(pr(), REPO_ID).authorLogin).toBeNull();
   });
 });

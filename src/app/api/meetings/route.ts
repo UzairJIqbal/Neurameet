@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase-server";
-import { MeetingListItem } from "@/lib/meeting-types";
+import { MeetingListItem, type ProjectMeetingType } from "@/lib/meeting-types";
+import { loadProjectMeetingStats, summaryExcerpt } from "@/lib/meeting-list";
 import { isProjectRole, type ProjectRole } from "@/lib/project-auth";
+import { lookupProfiles } from "@/lib/projects";
 
 interface MeetingRow {
   id: string;
@@ -15,11 +17,16 @@ interface MeetingRow {
   created_at: string;
   stream_call_id: string;
   project_id: string | null;
+  user_id: string;
+  description: string | null;
+  scheduled_end_at: string | null;
+  meeting_type: ProjectMeetingType | null;
+  invited_user_ids: string[] | null;
   meeting_insights: { category: string | null; summary: string | null }[] | null;
 }
 
 const MEETING_COLUMNS =
-  "id, title, status, started_at, ended_at, created_at, stream_call_id, project_id, meeting_insights(category, summary)";
+  "id, title, status, started_at, ended_at, created_at, stream_call_id, project_id, user_id, description, scheduled_end_at, meeting_type, invited_user_ids, meeting_insights(category, summary)";
 
 // The caller's active project memberships (removed members are excluded, so a
 // removed member stops seeing that project's meetings on the next request).
@@ -43,6 +50,7 @@ async function loadActiveRoles(
 function toListItem(
   row: MeetingRow,
   roles: Map<string, ProjectRole>,
+  organizerName: string | undefined,
 ): MeetingListItem {
   const insights = Array.isArray(row.meeting_insights) ? row.meeting_insights : [];
   const projectId = row.project_id ?? null;
@@ -58,6 +66,11 @@ function toListItem(
     streamCallId: row.stream_call_id,
     projectId,
     role: projectId ? (roles.get(projectId) ?? null) : null,
+    description: row.description ?? null,
+    scheduledEndAt: row.scheduled_end_at ?? null,
+    meetingType: row.meeting_type ?? null,
+    organizerName,
+    invitedUserIds: row.invited_user_ids ?? [],
   };
 }
 
@@ -121,11 +134,29 @@ export async function GET(request: Request) {
     ]) {
       byId.set(row.id, row);
     }
-    const meetings = [...byId.values()]
-      .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0))
-      .map((row) => toListItem(row, roles));
+    const rows = [...byId.values()].sort((a, b) =>
+      a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
+    );
+    const profiles = await lookupProfiles(rows.map((row) => row.user_id).filter(Boolean));
+    const meetings = rows.map((row) =>
+      toListItem(row, roles, profiles.get(row.user_id)?.name),
+    );
+    if (!onlyProject) return NextResponse.json({ meetings });
 
-    return NextResponse.json({ meetings });
+    const isViewer = roles.get(onlyProject) === "viewer";
+    const stats = await loadProjectMeetingStats(supabase, onlyProject, isViewer);
+    return NextResponse.json({
+      meetings: meetings.map((meeting, index) => {
+        const counts = stats.get(meeting.id);
+        return {
+          ...meeting,
+          summaryExcerpt: summaryExcerpt(rows[index].meeting_insights?.[0]?.summary),
+          decisionCount: counts?.decisions ?? 0,
+          actionItemCount: counts?.actionItems ?? 0,
+          ...(isViewer ? {} : { proposalCount: counts?.proposals ?? 0 }),
+        };
+      }),
+    });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Failed to load meetings";

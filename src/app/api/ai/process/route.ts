@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { sendMeetingReadyEmail } from "@/lib/email";
@@ -13,6 +13,7 @@ import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 import { buildMinutesDraft, cutMinutes } from "@/agent/minutes";
 import { buildProposalRows, hasReviewedProposals } from "@/agent/proposals";
+import { notifyProposalsReady } from "@/lib/notification-events";
 import { rpcErrorCode } from "@/lib/projects";
 import { MAX_PROPOSALS_PER_MEETING } from "@/lib/tasks";
 import {
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
     // a project meeting ("manage" need), may run extraction on it.
     const { data: owned, error: ownErr } = await supabase
       .from("meetings")
-      .select("id, user_id, project_id, started_at, created_at")
+      .select("id, user_id, project_id, title, started_at, created_at")
       .eq("id", meetingId)
       .maybeSingle();
 
@@ -232,6 +233,7 @@ Extraction rules:
 
     // W4: proposals are swapped first, inside one locked SQL call, so a review
     // that landed during the AI call wins and nothing below runs (AC-34).
+    let proposalsWritten = 0;
     if (projectId) {
       const rows = await buildProposalRows(supabase, {
         meetingId,
@@ -250,6 +252,7 @@ Extraction rules:
         }
         throw replaceErr;
       }
+      proposalsWritten = rows.length;
     }
 
     // Idempotent retry: clear any prior insights, action items, and their
@@ -283,6 +286,7 @@ Extraction rules:
     }
 
     // Write meeting insights
+    const processedAt = new Date().toISOString();
     const { error: insightsError } = await supabase
       .from("meeting_insights")
       .insert({
@@ -292,7 +296,7 @@ Extraction rules:
         decisions: minutes.decisions.map((p) => p.text),
         category: normalizeCategory(result.insights.category),
         detected_topics: result.insights.detectedTopics,
-        processed_at: new Date().toISOString(),
+        processed_at: processedAt,
         minutes_draft: minutesDraft,
       });
 
@@ -403,6 +407,18 @@ Extraction rules:
       await setTranscriptState(supabase, meetingId, "ready");
     } catch {
       // best-effort; AI work already succeeded.
+    }
+
+    if (projectId && proposalsWritten > 0) {
+      after(() =>
+        notifyProposalsReady(supabase, {
+          projectId,
+          meetingId,
+          meetingTitle: owned.title ?? "",
+          count: proposalsWritten,
+          processedAt,
+        }),
+      );
     }
 
     return NextResponse.json({

@@ -7,6 +7,7 @@ import {
   fireEvent,
   cleanup,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type {
   ProjectDetail,
@@ -62,6 +63,9 @@ function membersAs(myRole: "owner" | "developer"): ProjectMembersResponse {
         joinedAt: "2026-11-01T00:00:00Z",
         name: "Olivia",
         email: "o@x.dev",
+        imageUrl: null,
+        githubLogin: null,
+        openTaskCount: 0,
       },
       {
         userId: "u-admin",
@@ -69,6 +73,9 @@ function membersAs(myRole: "owner" | "developer"): ProjectMembersResponse {
         joinedAt: "2026-11-02T00:00:00Z",
         name: "Adam",
         email: null,
+        imageUrl: null,
+        githubLogin: null,
+        openTaskCount: 0,
       },
       {
         userId: "u-dev",
@@ -76,6 +83,9 @@ function membersAs(myRole: "owner" | "developer"): ProjectMembersResponse {
         joinedAt: "2026-11-02T00:00:00Z",
         name: "Dana",
         email: "d@x.dev",
+        imageUrl: null,
+        githubLogin: null,
+        openTaskCount: 0,
       },
     ],
   };
@@ -94,7 +104,7 @@ describe("CreateProjectDialog", () => {
     const name = screen.getByPlaceholderText("e.g. NeuraMeet Core");
     const prefix = screen.getByPlaceholderText("NM") as HTMLInputElement;
     fireEvent.change(name, { target: { value: "NeuraMeet Core" } });
-    expect(prefix.value).toBe("NMC");
+    expect(prefix.value).toBe("NC");
     fireEvent.change(prefix, { target: { value: "NM" } });
     fireEvent.change(name, { target: { value: "Something Else" } });
     expect(prefix.value).toBe("NM");
@@ -112,12 +122,50 @@ describe("CreateProjectDialog", () => {
     fireEvent.change(screen.getByPlaceholderText("NM"), {
       target: { value: "nm1" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Project" }));
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
       "Prefix must be 2 to 5 capital letters",
     );
     expect(onCreated).not.toHaveBeenCalled();
+  });
+});
+
+describe("CreateProjectDialog success", () => {
+  const card = { id: "p9", name: "Core" };
+
+  it("offers Connect GitHub only when you asked for it, and goes to the tab", async () => {
+    client.createProject.mockResolvedValue({ project: card });
+    const onCreated = vi.fn();
+    render(<CreateProjectDialog onClose={vi.fn()} onCreated={onCreated} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. NeuraMeet Core"), {
+      target: { value: "Core" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("NM"), {
+      target: { value: "CR" },
+    });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Connect GitHub next" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create Project" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Connect GitHub" }),
+    );
+    expect(onCreated).toHaveBeenCalledWith(card);
+    expect(push).toHaveBeenCalledWith("/projects/p9?tab=github");
+  });
+
+  it("shows only Open project by default", async () => {
+    client.createProject.mockResolvedValue({ project: card });
+    render(<CreateProjectDialog onClose={vi.fn()} onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. NeuraMeet Core"), {
+      target: { value: "Core" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create Project" }));
+    expect(
+      await screen.findByRole("button", { name: "Open project" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Connect GitHub" })).toBeNull();
   });
 });
 
@@ -133,7 +181,18 @@ describe("MembersTab", () => {
     await screen.findByText("Olivia");
     expect(screen.queryAllByRole("combobox")).toHaveLength(0);
     expect(screen.queryByRole("button", { name: /^Remove/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Leave project" })).toBeTruthy();
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "Actions for Dana" }),
+      {
+        key: "Enter",
+      },
+    );
+    expect(
+      await screen.findByRole("menuitem", { name: "Leave project" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Actions for Olivia" }),
+    ).toBeNull();
     expect(screen.queryByText("Delete project")).toBeNull();
   });
 
@@ -144,37 +203,86 @@ describe("MembersTab", () => {
     expect(screen.getByLabelText("Role for Adam")).toBeTruthy();
     expect(screen.getByLabelText("Role for Dana")).toBeTruthy();
     expect(screen.queryByLabelText("Role for Olivia")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Leave project" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Actions for Olivia" }),
+    ).toBeNull();
   });
 
-  it("enables Delete project only when the typed name matches exactly", async () => {
+  it("filters by search and by role chip, with counts", async () => {
     client.listMembers.mockResolvedValue(membersAs("owner"));
-    client.deleteProject.mockResolvedValue({ ok: true });
     render(<MembersTab project={project} onProjectChanged={vi.fn()} />);
-    await screen.findByLabelText("Role for Adam");
-    const button = screen.getByRole("button", {
-      name: "Delete project",
-    }) as HTMLButtonElement;
-    const input = screen.getByLabelText("Type the project name to confirm");
-    expect(button.disabled).toBe(true);
-    fireEvent.change(input, { target: { value: "neurameet core" } });
-    expect(button.disabled).toBe(true);
-    fireEvent.change(input, { target: { value: "NeuraMeet Core" } });
-    expect(button.disabled).toBe(false);
-    fireEvent.click(button);
-    await waitFor(() =>
-      expect(client.deleteProject).toHaveBeenCalledWith("p1", "NeuraMeet Core"),
+    await screen.findByText("Dana");
+    expect(screen.getByRole("button", { name: "All (3)" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Admins (1)" }));
+    expect(screen.getByText("Adam")).toBeTruthy();
+    expect(screen.queryByText("Dana")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All (3)" }));
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "d@x" },
+    });
+    expect(screen.getByText("Dana")).toBeTruthy();
+    expect(screen.queryByText("Adam")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Search members"), {
+      target: { value: "nobody" },
+    });
+    expect(screen.getByText("No members match your search.")).toBeTruthy();
+  });
+
+  it("shows the GitHub username and open task count", async () => {
+    const data = membersAs("owner");
+    data.members[2] = {
+      ...data.members[2],
+      githubLogin: "dana-dev",
+      openTaskCount: 4,
+    };
+    client.listMembers.mockResolvedValue(data);
+    render(<MembersTab project={project} onProjectChanged={vi.fn()} />);
+    expect(await screen.findByText("dana-dev")).toBeTruthy();
+    expect(screen.getByText("4")).toBeTruthy();
+  });
+
+  it("asks before removing someone", async () => {
+    client.listMembers.mockResolvedValue(membersAs("owner"));
+    client.removeMember.mockResolvedValue({});
+    render(<MembersTab project={project} onProjectChanged={vi.fn()} />);
+    await screen.findByText("Dana");
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: "Actions for Dana" }),
+      {
+        key: "Enter",
+      },
     );
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/projects"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    expect(client.removeMember).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog", { name: "Remove Dana" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    await waitFor(() =>
+      expect(client.removeMember).toHaveBeenCalledWith(project.id, "u-dev"),
+    );
   });
 
-  it("offers only Admins as the new owner", async () => {
-    client.listMembers.mockResolvedValue(membersAs("owner"));
+  it("keeps the empty state for a project of one", async () => {
+    const data = membersAs("owner");
+    data.members = [data.members[0]];
+    client.listMembers.mockResolvedValue(data);
+    const onAdd = vi.fn();
+    render(
+      <MembersTab
+        project={project}
+        onProjectChanged={vi.fn()}
+        onAddMember={onAdd}
+      />,
+    );
+    expect(await screen.findByText("Only you are here so far.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add Member" }));
+    expect(onAdd).toHaveBeenCalled();
+  });
+
+  it("shows a load error when the list fails", async () => {
+    client.listMembers.mockRejectedValue(new Error("down"));
     render(<MembersTab project={project} onProjectChanged={vi.fn()} />);
-    const select = (await screen.findByLabelText(
-      "New owner",
-    )) as HTMLSelectElement;
-    const options = Array.from(select.options).map((o) => o.textContent);
-    expect(options).toEqual(["Choose an Admin", "Adam"]);
+    expect(
+      await screen.findByText("We couldn't load the members."),
+    ).toBeTruthy();
   });
 });

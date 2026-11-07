@@ -9,17 +9,22 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
     actionItems: { data: null as unknown, error: null as unknown },
     // Phase W: active project memberships (removed_at null).
     members: [] as Array<Record<string, unknown>>,
+    transcript: { data: null as unknown, error: null as unknown },
+    tables: [] as string[],
   };
   const makeClient = () => ({
     from: (table: string) => {
+      store.tables.push(table);
       const result =
-        table === "meetings"
-          ? store.meetings
-          : table === "meeting_insights"
-            ? store.insights
-            : table === "action_items"
-              ? store.actionItems
-              : { data: null, error: null };
+        table === "transcripts"
+          ? store.transcript
+          : table === "meetings"
+            ? store.meetings
+            : table === "meeting_insights"
+              ? store.insights
+              : table === "action_items"
+                ? store.actionItems
+                : { data: null, error: null };
       // attendance_events applies the eq filters, so a row for another
       // meeting or another user never counts as proof of participation.
       const filters: Array<[string, unknown]> = [];
@@ -75,7 +80,24 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
-vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
+vi.mock("@clerk/nextjs/server", () => ({
+  auth: mockAuth,
+  clerkClient: async () => ({
+    users: {
+      getUserList: async () => ({
+        data: [
+          {
+            id: "owner",
+            firstName: "Ali",
+            lastName: "Hassan",
+            imageUrl: "",
+            primaryEmailAddress: { emailAddress: "ali@example.com" },
+          },
+        ],
+      }),
+    },
+  }),
+}));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 
 import { GET } from "./route";
@@ -267,6 +289,48 @@ describe("GET /api/meetings/[id] on a project meeting", () => {
       role: null,
       canManage: true,
     });
+  });
+
+  // AC-70v: the route leaves the transcript out for a Viewer, with no query.
+  it("never sends a Viewer the transcript and never reads it", async () => {
+    asMember("viewer");
+    store.transcript = { data: { raw_text: "Ali: secret" }, error: null };
+    store.tables = [];
+    const body = await (await call("u2", "m1")).json();
+    expect("transcriptText" in body).toBe(false);
+    expect(JSON.stringify(body)).not.toContain("secret");
+    expect(store.tables).not.toContain("transcripts");
+  });
+
+  it("sends a Developer the transcript and the header fields", async () => {
+    asMember("developer");
+    store.transcript = { data: { raw_text: "Ali: hello" }, error: null };
+    store.meetings = {
+      data: {
+        ...meetingRow("owner", "p1"),
+        description: "Auth",
+        scheduled_end_at: "2026-11-09T11:00:00Z",
+        meeting_type: "architecture",
+        invited_user_ids: ["u2"],
+      },
+      error: null,
+    };
+    const body = await (await call("u2", "m1")).json();
+    expect(body.transcriptText).toBe("Ali: hello");
+    expect(body.meeting).toMatchObject({
+      description: "Auth",
+      scheduledEndAt: "2026-11-09T11:00:00Z",
+      meetingType: "architecture",
+      organizerName: "Ali Hassan",
+      invitedUserIds: ["u2"],
+    });
+  });
+
+  it("sends a null transcript when the meeting has none", async () => {
+    asMember("developer");
+    store.transcript = { data: null, error: null };
+    const body = await (await call("u2", "m1")).json();
+    expect(body.transcriptText).toBeNull();
   });
 
   it("gives a personal meeting participant canManage false", async () => {

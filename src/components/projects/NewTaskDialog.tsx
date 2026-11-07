@@ -4,14 +4,25 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { X } from "lucide-react";
-import { createTask } from "@/lib/project-client";
-import { TASK_DESCRIPTION_MAX, TASK_TITLE_MAX } from "@/lib/tasks";
+import { createTask, updateTask } from "@/lib/project-client";
+import {
+  TASK_DESCRIPTION_MAX,
+  TASK_PRIORITIES,
+  TASK_PRIORITY_LABELS,
+  TASK_STATUS_LABELS,
+  TASK_TITLE_MAX,
+  isTaskPriority,
+  type TaskPriority,
+  type TaskStatus,
+} from "@/lib/tasks";
 import type { ProjectMember } from "@/lib/project-types";
 import type { Task } from "@/lib/task-types";
 
 type Props = {
   projectId: string;
   members: ProjectMember[];
+  /** Set by a column's `+`. The task is created, then moved here. */
+  initialStatus?: TaskStatus;
   onClose: () => void;
   onCreated: (task: Task) => void;
 };
@@ -22,11 +33,12 @@ const primaryButton =
   "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
 // Developer or higher: a task by hand, with the next key (AC-38).
-const NewTaskDialog = ({ projectId, members, onClose, onCreated }: Props) => {
+const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, onCreated }: Props) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState<TaskPriority>("medium");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +50,19 @@ const NewTaskDialog = ({ projectId, members, onClose, onCreated }: Props) => {
     return () => document.removeEventListener("keydown", onKey);
   }, [busy, onClose]);
 
+  // AC-70p: the move runs under the same rules as a drag, so it can be refused.
+  const moveToColumn = async (task: Task): Promise<Task> => {
+    if (initialStatus === "todo") return task;
+    try {
+      const moved = await updateTask(task.id, { status: initialStatus, ifVersion: task.version });
+      return moved.task;
+    } catch (err) {
+      console.error("Failed to move the new task:", err);
+      toast.error(`${task.key} was created in ${TASK_STATUS_LABELS.todo}`);
+      return task;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -48,9 +73,10 @@ const NewTaskDialog = ({ projectId, members, onClose, onCreated }: Props) => {
         description: description.trim() || null,
         assigneeId: assigneeId || null,
         dueDate: dueDate || null,
+        priority,
       });
       toast.success(`${task.key} created`);
-      onCreated(task);
+      onCreated(await moveToColumn(task));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create the task");
     } finally {
@@ -69,7 +95,7 @@ const NewTaskDialog = ({ projectId, members, onClose, onCreated }: Props) => {
       >
         <div className="flex items-center justify-between">
           <h2 id="new-task-title" className="text-headline-sm text-on-surface">
-            New task
+            Add Task
           </h2>
           <button
             type="button"
@@ -109,6 +135,22 @@ const NewTaskDialog = ({ projectId, members, onClose, onCreated }: Props) => {
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>
                 {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-body-md text-on-surface">
+          Priority
+          <select
+            value={priority}
+            onChange={(e) => {
+              if (isTaskPriority(e.target.value)) setPriority(e.target.value);
+            }}
+            className={inputClass}
+          >
+            {TASK_PRIORITIES.map((value) => (
+              <option key={value} value={value}>
+                {TASK_PRIORITY_LABELS[value]}
               </option>
             ))}
           </select>

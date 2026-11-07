@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Search, Loader2 } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
@@ -59,8 +59,8 @@ const SearchPage = () => {
   // Retry after a timeout) aborts the previous request.
   const controllerRef = useRef<AbortController | null>(null);
 
-  const runSearch = async () => {
-    const trimmed = query.trim();
+  const runSearch = async (text: string = query) => {
+    const trimmed = text.trim();
     if (!trimmed) return;
 
     controllerRef.current?.abort();
@@ -99,6 +99,15 @@ const SearchPage = () => {
       if (controllerRef.current === controller) setIsLoading(false);
     }
   };
+
+  // AC-78a: the palette opens /search?q=<text>; run that search once on arrival.
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get("q")?.trim();
+    if (!initial) return;
+    setQuery(initial);
+    runSearch(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

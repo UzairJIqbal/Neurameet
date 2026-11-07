@@ -1,8 +1,8 @@
 // Browser side caller for POST /api/ledger/match, shared by the upload modal,
-// Retry summary, and the Ledger tab's Check again button.
+// Retry summary, and the Decisions and Promises tab's Check again button.
 export const LEDGER_MATCH_TIMEOUT_MS = 120000;
 export const LEDGER_MATCH_FAILED_MESSAGE =
-  "Promise matching did not finish. Open the Ledger tab and press Check again.";
+  "Promise matching did not finish. Open the Decisions and Promises tab and press Check again.";
 
 /** True when matching finished. Never throws; a parent abort ends it early. */
 export async function requestLedgerMatch(

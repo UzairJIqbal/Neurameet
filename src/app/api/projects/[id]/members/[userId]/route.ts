@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/lib/project-auth";
 import { isAssignableRole, rpcErrorCode } from "@/lib/projects";
 import { removeFromLiveProjectCalls } from "@/lib/project-call-offboarding";
+import { notifyMemberRoleChanged } from "@/lib/notification-events";
 
 type Params = { params: Promise<{ id: string; userId: string }> };
 
@@ -69,15 +70,30 @@ export async function PATCH(request: Request, { params }: Params) {
       .is("removed_at", null);
     if (error) throw error;
 
-    const { error: auditError } = await supabase.from("audit_log").insert({
-      project_id: id,
-      actor_id: userId,
-      action: "member.role_changed",
-      target_type: "member",
-      target_id: targetId,
-      detail: { from: current, to: nextRole },
-    });
+    const { data: audit, error: auditError } = await supabase
+      .from("audit_log")
+      .insert({
+        project_id: id,
+        actor_id: userId,
+        action: "member.role_changed",
+        target_type: "member",
+        target_id: targetId,
+        detail: { from: current, to: nextRole },
+      })
+      .select("id")
+      .maybeSingle();
     if (auditError) console.error("[projects] audit write failed:", auditError);
+    const auditId = (audit as { id?: string } | null)?.id;
+    if (auditId) {
+      after(() =>
+        notifyMemberRoleChanged(supabase, {
+          projectId: id,
+          userId: targetId,
+          role: nextRole,
+          auditId,
+        }),
+      );
+    }
 
     return NextResponse.json({ ok: true, role: nextRole });
   } catch (err) {

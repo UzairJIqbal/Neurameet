@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProjectRole } from "@/lib/project-types";
 import type { Task, TaskEvent, TaskEventKind } from "@/lib/task-types";
 import type { PrState, TaskPrLink } from "@/lib/github-types";
-import { isTaskStatus, taskKey } from "@/lib/tasks";
+import { isTaskPriority, isTaskStatus, taskKey } from "@/lib/tasks";
 import { lookupProfiles } from "@/lib/projects";
 import { MINUTES_TZ } from "@/lib/minutes-types";
 import type { LedgerItem, LedgerLink } from "@/lib/meeting-types";
@@ -12,7 +12,7 @@ import type { LedgerItem, LedgerLink } from "@/lib/meeting-types";
 // `embedding` is in neither list, so no response ever carries it.
 
 const TASK_SELECT_BASE =
-  "id, project_id, number, title, description, status, position, assignee_id, due_date, source_meeting_id, completion_kind, completed_at, version, created_at, updated_at";
+  "id, project_id, number, title, description, status, priority, position, assignee_id, due_date, source_meeting_id, completion_kind, completed_at, version, created_at, updated_at";
 
 export const TASK_SELECT_VIEWER = TASK_SELECT_BASE;
 export const TASK_SELECT_FULL = `${TASK_SELECT_BASE}, quote, quote_speaker, quote_line, completion_evidence`;
@@ -28,6 +28,7 @@ export type TaskRow = {
   title: string;
   description: string | null;
   status: string;
+  priority: string;
   position: number;
   assignee_id: string | null;
   due_date: string | null;
@@ -56,6 +57,7 @@ export function toTask(
     title: row.title,
     description: row.description,
     status: isTaskStatus(row.status) ? row.status : "todo",
+    priority: isTaskPriority(row.priority) ? row.priority : "medium",
     position: Number(row.position),
     assigneeId: row.assignee_id,
     assigneeName: row.assignee_id
@@ -213,11 +215,17 @@ export function pktToday(): string {
 // JS Date, which would cut microseconds.
 const CURSOR_PATTERNS = {
   ledger: /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|\+00:00)\|[0-9a-f-]{36}$/,
+  notifications: /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|\+00:00)\|[0-9a-f-]{36}$/,
   activity:
     /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|\+00:00)\|(te|mt|ll|au):[0-9a-f-]{36}$/,
 };
 
 export const PAGE_SIZE = 50;
+
+/** Escapes the ilike wildcards so a search for "50%" means the text "50%". */
+export function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
 
 export type PageCursor = { timestamp: string; id: string };
 
@@ -241,14 +249,15 @@ export function cursorFilter(
   return `${timeColumn}.lt.${ts},and(${timeColumn}.eq.${ts},${idColumn}.lt."${cursor.id}")`;
 }
 
-/** Takes rows fetched with limit PAGE_SIZE + 1, and returns the page and next cursor. */
+/** Takes rows fetched with limit size + 1, and returns the page and next cursor. */
 export function pageOf<T>(
   rows: T[],
   cursorOf: (row: T) => string,
+  size: number = PAGE_SIZE,
 ): { page: T[]; next: string | null } {
-  if (rows.length <= PAGE_SIZE) return { page: rows, next: null };
-  const page = rows.slice(0, PAGE_SIZE);
-  return { page, next: cursorOf(page[PAGE_SIZE - 1]) };
+  if (rows.length <= size) return { page: rows, next: null };
+  const page = rows.slice(0, size);
+  return { page, next: cursorOf(page[size - 1]) };
 }
 
 // Hidden ledger columns are left out of a Viewer's query (AC-62). A code link
@@ -261,11 +270,15 @@ export const LEDGER_LINK_SELECT_VIEWER =
 export const LEDGER_LINK_SELECT_FULL = `${LEDGER_LINK_SELECT_VIEWER}, evidence_task_link_id, quote, speaker, line_number`;
 
 export function ledgerItemSelectFor(role: ProjectRole | null): string {
-  return role === "viewer" ? LEDGER_ITEM_SELECT_VIEWER : LEDGER_ITEM_SELECT_FULL;
+  return role === "viewer"
+    ? LEDGER_ITEM_SELECT_VIEWER
+    : LEDGER_ITEM_SELECT_FULL;
 }
 
 export function ledgerLinkSelectFor(role: ProjectRole | null): string {
-  return role === "viewer" ? LEDGER_LINK_SELECT_VIEWER : LEDGER_LINK_SELECT_FULL;
+  return role === "viewer"
+    ? LEDGER_LINK_SELECT_VIEWER
+    : LEDGER_LINK_SELECT_FULL;
 }
 
 export type LedgerItemRow = {

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -8,23 +8,28 @@ import {
   type ProjectRole,
 } from "@/lib/project-auth";
 import { lookupProfiles, rpcErrorCode } from "@/lib/projects";
+import { notifyTaskAssigned } from "@/lib/notification-events";
 import {
   activeMemberIds,
   getTaskPrefix,
+  likePattern,
   readTask,
   taskSelectFor,
   toTask,
   type TaskRow,
 } from "@/lib/project-select";
 import { embedTitle } from "@/agent/proposals";
+import { decorateBoardTasks, setInitialPriority } from "@/lib/task-board";
 import {
   BOARD_COLUMN_LIMIT,
   TASK_DESCRIPTION_MAX,
   TASK_STATUSES,
   TASK_TITLE_MAX,
   isIsoDate,
+  isTaskPriority,
   isTaskStatus,
   parseTaskKeyQuery,
+  type TaskPriority,
   type TaskStatus,
 } from "@/lib/tasks";
 import type { TaskResponse, TasksResponse } from "@/lib/task-types";
@@ -34,14 +39,10 @@ type Supabase = ReturnType<typeof supabaseServer>;
 
 type BoardFilters = {
   assigneeId: string | null;
+  priority: TaskPriority | null;
   number: number | null;
   titleLike: string | null;
 };
-
-/** Escapes the ilike wildcards so a search for "50%" means the text "50%". */
-function likePattern(q: string): string {
-  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-}
 
 async function loadColumn(
   supabase: Supabase,
@@ -58,6 +59,7 @@ async function loadColumn(
   if (filters.assigneeId === "none") query = query.is("assignee_id", null);
   else if (filters.assigneeId)
     query = query.eq("assignee_id", filters.assigneeId);
+  if (filters.priority) query = query.eq("priority", filters.priority);
   if (filters.number !== null) query = query.eq("number", filters.number);
   else if (filters.titleLike) query = query.ilike("title", filters.titleLike);
 
@@ -88,6 +90,13 @@ export async function GET(request: Request, { params }: Params) {
 
     const url = new URL(request.url);
     const statusParam = url.searchParams.get("status");
+    if (statusParam && !isTaskStatus(statusParam)) {
+      return NextResponse.json({ error: "Unknown status" }, { status: 422 });
+    }
+    const priority = url.searchParams.get("priority");
+    if (priority && !isTaskPriority(priority)) {
+      return NextResponse.json({ error: "Unknown priority" }, { status: 422 });
+    }
     const statuses: readonly TaskStatus[] = isTaskStatus(statusParam)
       ? [statusParam]
       : TASK_STATUSES;
@@ -96,6 +105,7 @@ export async function GET(request: Request, { params }: Params) {
     const number = q ? parseTaskKeyQuery(q, prefix) : null;
     const filters: BoardFilters = {
       assigneeId: url.searchParams.get("assigneeId") || null,
+      priority: isTaskPriority(priority) ? priority : null,
       number,
       titleLike: q && number === null ? likePattern(q) : null,
     };
@@ -114,7 +124,11 @@ export async function GET(request: Request, { params }: Params) {
     });
 
     return NextResponse.json({
-      tasks: rows.map((r) => toTask(r, prefix, role, names)),
+      tasks: await decorateBoardTasks(
+        supabase,
+        rows.map((r) => toTask(r, prefix, role, names)),
+        role,
+      ),
       truncated,
     } satisfies TasksResponse);
   } catch (err) {
@@ -133,6 +147,7 @@ type NewTask = {
   description: string | null;
   assigneeId: string | null;
   dueDate: string | null;
+  priority: TaskPriority;
 };
 
 function parseNewTask(
@@ -164,6 +179,10 @@ function parseNewTask(
   if (dueDate !== null && !isIsoDate(dueDate)) {
     return { ok: false, error: "Due date must be YYYY-MM-DD" };
   }
+  const priority = raw?.priority ?? "medium";
+  if (!isTaskPriority(priority)) {
+    return { ok: false, error: "Unknown priority" };
+  }
   return {
     ok: true,
     task: {
@@ -171,6 +190,7 @@ function parseNewTask(
       description,
       assigneeId: (assigneeId as string | null) || null,
       dueDate: dueDate as string | null,
+      priority,
     },
   };
 }
@@ -231,8 +251,12 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const taskId = (data as { id?: string } | null)?.id;
+    if (taskId) await setInitialPriority(supabase, taskId, input.priority);
     const task = taskId ? await readTask(supabase, taskId, role) : null;
     if (!task) throw new Error("Created task not readable");
+    if (taskId && input.assigneeId) {
+      after(() => notifyTaskAssigned(supabase, taskId, 1, userId));
+    }
     return NextResponse.json({ task } satisfies TaskResponse, { status: 201 });
   } catch (err) {
     const denied = accessErrorResponse(err);

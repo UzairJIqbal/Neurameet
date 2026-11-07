@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
+const { mockAuth, mockGetUserList } = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockGetUserList: vi.fn(),
+}));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
+vi.mock("@clerk/nextjs/server", () => ({
+  auth: mockAuth,
+  clerkClient: async () => ({ users: { getUserList: mockGetUserList } }),
+}));
 vi.mock(
   "@/lib/supabase-server",
   async () => (await import("@/test/supabase-queue-mock")).supabaseServerModule,
@@ -356,5 +362,111 @@ describe("GET /api/projects/[id]/ledger", () => {
     expect(await res.json()).toEqual({
       error: "Failed to load decisions and promises",
     });
+  });
+});
+
+describe("GET /api/projects/[id]/ledger filters (AC-70l)", () => {
+  const M = uuid(7);
+
+  it.each([
+    ["?meetingId=nope", "Unknown meeting"],
+    ["?tag=Gardening", "Unknown tag"],
+  ])("returns 422 for %s and never reads", async (qs, message) => {
+    const res = await get(qs);
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: message });
+    expect(callsOf("ledger_items", "select")).toHaveLength(0);
+  });
+
+  it("filters by meeting and by tag in SQL", async () => {
+    role("developer");
+    queue("ledger_items", ok([]));
+    await get(`?meetingId=${M}&tag=Engineering`);
+    const eqs = callsOf("ledger_items", "eq").map((c) => c.args);
+    expect(eqs).toContainEqual(["meeting_id", M]);
+    expect(eqs).toContainEqual([
+      "meetings.meeting_insights.category",
+      "Engineering",
+    ]);
+    expect(callsOf("ledger_items", "select")[0].args[0]).toContain(
+      "meeting_insights!inner(category)",
+    );
+  });
+
+  it("keeps meetings with no insights when no tag is set", async () => {
+    role("developer");
+    queue("ledger_items", ok([]));
+    await get();
+    const select = callsOf("ledger_items", "select")[0].args[0] as string;
+    expect(select).toContain("meeting_insights(category)");
+    expect(select).not.toContain("meeting_insights!inner");
+  });
+
+  it("searches the statement only, with wildcards escaped", async () => {
+    role("developer");
+    queue("ledger_items", ok([]));
+    await get(`?q=${encodeURIComponent(" 50%_off ")}`);
+    expect(callsOf("ledger_items", "ilike").map((c) => c.args)).toEqual([
+      ["statement", "%50\\%\\_off%"],
+    ]);
+  });
+
+  it("gives a Viewer's search nothing to probe a quote with", async () => {
+    role("viewer");
+    queue("ledger_items", ok([]));
+    await get("?q=secret");
+    expect(callsOf("ledger_items", "ilike")).toHaveLength(1);
+    expect(callsOf("ledger_items", "ilike")[0].args[0]).toBe("statement");
+    expect(callsOf("ledger_items", "select")[0].args[0]).not.toMatch(
+      HIDDEN_COLUMNS,
+    );
+  });
+
+  it("adds the tag and up to 5 participants to each item", async () => {
+    role("developer");
+    queue(
+      "ledger_items",
+      ok([
+        itemRow({
+          meetings: {
+            id: "m1",
+            title: "Standup",
+            started_at: "2026-11-01T00:00:00Z",
+            meeting_insights: { category: "Design" },
+          },
+        }),
+      ]),
+    );
+    queue(
+      "meeting_participants",
+      ok(
+        [1, 2, 3, 4, 5, 6].map((n) => ({
+          meeting_id: "m1",
+          user_id: `u${n}`,
+        })),
+      ),
+    );
+    mockGetUserList.mockResolvedValue({
+      data: [1, 2, 3, 4, 5].map((n) => ({
+        id: `u${n}`,
+        firstName: `Person${n}`,
+        lastName: null,
+        imageUrl: `https://img/${n}`,
+        primaryEmailAddress: null,
+      })),
+    });
+    const body = await (await get()).json();
+    expect(body.items[0].tag).toBe("Design");
+    expect(body.items[0].participants).toHaveLength(5);
+    expect(body.items[0].participants[0].imageUrl).toBe("https://img/1");
+  });
+
+  it("gives an item with no insights a null tag and no participants", async () => {
+    role("developer");
+    queue("ledger_items", ok([itemRow()]));
+    const body = await (await get()).json();
+    expect(body.items[0].tag).toBeNull();
+    expect(body.items[0].participants).toEqual([]);
+    expect(mockGetUserList).not.toHaveBeenCalled();
   });
 });

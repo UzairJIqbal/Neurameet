@@ -126,7 +126,7 @@ describe("Activity names", () => {
         kind: "task.status_changed",
         detail: { from: "todo", to: "completed" },
       }),
-    ).toBe("Sara moved NM-3 from To do to Completed");
+    ).toBe("Sara moved NM-3 from To Do to Completed");
   });
 
   it("shows the promise under a confirmation", () => {
