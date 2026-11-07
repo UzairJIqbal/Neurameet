@@ -24,6 +24,7 @@ import {
   callsOf,
   calls,
 } from "@/test/supabase-queue-mock";
+import { HIDDEN_COLUMNS, viewerLeaks } from "@/test/viewer-walk";
 import { GET as getTask, PATCH as patchTask } from "./[id]/route";
 import {
   GET as listTasks,
@@ -194,10 +195,15 @@ describe("PATCH /api/tasks/[id]", () => {
 });
 
 describe("GET /api/tasks/[id]", () => {
+  // The Outcome card's own read of the task, typed by hand with no source.
+  const queueOutcomeTask = () =>
+    queue("tasks", ok({ project_id: P, source_action_item_id: null }));
+
   it("hides the quote from a Viewer's Proof Chain and events", async () => {
     queue("tasks", ok(head()));
     role("viewer");
     queueReadTask({ source_meeting_id: "m1" });
+    queueOutcomeTask();
     queue(
       "task_events",
       ok([
@@ -239,6 +245,7 @@ describe("GET /api/tasks/[id]", () => {
     queue("tasks", ok(head()));
     role("viewer");
     queueReadTask({ completion_kind: "merge" });
+    queueOutcomeTask();
     queue("task_events", ok([]));
     queue("task_links", ok([LINK]));
     const res = await getTask(req(undefined, undefined, "GET"), params(T));
@@ -253,10 +260,37 @@ describe("GET /api/tasks/[id]", () => {
     expect(JSON.stringify(body)).not.toMatch(/secret/i);
   });
 
+  it("passes the Viewer walk with an outcome, and never reads a hidden column", async () => {
+    queue("tasks", ok(head()));
+    role("viewer");
+    queueReadTask({ completion_kind: "merge", source_action_item_id: "a1", source_meeting_id: "m1" });
+    queue("tasks", ok({ project_id: P, source_action_item_id: "a1" }));
+    queue("task_events", ok([]));
+    queue("task_links", ok([LINK]));
+    queue("action_items", ok([]));
+    queue(
+      "task_links",
+      ok([{ task_id: T, state: "merged", closes: true, base_ref: "main", repo_id: 1, merged_at: "2026-11-03", reverted_at: null }]),
+    );
+    queue("github_repos", ok([{ repo_id: 1, default_branch: "main" }]));
+    const body = await (await getTask(req(undefined, undefined, "GET"), params(T))).json();
+    expect(viewerLeaks(body)).toEqual([]);
+    expect(body.outcome).toMatchObject({
+      said: { state: "hidden" },
+      shipped: { state: "merged" },
+    });
+    for (const table of ["tasks", "task_links"]) {
+      for (const call of callsOf(table, "select").slice(table === "tasks" ? 1 : 0)) {
+        expect(String(call.args[0])).not.toMatch(HIDDEN_COLUMNS);
+      }
+    }
+  });
+
   it("gives a Developer the repo, number, title, and link", async () => {
     queue("tasks", ok(head()));
     role("developer");
     queueReadTask();
+    queueOutcomeTask();
     queue("task_events", ok([]));
     queue("task_links", ok([LINK]));
     const res = await getTask(req(undefined, undefined, "GET"), params(T));

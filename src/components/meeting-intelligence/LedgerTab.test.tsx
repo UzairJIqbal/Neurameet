@@ -109,7 +109,7 @@ const ledgerCalls = () =>
 describe("LedgerTab review (slice 3)", () => {
   it("shows Confirm and Not a match on a suggested link", async () => {
     ledgerResponses = [response([incoming("a", "kept", "suggested")])];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     expect(await screen.findByRole("button", { name: "Confirm" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Not a match" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
@@ -117,7 +117,7 @@ describe("LedgerTab review (slice 3)", () => {
 
   it("shows Undo on a confirmed link", async () => {
     ledgerResponses = [response([incoming("a", "kept", "confirmed")])];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
   });
@@ -127,7 +127,7 @@ describe("LedgerTab review (slice 3)", () => {
       response([incoming("a", "kept", "suggested")]),
       response([incoming("a", "kept", "confirmed")]),
     ];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
 
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
@@ -143,13 +143,13 @@ describe("LedgerTab review (slice 3)", () => {
 
   it("shows the reversal card only when reversalCount is above 0", async () => {
     ledgerResponses = [response([incoming("a", "kept", "suggested")])];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     await screen.findByRole("button", { name: "Confirm" });
     expect(screen.queryByText(/reversed in this meeting/)).toBeNull();
     cleanup();
 
     ledgerResponses = [response([incoming("b", "reversed", "suggested")], 1)];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     expect(
       await screen.findByText(
         "1 earlier decision was reversed in this meeting",
@@ -168,7 +168,7 @@ describe("LedgerTab review (slice 3)", () => {
       ),
     ];
     const onReversalCount = vi.fn();
-    render(<LedgerTab meetingId="m2" onReversalCount={onReversalCount} />);
+    render(<LedgerTab canManage meetingId="m2" onReversalCount={onReversalCount} />);
     await waitFor(() => expect(onReversalCount).toHaveBeenCalledWith(2));
     expect(
       screen.getByText("2 earlier decisions were reversed in this meeting"),
@@ -228,7 +228,7 @@ describe("LedgerTab said in this meeting (AC-1, AC-10)", () => {
         reversalCount: 0,
       },
     ];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     expect(await screen.findByText("Ali sends the survey")).toBeTruthy();
     expect(screen.getByText("main Friday tak survey bhej dunga")).toBeTruthy();
@@ -246,7 +246,7 @@ describe("LedgerTab said in this meeting (AC-1, AC-10)", () => {
         reversalCount: 0,
       },
     ];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     expect(await screen.findByText("Kept")).toBeTruthy();
     expect(screen.getByText("Later meeting · kept · confirmed")).toBeTruthy();
@@ -255,7 +255,7 @@ describe("LedgerTab said in this meeting (AC-1, AC-10)", () => {
 
   it("shows both empty states when nothing was found", async () => {
     ledgerResponses = [response([])];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     expect(
       await screen.findByText(
         "No decisions or promises found in this meeting.",
@@ -274,7 +274,7 @@ describe("LedgerTab review failure", () => {
       review: () => ({ ok: false, status: 500, json: async () => ({}) }),
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
 
@@ -293,7 +293,7 @@ describe("LedgerTab Check again (AC-6, AC-14)", () => {
   it("runs matching, then reloads the ledger", async () => {
     ledgerResponses = [response([])];
     routeFetch({});
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Check again" }));
 
@@ -310,7 +310,7 @@ describe("LedgerTab Check again (AC-6, AC-14)", () => {
     ledgerResponses = [response([])];
     let finish: (v: unknown) => void = () => {};
     routeFetch({ match: () => new Promise((r) => (finish = r)) });
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Check again" }));
 
@@ -328,7 +328,7 @@ describe("LedgerTab Check again (AC-6, AC-14)", () => {
       match: () => ({ ok: false, status: 502, json: async () => ({}) }),
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Check again" }));
 
@@ -355,7 +355,7 @@ describe("LedgerTab loading guard (AC-17)", () => {
           : { ok: true, json: async () => ledgerResponses[0] },
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     expect(
       await screen.findByText("We couldn't load the ledger."),
@@ -372,7 +372,7 @@ describe("LedgerTab loading guard (AC-17)", () => {
   it("stops spinning and shows LoadError when the load never settles", async () => {
     vi.useFakeTimers();
     routeFetch({ ledger: () => new Promise(() => {}) });
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     expect(screen.queryByText("We couldn't load the ledger.")).toBeNull();
     await act(async () => {
@@ -404,7 +404,7 @@ describe("LedgerTab Live Ledger badges (spec 0002 AC-15)", () => {
         reversalCount: 0,
       },
     ];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     expect(await screen.findByText("Agreed live by 3 of 4")).toBeTruthy();
     expect(screen.queryByText(/line 0/)).toBeNull();
   });
@@ -418,7 +418,7 @@ describe("LedgerTab Live Ledger badges (spec 0002 AC-15)", () => {
         reversalCount: 0,
       },
     ];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     await screen.findByText("Ali sends the survey");
     expect(screen.getAllByText("Marked live")).toHaveLength(2);
   });
@@ -435,7 +435,7 @@ describe("LedgerTab Live Ledger badges (spec 0002 AC-15)", () => {
         reversalCount: 0,
       },
     ];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
     expect(
       await screen.findByText(
         "Marked live as kept, no transcript evidence found",
@@ -471,12 +471,114 @@ describe("LedgerTab Live Ledger badges (spec 0002 AC-15)", () => {
       ],
     };
     ledgerResponses = [{ ...response([], 0), items: [item] }];
-    render(<LedgerTab meetingId="m2" />);
+    render(<LedgerTab canManage meetingId="m2" />);
 
     const pr = await screen.findByRole("link", { name: "Closes NM-1" });
     expect(pr.getAttribute("href")).toBe("https://github.com/acme/app/pull/7");
     expect(screen.getByText(/Merged PR · acme\/app #7/)).toBeTruthy();
     expect(screen.getByText(/reverted/)).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/line null/);
+  });
+});
+
+describe("LedgerTab controls (spec 0004 AC-58b)", () => {
+  const codeItem = (state: "suggested" | "confirmed", reverted = false) => ({
+    ...incoming("a", "kept", "suggested").item,
+    id: "i1",
+    kind: "promise" as const,
+    links: [
+      {
+        id: "cl1",
+        itemId: "i1",
+        evidenceKind: "code" as const,
+        evidenceMeetingId: null,
+        relation: "kept" as const,
+        quote: "Fix the survey",
+        speaker: null,
+        lineNumber: null,
+        confidence: 0.9,
+        state,
+        decidedAt: null,
+        createdAt: "2026-10-30T00:00:00.000Z",
+        pr: {
+          repoFullName: "acme/app",
+          prNumber: 7,
+          prUrl: "https://github.com/acme/app/pull/7",
+          reverted,
+        },
+      },
+    ],
+    derivedStatus: "open" as const,
+    liveMark: null,
+  });
+
+  const withItems = (items: unknown[], links: LedgerIncomingLink[] = []): LedgerResponse =>
+    ({ ...response(links), items }) as unknown as LedgerResponse;
+
+  it("gives a reader no review button and no Check again", async () => {
+    ledgerResponses = [
+      withItems([codeItem("suggested")], [incoming("a", "kept", "suggested")]),
+    ];
+    render(<LedgerTab canManage={false} meetingId="m2" />);
+    expect((await screen.findAllByText("earlier quote a")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Not a match" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Check again/ })).toBeNull();
+  });
+
+  it("reviews a code link when you can manage", async () => {
+    ledgerResponses = [withItems([codeItem("suggested")])];
+    render(<LedgerTab canManage meetingId="m2" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes("/api/ledger/links/cl1/review")),
+      ).toBe(true),
+    );
+  });
+
+  it("offers Undo on a decided code link, and hides it once the PR is reverted", async () => {
+    ledgerResponses = [withItems([codeItem("confirmed")])];
+    const { unmount } = render(<LedgerTab canManage meetingId="m2" />);
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    unmount();
+    ledgerResponses = [withItems([codeItem("confirmed", true)])];
+    render(<LedgerTab canManage meetingId="m2" />);
+    expect(await screen.findByText(/acme\/app/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+  });
+
+  it("shows Hidden for viewers when a quote is null", async () => {
+    ledgerResponses = [
+      withItems([{ ...codeItem("suggested"), quote: null, speaker: null, lineNumber: null, links: [] }]),
+    ];
+    render(<LedgerTab canManage={false} meetingId="m2" />);
+    expect(await screen.findByText("Hidden for viewers")).toBeTruthy();
+    expect(screen.queryByText(/line null/)).toBeNull();
+  });
+
+  it("says when evidence sits outside the project, with no quote", async () => {
+    ledgerResponses = [
+      withItems([
+        {
+          ...codeItem("suggested"),
+          links: [
+            {
+              ...codeItem("suggested").links[0],
+              id: "ml1",
+              evidenceKind: "meeting",
+              evidenceMeetingId: null,
+              state: "confirmed",
+              quote: null,
+              pr: undefined,
+              outsideProject: true,
+            },
+          ],
+        },
+      ]),
+    ];
+    render(<LedgerTab canManage={false} meetingId="m2" />);
+    expect(await screen.findByText("Evidence outside this project")).toBeTruthy();
+    expect(screen.queryByText("Hidden for viewers")).toBeNull();
   });
 });

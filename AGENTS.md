@@ -135,7 +135,7 @@ POST /api/ai/process               → (extended) also extracts up to 15 ledger 
 POST /api/transcript/upload        → (extended) optional meetingDate (YYYY-MM-DD) sets started_at on new meetings only
 POST /api/ledger/match             → owner only: match this meeting's transcript against earlier open ledger items, store suggested links
 GET  /api/ledger                   → owner only: ?meetingId=&today=YYYY-MM-DD, this meeting's items + links, incoming links, reversal count
-POST /api/ledger/links/[id]/review → owner only: { decision: "confirm" | "reject" | "reset" }
+POST /api/ledger/links/[id]/review → personal meeting owner, or project Owner or Admin: { decision: "confirm" | "reject" | "reset" }
 POST /api/prep                     → (extended) adds a deterministic ledgerItems list (top 5 open or overdue)
 GET  /api/ledger/live/checkin      → owner only: ?callId=&today=YYYY-MM-DD, up to 20 open/overdue items from the owner's other meetings (deterministic, no AI)
 GET  /api/ledger/live              → participant: ?callId=&today=YYYY-MM-DD (+ guestStreamToken for guests), open card + open agreement with tallies and the caller's vote
@@ -202,9 +202,14 @@ GET  /api/cron/daily               → Vercel cron only (Bearer CRON_SECRET): di
 POST /api/ai/chat                  → (extended) { projectId } project assistant, developer or higher, project filtered in SQL, citations built in code
 POST /api/ai/process               → (extended) on a project meeting writes proposals, never follow ups; 409 once any proposal was reviewed
 GET  /api/meetings                 → (extended) adds project meetings from your active projects, with projectId and role (?projectId= for one project)
-GET  /api/meetings/[id]            → (extended) adds projectId, projectName, role, canManage; Viewers get no transcript fields and only confirmed action items
+GET  /api/meetings/[id]            → (extended) adds projectId, projectName, role, canManage (false for Developer and Viewer); Viewers get no transcript fields and only confirmed action items
 (all owner only meeting routes)    → (extended) on a project meeting the project Owner or Admin passes; meeting delete stays Owner only
 POST /api/search                   → (extended) { query, projectId? } scopes to one project where you are developer or higher
+GET  /api/projects/[id]/ledger     → (extended) items carry outcome; adds nextCursor, canReview, needsReview, reviewCount; a bad cursor is 422
+GET  /api/projects/[id]/activity   → (extended) ?before= is a timestamp|id cursor; rows are allowlisted for every role; adds nextBefore
+GET  /api/tasks/[id]               → (extended) adds outcome
+GET  /api/ledger                   → (extended) adds outcome on project meetings; a Viewer's items and links omit quote, speaker, and line
+POST /api/ledger/links/[id]/review → (extended) records decided_by
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 

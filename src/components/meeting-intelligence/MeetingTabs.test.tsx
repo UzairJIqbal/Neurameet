@@ -111,6 +111,27 @@ describe("Ledger tab is owner only (spec 0001 AC-12)", () => {
     expect(await screen.findByText("Ledger")).toBeTruthy();
   });
 
+  // Spec 0004 AC-58b: on a project meeting every member reads the tab.
+  it("shows the Ledger tab to a non creator on a project meeting", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ items: [], incoming: [], reversalCount: 0 }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MeetingTabs {...baseProps} isOwner={false} projectId="p1" canManage={false} />,
+    );
+    expect(await screen.findByText("Ledger")).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some((args: unknown[]) =>
+          String(args[0]).includes("/api/ledger"),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.queryByText("Recording")).toBeNull();
+  });
+
   it("shows the Minutes tab to a participant but not Ledger or Recording (spec 0003)", async () => {
     vi.stubGlobal("fetch", vi.fn());
     render(<MeetingTabs {...baseProps} isOwner={false} />);

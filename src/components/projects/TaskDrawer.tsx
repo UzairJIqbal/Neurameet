@@ -10,6 +10,7 @@ import { getTask } from "@/lib/project-client";
 import { PR_STATE_LABELS, type TaskPrLink } from "@/lib/github-types";
 import { TASK_STATUS_LABELS, isTaskStatus } from "@/lib/tasks";
 import type { TaskDetailResponse, TaskEvent, TaskEventKind } from "@/lib/task-types";
+import OutcomeCard from "./OutcomeCard";
 
 const RECENT_EVENTS = 10;
 
@@ -97,6 +98,8 @@ const DrawerBody = ({ detail }: { detail: TaskDetailResponse }) => {
         <p className="text-body-md text-on-surface-variant">{TASK_STATUS_LABELS[task.status]}</p>
         {task.completionKind === "merge" && <CompletedByMerge evidence={task.completionEvidence} />}
       </div>
+
+      {detail.outcome && <OutcomeCard outcome={detail.outcome} />}
 
       <section aria-label="Pull requests" className="flex flex-col gap-2">
         <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">Pull requests</h3>

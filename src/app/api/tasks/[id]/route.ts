@@ -24,6 +24,7 @@ import {
   needsRenumber,
 } from "@/lib/tasks";
 import { patchDenial, type TaskRulePatch } from "@/lib/task-rules";
+import { outcomeForTask } from "@/lib/proof-chain";
 import type { TaskDetailResponse, TaskResponse } from "@/lib/task-types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -122,6 +123,7 @@ export async function GET(_request: Request, { params }: Params) {
               quoteLine: task.quoteLine ?? null,
             }),
       },
+      outcome: await outcomeForTask(supabase, task, role),
     };
     return NextResponse.json(response);
   } catch (err) {

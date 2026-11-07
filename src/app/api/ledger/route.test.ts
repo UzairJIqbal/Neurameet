@@ -28,6 +28,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 
+import { viewerLeaks } from "@/test/viewer-walk";
 import { GET } from "./route";
 
 const call = (userId: string | null, qs: string) => {
@@ -244,6 +245,86 @@ describe("GET /api/ledger", () => {
   });
 });
 
+describe("GET /api/ledger Viewer redaction (spec 0004 AC-62)", () => {
+  beforeEach(() => {
+    for (const k of Object.keys(queues)) delete queues[k];
+  });
+
+  // The route must drop these even from a wider row than it asked for.
+  it("returns no quote, speaker, or line on items, links, incoming, or live only", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "u0", project_id: "p1", title: "Standup" }, error: null },
+      {
+        data: [{ id: "m0", title: "Kickoff", started_at: "2026-10-01T12:00:00Z" }],
+        error: null,
+      },
+    ];
+    queues.project_members = [{ data: { role: "viewer" }, error: null }];
+    queues.ledger_items = [
+      { data: [itemRow()], error: null },
+      {
+        data: [
+          itemRow({ id: "old1", meeting_id: "m0" }),
+          itemRow({ id: "old2", meeting_id: "m0" }),
+        ],
+        error: null,
+      },
+    ];
+    queues.ledger_links = [
+      { data: [linkRow({ item_id: "i1", evidence_kind: "meeting" })], error: null },
+      { data: [linkRow()], error: null },
+    ];
+    queues.ledger_live_marks = [
+      { data: [], error: null },
+      {
+        data: [{ meeting_id: "m1", item_id: "old2", mark: "kept", marked_at: null }],
+        error: null,
+      },
+    ];
+    const res = await call("u1", "meetingId=m1&today=2026-10-30");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.incoming).toHaveLength(1);
+    expect(body.liveOnly).toHaveLength(1);
+    expect(viewerLeaks(body)).toEqual([]);
+    expect(body.items[0].outcome.said.state).toBe("hidden");
+  });
+
+  it("hides a meeting link's quote when its evidence is outside the project", async () => {
+    queues.meetings = [
+      { data: { id: "m1", user_id: "u1", project_id: "p1", title: "Standup" }, error: null },
+    ];
+    queues.project_members = [{ data: { role: "developer" }, error: null }];
+    queues.ledger_items = [{ data: [itemRow()], error: null }];
+    queues.ledger_links = [
+      {
+        data: [
+          linkRow({
+            item_id: "i1",
+            evidence_kind: "meeting",
+            evidence_meeting_id: "outside",
+            state: "confirmed",
+            quote: "secret quote",
+          }),
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ];
+    queues.ledger_live_marks = [
+      { data: [], error: null },
+      { data: [], error: null },
+    ];
+    const res = await call("u1", "meetingId=m1&today=2026-10-30");
+    const body = await res.json();
+    expect(JSON.stringify(body.items[0].links)).not.toContain("secret");
+    expect(body.items[0].links[0]).toMatchObject({
+      outsideProject: true,
+      evidenceMeetingId: null,
+    });
+  });
+});
+
 describe("GET /api/ledger code links", () => {
   beforeEach(() => {
     for (const k of Object.keys(queues)) delete queues[k];
@@ -301,7 +382,7 @@ describe("GET /api/ledger code links", () => {
     });
   });
 
-  it("gives a Viewer no PR, a blank quote, and never reads the links", async () => {
+  it("gives a Viewer no PR, a null quote, and never reads the links", async () => {
     queued({ id: "m1", user_id: "u0", project_id: "p1" });
     queues.project_members = [{ data: { role: "viewer" }, error: null }];
     queues.task_links = [{ data: null, error: { message: "must not be read" } }];
@@ -309,7 +390,7 @@ describe("GET /api/ledger code links", () => {
     expect(res.status).toBe(200);
     const link = (await res.json()).items[0].links[0];
     expect(link.pr).toBeUndefined();
-    expect(link.quote).toBe("");
+    expect(link.quote).toBeNull();
     expect(queues.task_links).toHaveLength(1);
   });
 });

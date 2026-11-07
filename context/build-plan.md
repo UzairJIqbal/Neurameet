@@ -711,7 +711,7 @@ Project and participant picker in the schedule dialog, `meeting_participants`, p
 ### Step W5 — GitHub App 🟡 (code built 2026-11-05; SQL applied live; dev GitHub App created; live test run 2026-11-05, merge race fixed 2026-11-06, second Owner check still owed)
 Install callback stores installation and repo ids; webhook route verifies `X-Hub-Signature-256` over the raw body (`await req.text()`, `timingSafeEqual`), dedupes on `X-GitHub-Delivery`, replies within 10 s and processes in `after()`; completion only on closing reference + `merged == true` + base is the default branch + all linked PRs done; drafts stay In Progress; closed unmerged does nothing; revert reopens; "Sync GitHub" reconciles missed deliveries (GitHub does not retry). Exit: forged webhook rejected; partial, draft, unmerged, non default, and revert PRs each behave correctly.
 
-### Step W6 — Proof Chain surfaces ⬜
+### Step W6 — Proof Chain surfaces 🟡 (build in progress 2026-11-07)
 Project Decisions and Promises tab on `ledger_items` (project scoped; Owner/Admin review), code evidence on promises (owner confirms), meeting Outcome card, Activity timeline as a SQL view, Live Ledger check in scoped to the project. Exit: one demo promise traced in the UI from quote to merge.
 
 ### Step W7 — Project AI assistant ⬜

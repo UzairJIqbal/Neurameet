@@ -3,58 +3,34 @@ import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 import { deriveLedgerStatus } from "@/agent/ledger";
+import {
+  ledgerItemSelectFor,
+  ledgerLinkSelectFor,
+  meetingsInProject,
+  toLedgerItem,
+  toLedgerLink,
+  type LedgerItemRow,
+  type LedgerLinkRow,
+} from "@/lib/project-select";
+import { outcomesForItems } from "@/lib/proof-chain";
+import type { ProjectRole } from "@/lib/project-types";
 import type {
   LedgerIncomingLink,
-  LedgerItem,
   LedgerLink,
   LedgerLiveMark,
   LedgerLiveOnlyMark,
   LedgerResponse,
 } from "@/lib/meeting-types";
+import type { Outcome } from "@/lib/proof-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-interface LedgerItemRow {
-  id: string;
-  meeting_id: string;
-  action_item_id: string | null;
-  kind: LedgerItem["kind"];
-  statement: string;
-  quote: string;
-  quote_language: LedgerItem["quoteLanguage"];
-  speaker: string | null;
-  assignee: string | null;
-  due_date: string | null;
-  line_number: number;
-  status: LedgerItem["status"];
-  created_at: string;
-  source: LedgerItem["source"];
-  agreed_count: number | null;
-  total_count: number | null;
-}
 
 interface LiveMarkRow {
   meeting_id: string;
   item_id: string;
   mark: LedgerLiveMark;
   marked_at: string | null;
-}
-
-interface LedgerLinkRow {
-  id: string;
-  item_id: string;
-  evidence_kind: LedgerLink["evidenceKind"];
-  evidence_meeting_id: string | null;
-  evidence_task_link_id: string | null;
-  relation: LedgerLink["relation"];
-  quote: string;
-  speaker: string | null;
-  line_number: number | null;
-  confidence: number;
-  state: LedgerLink["state"];
-  decided_at: string | null;
-  created_at: string;
 }
 
 interface TaskLinkRow {
@@ -71,11 +47,6 @@ interface SourceMeetingRow {
   started_at: string;
 }
 
-const ITEM_COLUMNS =
-  "id, meeting_id, action_item_id, kind, statement, quote, quote_language, speaker, assignee, due_date, line_number, status, created_at, source, agreed_count, total_count";
-const LINK_COLUMNS =
-  "id, item_id, evidence_kind, evidence_meeting_id, evidence_task_link_id, relation, quote, speaker, line_number, confidence, state, decided_at, created_at";
-
 function isIsoDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
@@ -85,61 +56,18 @@ function isIsoDate(value: string): boolean {
   );
 }
 
-function toItem(row: LedgerItemRow): LedgerItem {
-  return {
-    id: row.id,
-    meetingId: row.meeting_id,
-    actionItemId: row.action_item_id,
-    kind: row.kind,
-    statement: row.statement,
-    quote: row.quote,
-    quoteLanguage: row.quote_language,
-    speaker: row.speaker,
-    assignee: row.assignee,
-    dueDate: row.due_date,
-    lineNumber: row.line_number,
-    status: row.status,
-    createdAt: row.created_at,
-    source: row.source,
-    agreedCount: row.agreed_count,
-    totalCount: row.total_count,
-  };
-}
-
-function toLink(row: LedgerLinkRow): LedgerLink {
-  return {
-    id: row.id,
-    itemId: row.item_id,
-    evidenceKind: row.evidence_kind,
-    evidenceMeetingId: row.evidence_meeting_id,
-    relation: row.relation,
-    quote: row.quote,
-    speaker: row.speaker,
-    lineNumber: row.line_number,
-    confidence: row.confidence,
-    state: row.state,
-    decidedAt: row.decided_at,
-    createdAt: row.created_at,
-  };
-}
-
 // Code links read their PR in one batch. A Viewer's copy has no PR title, repo
-// name, or link, and the task_links query is never run for them (AC-55).
+// name, or link, and the task_links query is never run for them (AC-55, AC-62a).
 async function toOutgoingLinks(
   supabase: ReturnType<typeof supabaseServer>,
   rows: LedgerLinkRow[],
-  isViewer: boolean,
+  role: ProjectRole | null,
 ): Promise<LedgerLink[]> {
-  const links = rows.map(toLink);
+  const links = rows.map((row) => toLedgerLink(row, role));
   const taskLinkIds = rows
     .map((r) => r.evidence_task_link_id)
     .filter((id): id is string => !!id);
-  if (taskLinkIds.length === 0) return links;
-  if (isViewer) {
-    return links.map((link) =>
-      link.evidenceKind === "code" ? { ...link, quote: "" } : link,
-    );
-  }
+  if (taskLinkIds.length === 0 || role === "viewer") return links;
 
   const { data, error } = await supabase
     .from("task_links")
@@ -164,6 +92,35 @@ async function toOutgoingLinks(
   });
 }
 
+// AC-62b: evidence from outside the project keeps no quote or meeting link. A
+// confirmed one still counts toward status, and a suggested one is not shown.
+async function hideOutsideEvidence(
+  supabase: ReturnType<typeof supabaseServer>,
+  links: LedgerLink[],
+  projectId: string | null,
+): Promise<LedgerLink[]> {
+  if (!projectId) return links;
+  const evidenceIds = links
+    .filter((l) => l.evidenceKind === "meeting" && l.evidenceMeetingId)
+    .map((l) => l.evidenceMeetingId as string);
+  const inside = await meetingsInProject(supabase, evidenceIds, projectId);
+  return links.flatMap((link) => {
+    if (link.evidenceKind !== "meeting" || !link.evidenceMeetingId) return [link];
+    if (inside.has(link.evidenceMeetingId)) return [link];
+    if (link.state === "suggested") return [];
+    return [
+      {
+        ...link,
+        evidenceMeetingId: null,
+        quote: null,
+        speaker: null,
+        lineNumber: null,
+        outsideProject: true,
+      },
+    ];
+  });
+}
+
 export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -185,7 +142,7 @@ export async function GET(request: Request) {
 
     const { data: meeting, error: meetingErr } = await supabase
       .from("meetings")
-      .select("id, user_id, project_id")
+      .select("id, user_id, project_id, title")
       .eq("id", meetingId)
       .maybeSingle();
     if (meetingErr) throw meetingErr;
@@ -203,18 +160,20 @@ export async function GET(request: Request) {
     // Items said in this meeting, plus the links later meetings suggested.
     const { data: itemRows, error: itemsErr } = await supabase
       .from("ledger_items")
-      .select(ITEM_COLUMNS)
+      .select(ledgerItemSelectFor(role))
       .eq("meeting_id", meetingId)
       .order("line_number", { ascending: true });
     if (itemsErr) throw itemsErr;
-    const items = ((itemRows ?? []) as LedgerItemRow[]).map(toItem);
+    const items = ((itemRows ?? []) as unknown as LedgerItemRow[]).map((row) =>
+      toLedgerItem(row, role),
+    );
 
     let outgoing: LedgerLink[] = [];
     const itemMarks = new Map<string, LedgerLiveMark>();
     if (items.length > 0) {
       const { data: outRows, error: outErr } = await supabase
         .from("ledger_links")
-        .select(LINK_COLUMNS)
+        .select(ledgerLinkSelectFor(role))
         .in(
           "item_id",
           items.map((i) => i.id),
@@ -222,8 +181,8 @@ export async function GET(request: Request) {
       if (outErr) throw outErr;
       outgoing = await toOutgoingLinks(
         supabase,
-        (outRows ?? []) as LedgerLinkRow[],
-        role === "viewer",
+        (outRows ?? []) as unknown as LedgerLinkRow[],
+        role,
       );
 
       // Live marks later calls made on these items (spec 0002 AC-15).
@@ -246,10 +205,12 @@ export async function GET(request: Request) {
     // Links found in this meeting that point back at earlier items.
     const { data: inRows, error: inErr } = await supabase
       .from("ledger_links")
-      .select(LINK_COLUMNS)
+      .select(ledgerLinkSelectFor(role))
       .eq("evidence_meeting_id", meetingId);
     if (inErr) throw inErr;
-    const incomingLinks = ((inRows ?? []) as LedgerLinkRow[]).map(toLink);
+    const incomingLinks = ((inRows ?? []) as unknown as LedgerLinkRow[]).map(
+      (row) => toLedgerLink(row, role),
+    );
 
     // Marks the owner made live in this meeting on earlier items.
     const { data: hereMarkRows, error: hereMarkErr } = await supabase
@@ -270,11 +231,14 @@ export async function GET(request: Request) {
     if (srcItemIds.length > 0) {
       const { data: srcItemRows, error: srcItemsErr } = await supabase
         .from("ledger_items")
-        .select(ITEM_COLUMNS)
+        .select(ledgerItemSelectFor(role))
         .in("id", srcItemIds);
       if (srcItemsErr) throw srcItemsErr;
       const srcItems = new Map(
-        ((srcItemRows ?? []) as LedgerItemRow[]).map((r) => [r.id, toItem(r)]),
+        ((srcItemRows ?? []) as unknown as LedgerItemRow[]).map((r) => [
+          r.id,
+          toLedgerItem(r, role),
+        ]),
       );
 
       // Scoped to the caller (or, on a project meeting, to the project), so a
@@ -332,12 +296,31 @@ export async function GET(request: Request) {
       }
     }
 
+    const visibleOutgoing = await hideOutsideEvidence(
+      supabase,
+      outgoing,
+      projectId,
+    );
+    // Last, on project meetings only. A personal meeting shows no card (AC-60).
+    const outcomes = projectId
+      ? await outcomesForItems(
+          supabase,
+          items.map((item) => ({
+            ...item,
+            meetingTitle: (meeting as { title?: string | null }).title ?? null,
+            projectId,
+          })),
+          role,
+        )
+      : new Map<string, Outcome>();
+
     const body: LedgerResponse = {
       items: items.map((item) => ({
         ...item,
         derivedStatus: deriveLedgerStatus(item.status, item.dueDate, today),
-        links: outgoing.filter((l) => l.itemId === item.id),
+        links: visibleOutgoing.filter((l) => l.itemId === item.id),
         liveMark: itemMarks.get(item.id) ?? null,
+        ...(outcomes.has(item.id) ? { outcome: outcomes.get(item.id) } : {}),
       })),
       incoming,
       liveOnly,

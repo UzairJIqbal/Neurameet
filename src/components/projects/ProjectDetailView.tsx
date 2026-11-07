@@ -15,20 +15,24 @@ import MembersTab from "./MembersTab";
 import TasksBoard from "./TasksBoard";
 import ProposalsPanel from "./ProposalsPanel";
 import GitHubTab from "./GitHubTab";
+import DecisionsTab from "./DecisionsTab";
+import ActivityTab from "./ActivityTab";
 
-type TabKey = "members" | "tasks" | "proposals" | "github";
+type TabKey = "members" | "tasks" | "promises" | "proposals" | "activity" | "github";
 
 const TAB_LABELS: Record<TabKey, string> = {
   members: "Members",
   tasks: "Tasks",
+  promises: "Decisions and Promises",
   proposals: "Proposals",
+  activity: "Activity",
   github: "GitHub",
 };
 
 // Proposals are hidden for Viewers (AC-37). GitHub is the Owner's alone (AC-47).
 const tabsFor = (project: ProjectDetail): TabKey[] => {
-  if (project.role === "viewer") return ["members", "tasks"];
-  const tabs: TabKey[] = ["members", "tasks", "proposals"];
+  if (project.role === "viewer") return ["members", "tasks", "promises", "activity"];
+  const tabs: TabKey[] = ["members", "tasks", "promises", "proposals", "activity"];
   return project.role === "owner" ? [...tabs, "github"] : tabs;
 };
 
@@ -139,7 +143,7 @@ const ProjectDetailView = ({ id }: { id: string }) => {
         </p>
       </header>
 
-      <nav role="tablist" className="flex gap-2 border-b border-surface-variant">
+      <nav role="tablist" className="flex gap-2 overflow-x-auto border-b border-surface-variant">
         {tabs.map((key) => (
           <button
             key={key}
@@ -149,8 +153,8 @@ const ProjectDetailView = ({ id }: { id: string }) => {
             onClick={() => selectTab(key)}
             className={
               key === tab
-                ? "border-b-2 border-primary px-3 py-2 text-body-md font-medium text-primary"
-                : "border-b-2 border-transparent px-3 py-2 text-body-md text-on-surface-variant hover:text-on-surface"
+                ? "whitespace-nowrap border-b-2 border-primary px-3 py-2 text-body-md font-medium text-primary"
+                : "whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-body-md text-on-surface-variant hover:text-on-surface"
             }
           >
             {TAB_LABELS[key]}
@@ -162,6 +166,8 @@ const ProjectDetailView = ({ id }: { id: string }) => {
       {tab === "tasks" && <TasksBoard project={project} />}
       {tab === "proposals" && <ProposalsPanel project={project} />}
       {tab === "github" && <GitHubTab project={project} />}
+      {tab === "promises" && <DecisionsTab project={project} />}
+      {tab === "activity" && <ActivityTab project={project} />}
     </section>
   );
 };

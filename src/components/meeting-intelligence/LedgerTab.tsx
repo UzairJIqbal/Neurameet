@@ -22,19 +22,21 @@ import {
   requestLedgerMatch,
 } from "@/lib/ledger-match-client";
 import { fetchLedger, reviewLedgerLink } from "@/lib/ledger-client";
+import OutcomeCard from "@/components/projects/OutcomeCard";
+import TaskDrawer from "@/components/projects/TaskDrawer";
 import TabEmptyState from "./EmptyState";
 
 const formatDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString();
 
-const STATUS_BADGE: Record<LedgerDerivedStatus, { label: string; className: string }> = {
+export const STATUS_BADGE: Record<LedgerDerivedStatus, { label: string; className: string }> = {
   open: { label: "Open", className: "bg-surface-container-high text-on-surface-variant" },
   overdue: { label: "Overdue", className: "bg-error-container text-on-error-container" },
   kept: { label: "Kept", className: "bg-primary-container/15 text-primary-container" },
   reversed: { label: "Reversed", className: "bg-error-container text-error" },
 };
 
-const badgeBase =
+export const badgeBase =
   "rounded-full px-3 py-1 text-label-caps font-medium uppercase tracking-wider";
 
 // Live Ledger (spec 0002 AC-15): marks made during a call.
@@ -42,16 +44,76 @@ const LIVE_BADGE = `${badgeBase} border border-primary-container text-primary-co
 
 const LiveBadge = () => <span className={LIVE_BADGE}>Marked live</span>;
 
-const itemMeta = (item: LedgerItemView): string =>
-  item.source === "live_agreement"
-    ? `Agreed live by ${item.agreedCount ?? 0} of ${item.totalCount ?? 0}`
-    : `${item.speaker ? `${item.speaker} · ` : ""}line ${item.lineNumber}`;
-
 const quoteMeta = (speaker: string | null, lineNumber: number | null): string =>
   [speaker, lineNumber === null ? null : `line ${lineNumber}`].filter(Boolean).join(" · ");
 
+const itemMeta = (item: LedgerItemView): string =>
+  item.source === "live_agreement"
+    ? `Agreed live by ${item.agreedCount ?? 0} of ${item.totalCount ?? 0}`
+    : quoteMeta(item.speaker, item.lineNumber);
+
+const HIDDEN_QUOTE = "Hidden for viewers";
+
+const primaryButton =
+  "inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60";
+const outlineButton =
+  "inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60";
+
+type ReviewHandler = (linkId: string, decision: LedgerReviewDecision) => void;
+
+const savingLabel = (
+  saving: LedgerReviewDecision | null,
+  decision: LedgerReviewDecision,
+  text: string,
+): string => (saving === decision ? "Saving…" : text);
+
+// The server refuses to confirm or undo a reverted PR's link, so those buttons
+// are not offered (AC-55a).
+const CodeLinkControls = ({
+  link,
+  saving,
+  onReview,
+}: {
+  link: LedgerLink;
+  saving: LedgerReviewDecision | null;
+  onReview: ReviewHandler;
+}) => {
+  const busy = saving !== null;
+  const reverted = link.pr?.reverted === true;
+  if (link.state !== "suggested") {
+    if (reverted) return null;
+    return (
+      <button type="button" disabled={busy} onClick={() => onReview(link.id, "reset")} className={`${outlineButton} mt-1`}>
+        {savingLabel(saving, "reset", "Undo")}
+      </button>
+    );
+  }
+  return (
+    <div className="mt-1 flex flex-wrap gap-2">
+      {!reverted && (
+        <button type="button" disabled={busy} onClick={() => onReview(link.id, "confirm")} className={primaryButton}>
+          {savingLabel(saving, "confirm", "Confirm")}
+        </button>
+      )}
+      <button type="button" disabled={busy} onClick={() => onReview(link.id, "reject")} className={outlineButton}>
+        {savingLabel(saving, "reject", "Not a match")}
+      </button>
+    </div>
+  );
+};
+
 // A merged PR as evidence (AC-55a). A Viewer's copy has no `pr` and no title.
-const CodeLinkRow = ({ link }: { link: LedgerLink }) => (
+const CodeLinkRow = ({
+  link,
+  canManage,
+  saving,
+  onReview,
+}: {
+  link: LedgerLink;
+  canManage: boolean;
+  saving: LedgerReviewDecision | null;
+  onReview: ReviewHandler;
+}) => (
   <li className="flex flex-col gap-1 text-body-md text-on-surface-variant">
     <span className="text-label-caps font-medium uppercase tracking-wider">
       Merged PR{link.pr ? ` · ${link.pr.repoFullName} #${link.pr.prNumber}` : ""} · {link.relation} · {link.state}
@@ -68,12 +130,25 @@ const CodeLinkRow = ({ link }: { link: LedgerLink }) => (
         {link.quote}
       </a>
     ) : (
-      link.quote && <span dir="auto">{link.quote}</span>
+      <span dir="auto">{link.quote ?? HIDDEN_QUOTE}</span>
     )}
+    {canManage && <CodeLinkControls link={link} saving={saving} onReview={onReview} />}
   </li>
 );
 
-const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
+const LedgerItemCard = ({
+  item,
+  canManage,
+  saving,
+  onReview,
+  onOpenTask,
+}: {
+  item: LedgerItemView;
+  canManage: boolean;
+  saving: { linkId: string; decision: LedgerReviewDecision } | null;
+  onReview: ReviewHandler;
+  onOpenTask: (taskId: string) => void;
+}) => {
   const status = STATUS_BADGE[item.derivedStatus];
   const isPromise = item.kind === "promise";
 
@@ -99,7 +174,7 @@ const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
         <Quote className="mt-1 h-4 w-4 shrink-0 text-primary-container" />
         <span className="flex flex-col gap-1">
           <span dir="auto" className="italic text-on-surface">
-            {item.quote}
+            {item.quote ?? HIDDEN_QUOTE}
           </span>
           <span>{itemMeta(item)}</span>
         </span>
@@ -124,21 +199,35 @@ const LedgerItemCard = ({ item }: { item: LedgerItemView }) => {
         <ul className="flex flex-col gap-2 border-l-2 border-surface-variant pl-4">
           {item.links.map((link) =>
             link.evidenceKind === "code" ? (
-              <CodeLinkRow key={link.id} link={link} />
+              <CodeLinkRow
+                key={link.id}
+                link={link}
+                canManage={canManage}
+                saving={saving?.linkId === link.id ? saving.decision : null}
+                onReview={onReview}
+              />
             ) : (
               <li key={link.id} className="flex flex-col gap-1 text-body-md text-on-surface-variant">
                 <span className="text-label-caps font-medium uppercase tracking-wider">
                   Later meeting · {link.relation} · {link.state}
                 </span>
-                <span dir="auto" className="italic text-on-surface">
-                  {link.quote}
-                </span>
-                <span>{quoteMeta(link.speaker, link.lineNumber)}</span>
+                {link.outsideProject ? (
+                  <span>Evidence outside this project</span>
+                ) : (
+                  <>
+                    <span dir="auto" className="italic text-on-surface">
+                      {link.quote ?? HIDDEN_QUOTE}
+                    </span>
+                    <span>{quoteMeta(link.speaker, link.lineNumber)}</span>
+                  </>
+                )}
               </li>
             ),
           )}
         </ul>
       )}
+
+      {item.outcome && <OutcomeCard outcome={item.outcome} onOpenTask={onOpenTask} />}
     </div>
   );
 };
@@ -155,13 +244,13 @@ const QuoteBlock = ({
   meta,
 }: {
   label: string;
-  quote: string;
+  quote: string | null;
   meta: string;
 }) => (
   <blockquote className="flex flex-col gap-1 rounded-lg bg-surface-container-low px-4 py-3 text-body-md text-on-surface-variant">
     <span className="text-label-caps font-medium uppercase tracking-wider">{label}</span>
     <span dir="auto" className="italic text-on-surface">
-      {quote}
+      {quote ?? HIDDEN_QUOTE}
     </span>
     <span>{meta}</span>
   </blockquote>
@@ -185,24 +274,21 @@ const LinkQuotes = ({ link }: { link: LedgerIncomingLink }) => (
   </div>
 );
 
-const primaryButton =
-  "inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60";
-const outlineButton =
-  "inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60";
-
 const MatchCard = ({
   link,
+  canManage,
   saving,
   onReview,
 }: {
   link: LedgerIncomingLink;
+  canManage: boolean;
   saving: LedgerReviewDecision | null;
-  onReview: (linkId: string, decision: LedgerReviewDecision) => void;
+  onReview: ReviewHandler;
 }) => {
   const relation = STATUS_BADGE[link.relation];
   const busy = saving !== null;
   const label = (decision: LedgerReviewDecision, text: string) =>
-    saving === decision ? "Saving…" : text;
+    savingLabel(saving, decision, text);
 
   return (
     <div className="flex flex-col gap-3 px-6 py-4">
@@ -221,6 +307,7 @@ const MatchCard = ({
 
       <LinkQuotes link={link} />
 
+      {canManage && (
       <div className="flex flex-wrap gap-2">
         {link.state === "suggested" ? (
           <>
@@ -252,6 +339,7 @@ const MatchCard = ({
           </button>
         )}
       </div>
+      )}
     </div>
   );
 };
@@ -291,10 +379,12 @@ const ReversalCard = ({ links }: { links: LedgerIncomingLink[] }) => (
 
 const LedgerTab = ({
   meetingId,
+  canManage,
   refreshKey = 0,
   onReversalCount,
 }: {
   meetingId: string;
+  canManage: boolean;
   refreshKey?: number;
   onReversalCount?: (n: number) => void;
 }) => {
@@ -304,6 +394,7 @@ const LedgerTab = ({
   const [retryNonce, setRetryNonce] = useState(0);
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState<{ linkId: string; decision: LedgerReviewDecision } | null>(null);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const { timedOut } = useLoadingTimeout(isLoading, { retryNonce });
 
   // Kept in a ref so a new callback identity never refetches the ledger.
@@ -396,15 +487,17 @@ const LedgerTab = ({
         <p className="text-body-md text-on-surface-variant">
           Decisions and promises, checked against your earlier meetings.
         </p>
-        <button
-          type="button"
-          onClick={checkAgain}
-          disabled={checking}
-          className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} />
-          {checking ? "Checking…" : "Check again"}
-        </button>
+        {canManage && (
+          <button
+            type="button"
+            onClick={checkAgain}
+            disabled={checking}
+            className={outlineButton}
+          >
+            <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} />
+            {checking ? "Checking…" : "Check again"}
+          </button>
+        )}
       </div>
 
       {data.reversalCount > 0 && reversed.length > 0 && <ReversalCard links={reversed} />}
@@ -422,6 +515,7 @@ const LedgerTab = ({
                 <MatchCard
                   key={link.id}
                   link={link}
+                  canManage={canManage}
                   saving={saving?.linkId === link.id ? saving.decision : null}
                   onReview={review}
                 />
@@ -444,12 +538,21 @@ const LedgerTab = ({
           <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
             <div className="divide-y divide-surface-variant">
               {data.items.map((item) => (
-                <LedgerItemCard key={item.id} item={item} />
+                <LedgerItemCard
+                  key={item.id}
+                  item={item}
+                  canManage={canManage}
+                  saving={saving}
+                  onReview={review}
+                  onOpenTask={setOpenTaskId}
+                />
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {openTaskId && <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
     </div>
   );
 };

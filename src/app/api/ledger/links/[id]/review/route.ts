@@ -16,15 +16,21 @@ const UUID_RE =
 const DECISIONS: LedgerReviewDecision[] = ["confirm", "reject", "reset"];
 const NOT_FOUND = { error: "Link not found" };
 
-function nextState(decision: LedgerReviewDecision): {
+function nextState(
+  decision: LedgerReviewDecision,
+  userId: string,
+): {
   state: LedgerLinkState;
   decided_at: string | null;
+  decided_by: string | null;
 } {
-  if (decision === "reset") return { state: "suggested", decided_at: null };
-  const decidedAt = new Date().toISOString();
+  if (decision === "reset") {
+    return { state: "suggested", decided_at: null, decided_by: null };
+  }
+  const decided = { decided_at: new Date().toISOString(), decided_by: userId };
   return decision === "confirm"
-    ? { state: "confirmed", decided_at: decidedAt }
-    : { state: "rejected", decided_at: decidedAt };
+    ? { state: "confirmed", ...decided }
+    : { state: "rejected", ...decided };
 }
 
 async function readDecision(
@@ -111,7 +117,7 @@ export async function POST(
       }
     }
 
-    const update = nextState(decision);
+    const update = nextState(decision, userId);
     const { error: updateErr } = await supabase
       .from("ledger_links")
       .update(update)

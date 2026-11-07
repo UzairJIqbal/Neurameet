@@ -26,6 +26,7 @@ import type {
   TasksResponse,
 } from "@/lib/task-types";
 import type { GitHubReposResponse, GitHubSyncResult } from "@/lib/github-types";
+import type { ActivityResponse, ProjectLedgerResponse } from "@/lib/proof-types";
 
 export class ProjectClientError extends Error {
   constructor(
@@ -258,4 +259,31 @@ export function syncGitHub(id: string) {
   return request<GitHubSyncResult>(`${base(id)}/github/sync`, {
     method: "POST",
   });
+}
+
+// ===== W6: Proof Chain =====
+
+export function getProjectLedger(
+  id: string,
+  filters: { kind?: string; status?: string; cursor?: string | null },
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams();
+  if (filters.kind) params.set("kind", filters.kind);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.cursor) params.set("cursor", filters.cursor);
+  const query = params.toString();
+  return request<ProjectLedgerResponse>(
+    `${base(id)}/ledger${query ? `?${query}` : ""}`,
+    { signal },
+  );
+}
+
+export function listActivity(
+  id: string,
+  before: string | null,
+  signal?: AbortSignal,
+) {
+  const query = before ? `?before=${encodeURIComponent(before)}` : "";
+  return request<ActivityResponse>(`${base(id)}/activity${query}`, { signal });
 }

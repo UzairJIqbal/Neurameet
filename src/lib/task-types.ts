@@ -2,6 +2,7 @@
 
 import type { TaskStatus } from "@/lib/tasks";
 import type { TaskPrLink } from "@/lib/github-types";
+import type { Outcome } from "@/lib/proof-types";
 
 export interface Task {
   id: string;
@@ -64,6 +65,7 @@ export interface TaskDetailResponse {
   events: TaskEvent[];
   prLinks: TaskPrLink[];
   proofChain: TaskProofChain;
+  outcome?: Outcome;
 }
 
 export interface TasksResponse {

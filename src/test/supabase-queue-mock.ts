@@ -34,6 +34,7 @@ const CHAIN = [
   "ilike",
   "order",
   "limit",
+  "range",
   "insert",
   "update",
   "delete",

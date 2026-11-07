@@ -644,11 +644,11 @@ The project Decisions and Promises tab built on `ledger_items`; a qualifying mer
 **Done when:** one demo promise from a real Urdu English meeting is traced in the UI from quote to reviewed task to merged PR to kept.
 Spec: [0004-proof-chain](../specs/0004-conversations-to-code/0004-proof-chain.md), under [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
 - [x] Design it (spec)
-- [ ] Build it: `/develop proof chain`
-  - [ ] Schema, cursor helper, and Decisions and Promises tab with its review group (AC-57 to AC-59a)
-  - [ ] Outcome card and `proof-chain.ts` on the project tab and task drawer (AC-60 to AC-60c)
-  - [ ] Viewer redaction and the meeting Ledger tab opened to members (AC-58b, AC-62 to AC-62b)
-  - [ ] Activity route and tab with the kind allowlist (AC-61 to AC-61b)
+- [x] Build it: `/develop proof chain`
+  - [x] Schema, cursor helper, and Decisions and Promises tab with its review group (AC-57 to AC-59a)
+  - [x] Outcome card and `proof-chain.ts` on the project tab and task drawer (AC-60 to AC-60c)
+  - [x] Viewer redaction and the meeting Ledger tab opened to members (AC-58b, AC-62 to AC-62b)
+  - [x] Activity route and tab with the kind allowlist (AC-61 to AC-61b)
 - [ ] Verify it: `/check verify proof chain`
 - [ ] Test it: `/test proof chain`
 - [ ] Review it (fresh model): `/check review proof chain`

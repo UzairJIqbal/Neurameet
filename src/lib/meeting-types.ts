@@ -1,4 +1,5 @@
 import type { ProjectRole } from "@/lib/project-types";
+import type { Outcome } from "@/lib/proof-types";
 
 export interface MeetingListItem {
   id: string;
@@ -149,12 +150,13 @@ export interface LedgerItem {
   actionItemId: string | null;
   kind: LedgerKind;
   statement: string;
-  quote: string;
-  quoteLanguage: LedgerQuoteLanguage;
+  /** Null for Viewers (spec 0004 AC-62a), and when confirmed without a quote. */
+  quote: string | null;
+  quoteLanguage: LedgerQuoteLanguage | null;
   speaker: string | null;
   assignee: string | null;
   dueDate: string | null;
-  lineNumber: number;
+  lineNumber: number | null;
   status: LedgerItemStatus;
   createdAt: string;
   source: LedgerItemSource;
@@ -178,8 +180,8 @@ export interface LedgerLink {
   /** Null on a code link, which has no meeting and no transcript line. */
   evidenceMeetingId: string | null;
   relation: LedgerRelation;
-  /** On a code link this is the PR title, blank for Viewers. */
-  quote: string;
+  /** On a code link this is the PR title. Null for Viewers and outside evidence. */
+  quote: string | null;
   speaker: string | null;
   lineNumber: number | null;
   confidence: number;
@@ -187,6 +189,8 @@ export interface LedgerLink {
   decidedAt: string | null;
   createdAt: string;
   pr?: LedgerLinkPr;
+  /** A meeting link whose evidence is not in this project (spec 0004 AC-62b). */
+  outsideProject?: boolean;
 }
 
 export interface LedgerItemView extends LedgerItem {
@@ -194,6 +198,8 @@ export interface LedgerItemView extends LedgerItem {
   links: LedgerLink[];
   /** The latest live mark on this item from a later call, if any. */
   liveMark: LedgerLiveMark | null;
+  /** Project meetings only (spec 0004 AC-60). */
+  outcome?: Outcome;
 }
 
 export interface LedgerIncomingLink extends LedgerLink {

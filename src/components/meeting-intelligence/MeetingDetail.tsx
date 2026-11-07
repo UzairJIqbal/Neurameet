@@ -221,6 +221,8 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         onRetry={retrySummary}
         onMoved={data.projectId ? undefined : () => setRetryNonce((k) => k + 1)}
         ledgerVersion={ledgerVersion}
+        projectId={data.projectId ?? null}
+        canManage={data.projectId ? !!data.canManage : isOwner}
       />
     </section>
   );

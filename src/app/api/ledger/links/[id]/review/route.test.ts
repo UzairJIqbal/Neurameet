@@ -149,13 +149,16 @@ describe("POST /api/ledger/links/[id]/review", () => {
       const payload = updates[0].payload as {
         state: string;
         decided_at: string | null;
+        decided_by: string | null;
       };
       expect(updates[0].table).toBe("ledger_links");
       expect(payload.state).toBe(state);
       if (hasDecidedAt) {
         expect(Number.isNaN(Date.parse(payload.decided_at ?? ""))).toBe(false);
+        expect(payload.decided_by).toBe("u1");
       } else {
         expect(payload.decided_at).toBeNull();
+        expect(payload.decided_by).toBeNull();
       }
 
       expect(mockRpc).toHaveBeenCalledWith("ledger_recompute_item_status", {
