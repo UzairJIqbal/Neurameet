@@ -58,7 +58,26 @@ vi.mock("@hello-pangea/dnd", () => {
   };
 });
 
+const nav = vi.hoisted(() => ({
+  replace: vi.fn(),
+  params: new URLSearchParams(),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: nav.replace }),
+  usePathname: () => "/projects/p1",
+  useSearchParams: () => nav.params,
+}));
+
+// The drawer loads its own data and has its own rules. Here only opening and
+// closing it matter.
+vi.mock("./TaskDrawer", () => ({
+  default: ({ taskId, onClose }: { taskId: string; onClose: () => void }) => (
+    <button onClick={onClose}>Close drawer {taskId}</button>
+  ),
+}));
+
 const client = vi.hoisted(() => ({
+  getTask: vi.fn(),
   listMembers: vi.fn(),
   listTasks: vi.fn(),
   updateTask: vi.fn(),
@@ -136,6 +155,8 @@ const column = (name: string) => screen.getByRole("region", { name });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  nav.params = new URLSearchParams();
+  client.getTask.mockResolvedValue({ task: task() });
   client.listMembers.mockResolvedValue(members("developer"));
   client.listTasks.mockResolvedValue({ tasks: [task()], truncated: {} });
 });
@@ -192,6 +213,49 @@ describe("TasksBoard", () => {
       "You can only change your own or unassigned tasks",
     );
     expect(client.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("opens no drawer and asks for no task without ?task=", async () => {
+    render(<TasksBoard project={project} />);
+    await screen.findByText("Fix login");
+    expect(client.getTask).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /Close drawer/ })).toBeNull();
+  });
+
+  it("opens the drawer from ?task=, and closing it removes only that param", async () => {
+    nav.params = new URLSearchParams("tab=tasks&task=t9");
+    render(<TasksBoard project={project} />);
+
+    const close = await screen.findByRole("button", {
+      name: "Close drawer t9",
+    });
+    expect(client.getTask).toHaveBeenCalledWith("t9", expect.anything());
+    expect(nav.replace).not.toHaveBeenCalled();
+
+    fireEvent.click(close);
+
+    expect(nav.replace).toHaveBeenCalledWith("/projects/p1?tab=tasks", {
+      scroll: false,
+    });
+    expect(screen.queryByRole("button", { name: /Close drawer/ })).toBeNull();
+  });
+
+  it("toasts and clears a ?task= you can't read, with no drawer", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    client.getTask.mockRejectedValue(
+      new ProjectClientError(404, "Not found", null),
+    );
+    nav.params = new URLSearchParams("tab=tasks&task=bad");
+    render(<TasksBoard project={project} />);
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("We couldn't open that task."),
+    );
+    expect(nav.replace).toHaveBeenCalledWith("/projects/p1?tab=tasks", {
+      scroll: false,
+    });
+    expect(screen.queryByRole("button", { name: /Close drawer/ })).toBeNull();
+    spy.mockRestore();
   });
 });
 

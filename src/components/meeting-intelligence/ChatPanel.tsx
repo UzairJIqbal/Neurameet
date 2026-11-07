@@ -14,7 +14,7 @@ const STORAGE_PREFIX = "neurameet:chat:";
 
 type StoredChat = { messages: UIMessage[]; updatedAt: number };
 
-const loadMessages = (id: string): UIMessage[] => {
+export const loadMessages = (id: string): UIMessage[] => {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.sessionStorage.getItem(STORAGE_PREFIX + id);
@@ -28,7 +28,7 @@ const loadMessages = (id: string): UIMessage[] => {
   }
 };
 
-const saveMessages = (id: string, messages: UIMessage[]): void => {
+export const saveMessages = (id: string, messages: UIMessage[]): void => {
   if (typeof window === "undefined") return;
   try {
     const payload: StoredChat = { messages, updatedAt: Date.now() };

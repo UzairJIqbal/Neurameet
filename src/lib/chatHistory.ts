@@ -54,6 +54,8 @@ export function listConversations(): ConversationMeta[] {
       if (!Array.isArray(messages) || messages.length === 0) continue;
 
       const id = key.slice(STORAGE_PREFIX.length);
+      // A project assistant's history stays inside its own tab.
+      if (id.startsWith("project:")) continue;
       // ChatPanel keys a meeting chat by the raw meeting id.
       const meetingId = id === "general" ? undefined : id;
 

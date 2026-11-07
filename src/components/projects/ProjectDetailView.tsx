@@ -17,8 +17,9 @@ import ProposalsPanel from "./ProposalsPanel";
 import GitHubTab from "./GitHubTab";
 import DecisionsTab from "./DecisionsTab";
 import ActivityTab from "./ActivityTab";
+import AssistantTab from "./AssistantTab";
 
-type TabKey = "members" | "tasks" | "promises" | "proposals" | "activity" | "github";
+type TabKey = "members" | "tasks" | "promises" | "proposals" | "activity" | "assistant" | "github";
 
 const TAB_LABELS: Record<TabKey, string> = {
   members: "Members",
@@ -26,13 +27,15 @@ const TAB_LABELS: Record<TabKey, string> = {
   promises: "Decisions and Promises",
   proposals: "Proposals",
   activity: "Activity",
+  assistant: "AI Assistant",
   github: "GitHub",
 };
 
-// Proposals are hidden for Viewers (AC-37). GitHub is the Owner's alone (AC-47).
+// Proposals and the assistant are hidden for Viewers (AC-37, AC-63). GitHub is
+// the Owner's alone (AC-47).
 const tabsFor = (project: ProjectDetail): TabKey[] => {
   if (project.role === "viewer") return ["members", "tasks", "promises", "activity"];
-  const tabs: TabKey[] = ["members", "tasks", "promises", "proposals", "activity"];
+  const tabs: TabKey[] = ["members", "tasks", "promises", "proposals", "activity", "assistant"];
   return project.role === "owner" ? [...tabs, "github"] : tabs;
 };
 
@@ -168,6 +171,7 @@ const ProjectDetailView = ({ id }: { id: string }) => {
       {tab === "github" && <GitHubTab project={project} />}
       {tab === "promises" && <DecisionsTab project={project} />}
       {tab === "activity" && <ActivityTab project={project} />}
+      {tab === "assistant" && <AssistantTab projectId={project.id} />}
     </section>
   );
 };

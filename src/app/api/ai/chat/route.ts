@@ -12,7 +12,23 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { resolveChatModel } from "@/agent/models";
 import { retrieveContext, buildSystemPrompt } from "@/agent/rag";
 import { getUserRecordings } from "@/lib/recordings";
-import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
+import {
+  NEED_ROLES,
+  accessErrorResponse,
+  checkMeetingAccess,
+  requireProjectRole,
+} from "@/lib/project-auth";
+import { dataBlock } from "@/lib/data-block";
+import { isUuid } from "@/lib/invitations";
+import {
+  NOT_FOUND,
+  buildProjectPrompt,
+  buildProjectSources,
+  retrieveProjectSources,
+  toClientSources,
+  type BuiltSource,
+} from "@/lib/project-assistant";
+import { stripMarkers } from "@/lib/project-citations";
 
 // Extract the text of the most recent user message (for RAG retrieval).
 function lastUserText(messages: UIMessage[]): string {
@@ -29,14 +45,6 @@ function lastUserText(messages: UIMessage[]): string {
     }
   }
   return "";
-}
-
-// Wrap a user- or profile-supplied value in a named tag so the model treats it
-// as data. Closing-tag text inside the value is neutralised so it cannot break
-// out of the block.
-function dataBlock(name: string, value: string): string {
-  const safe = value.replace(new RegExp(`</?${name}>`, "gi"), "");
-  return `<${name}>\n${safe}\n</${name}>`;
 }
 
 // True when the caller has an attendance row for the meeting. Guests may have
@@ -162,17 +170,95 @@ function buildRecordingAnswer(count: number): string {
   return `You have ${count} ${noun} across your calls in NeuraMeet. You can watch each one from that meeting's Recording tab on its detail page.`;
 }
 
+// Client history for the project path: no client supplied system messages, and
+// no markers on earlier answers, since each turn numbers its sources afresh.
+function projectHistory(messages: UIMessage[]): UIMessage[] {
+  return messages
+    .filter((message) => message.role !== "system")
+    .map((message) =>
+      message.role !== "assistant"
+        ? message
+        : {
+            ...message,
+            parts: message.parts.map((part) =>
+              part.type === "text"
+                ? { ...part, text: stripMarkers(part.text) }
+                : part,
+            ),
+          },
+    );
+}
+
+// The fixed answer as a normal UI message stream, with no model call.
+function notFoundResponse(): Response {
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      const id = "project-not-found";
+      writer.write({ type: "start", messageMetadata: { sources: [] } });
+      writer.write({ type: "text-start", id });
+      writer.write({ type: "text-delta", id, delta: NOT_FOUND });
+      writer.write({ type: "text-end", id });
+    },
+  });
+  return createUIMessageStreamResponse({ stream });
+}
+
+// The project assistant (spec 0004, W7): no tools, no table writes, and
+// citations built here from what was really retrieved.
+async function answerProject(
+  userId: string,
+  projectId: string,
+  rawMessages: UIMessage[],
+): Promise<Response> {
+  const supabase = supabaseServer();
+  try {
+    await requireProjectRole(supabase, userId, projectId, NEED_ROLES.content);
+  } catch (accessErr) {
+    const denied = accessErrorResponse(accessErr);
+    if (!denied) throw accessErr;
+    return denied;
+  }
+
+  const messages = projectHistory(rawMessages);
+  const question = lastUserText(messages);
+  if (!question.trim()) {
+    return NextResponse.json({ error: "Messages are required" }, { status: 400 });
+  }
+
+  let sources: BuiltSource[];
+  try {
+    const retrieval = await retrieveProjectSources(supabase, projectId, question);
+    sources = buildProjectSources(retrieval);
+  } catch (err) {
+    console.error("Project assistant retrieval failed:", err);
+    return NextResponse.json(
+      { error: "Could not search this project's records" },
+      { status: 500 },
+    );
+  }
+
+  if (sources.length === 0) return notFoundResponse();
+
+  // Only now, because the probe is itself a real model call.
+  const model = await resolveChatModel();
+  const result = streamText({
+    model,
+    system: buildProjectPrompt(sources),
+    messages: await convertToModelMessages(messages),
+  });
+  const clientSources = toClientSources(sources);
+  return result.toUIMessageStreamResponse({
+    messageMetadata: ({ part }) =>
+      part.type === "start" ? { sources: clientSources } : undefined,
+  });
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  // Start model resolution now. A cold Gemini probe can take ~4s; running it in
-  // parallel with the body parse and the context lookups below means the probe
-  // no longer stacks on top of them.
-  const modelPromise = resolveChatModel();
 
   try {
     const body: unknown = await request.json().catch(() => null);
@@ -183,6 +269,10 @@ export async function POST(request: Request) {
     const rawMeetingId =
       body && typeof body === "object"
         ? (body as { meetingId?: unknown }).meetingId
+        : undefined;
+    const rawProjectId =
+      body && typeof body === "object"
+        ? (body as { projectId?: unknown }).projectId
         : undefined;
 
     if (!isUIMessageArray(rawMessages)) {
@@ -195,6 +285,19 @@ export async function POST(request: Request) {
     const messages = rawMessages;
     const meetingId =
       typeof rawMeetingId === "string" && rawMeetingId ? rawMeetingId : undefined;
+
+    // When both ids arrive, meetingId wins and projectId is ignored.
+    if (!meetingId && rawProjectId !== undefined) {
+      if (typeof rawProjectId !== "string" || !isUuid(rawProjectId)) {
+        return NextResponse.json({ error: "Invalid project id" }, { status: 422 });
+      }
+      return await answerProject(userId, rawProjectId, messages);
+    }
+
+    // Start model resolution now. A cold Gemini probe can take ~4s; running it in
+    // parallel with the context lookups below means the probe no longer stacks
+    // on top of them.
+    const modelPromise = resolveChatModel();
 
     const supabase = supabaseServer();
 

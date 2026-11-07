@@ -2,13 +2,14 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
-import { listMembers, listTasks, ProjectClientError, syncGitHub, updateTask } from "@/lib/project-client";
+import { getTask, listMembers, listTasks, ProjectClientError, syncGitHub, updateTask } from "@/lib/project-client";
 import { patchDenial } from "@/lib/task-rules";
 import {
   BOARD_REFETCH_MS,
@@ -59,6 +60,10 @@ const syncSummary = (result: GitHubSyncResult): string => {
 // 409 puts the card back and refetches. The server checks the same role rules
 // the board uses to refuse a drop early.
 const TasksBoard = ({ project }: { project: ProjectDetail }) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const taskParam = searchParams.get("task");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [truncated, setTruncated] = useState<TasksResponse["truncated"]>({});
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -80,6 +85,36 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
   const { timedOut } = useLoadingTimeout(isLoading && !loaded, { timeoutMs: 12000, retryNonce });
 
   busyRef.current = pending !== null || saving;
+
+  const clearTaskParam = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("task");
+    const rest = params.toString();
+    router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false });
+  };
+  const clearTaskParamRef = useRef(clearTaskParam);
+  clearTaskParamRef.current = clearTaskParam;
+
+  // A citation link (?task=). The board may not hold the task because of its
+  // filters, so the id is checked once against the server.
+  useEffect(() => {
+    if (!taskParam) return;
+    const controller = new AbortController();
+    getTask(taskParam, controller.signal)
+      .then(() => setOpenTaskId(taskParam))
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        console.error("Failed to open the linked task:", err);
+        toast.error("We couldn't open that task.");
+        clearTaskParamRef.current();
+      });
+    return () => controller.abort();
+  }, [taskParam]);
+
+  const closeDrawer = () => {
+    setOpenTaskId(null);
+    if (taskParam) clearTaskParam();
+  };
 
   const fetchBoard = useCallback(
     async (signal?: AbortSignal) => {
@@ -348,7 +383,7 @@ const TasksBoard = ({ project }: { project: ProjectDetail }) => {
           onConfirm={confirmComplete}
         />
       )}
-      {openTaskId && <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+      {openTaskId && <TaskDrawer taskId={openTaskId} onClose={closeDrawer} />}
       {showNew && (
         <NewTaskDialog
           projectId={project.id}

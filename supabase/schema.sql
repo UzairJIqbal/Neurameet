@@ -1585,3 +1585,22 @@ create or replace view project_activity with (security_invoker = true) as
         'repo.unlinked', 'meeting.moved');   -- allowlist: invite and join request rows (emails) never show
 grant select on project_activity to service_role;
 revoke all on project_activity from anon, authenticated;
+
+-- W7: project assistant retrieval. The project filter lives inside SQL (AC-64).
+create or replace function match_project_chunks(
+  p_project uuid, query_embedding vector(768), match_count integer, min_similarity real
+) returns table (chunk_id uuid, meeting_id uuid, meeting_title text, started_at timestamptz,
+                 content text, chunk_index integer, similarity real)
+language sql stable
+set search_path = public
+as $$
+  select c.id, m.id, m.title, m.started_at, c.chunk_text, c.chunk_index,
+         (1 - (c.embedding <=> query_embedding))::real
+  from meeting_chunks c join meetings m on m.id = c.meeting_id
+  where m.project_id = p_project
+    and 1 - (c.embedding <=> query_embedding) >= min_similarity
+  order by c.embedding <=> query_embedding
+  limit match_count;
+$$;
+revoke execute on function match_project_chunks(uuid, vector, integer, real) from public, anon, authenticated;
+grant execute on function match_project_chunks(uuid, vector, integer, real) to service_role;
