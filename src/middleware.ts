@@ -38,7 +38,10 @@ export default clerkMiddleware(async (auth, req) => {
 	// pathname explicitly with a regex as a belt-and-suspenders guard.
 	const isGuestPath = /^\/meeting\/[^/]+\/guest$/.test(req.nextUrl.pathname);
 	if (isPublicRoute(req) || isGuestPath) {
-		if (userId) {
+		// A signed-in non member sent here by MeetingSetup joins as a guest (AC-27).
+		// The param only opens the lobby, which anyone can reach signed out.
+		const isSetupFallback = isGuestPath && req.nextUrl.searchParams.get("from") === "setup";
+		if (userId && !isSetupFallback) {
 			return NextResponse.redirect(new URL("/dashboard", req.url));
 		}
 		return; // signed-out visitor on a public route — allow through

@@ -93,7 +93,7 @@ const MeetingSetup = ({
   const { hasBrowserPermission: hasMicrophonePermissions } = useMicrophoneState();
 
   const sendToGuestFlow = () => {
-    router.push(`/meeting/${encodeURIComponent(callId)}/guest`);
+    router.push(`/meeting/${encodeURIComponent(callId)}/guest?from=setup`);
   };
 
   // Saves the tick right before /members checks it. False means stop here.
