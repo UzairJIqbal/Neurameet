@@ -1,4 +1,4 @@
-# Memory — NeuraMeet: all build steps closed, UI polish done, Deploy next
+# Memory — NeuraMeet: deployed to Vercel, live checks owed
 
 Last updated: 2026-11-08
 
@@ -25,11 +25,11 @@ UI polish pass (this session, token only, no redesign): `src/lib/utils.ts` `cn()
 
 ## Current state
 
-Typecheck clean, 1883 vitest tests pass. `npx next lint` reports one old prettier error in `src/lib/transcript-state.ts` (untouched file, trivial to fix). `.env.example` still lacks `RESEND_WORKSPACE_FROM=` and `CRON_SECRET=` (an edit was denied; add them). Untracked leftovers: `reports/tasdeeq-seed-*.json`. Optional: `npx impeccable update` (v4.8.1).
+Typecheck clean, 1883 vitest tests pass. `npx next lint` reports one old prettier error in `src/lib/transcript-state.ts` (untouched file, trivial to fix). `.env.example` now lists `RESEND_WORKSPACE_FROM=` and `CRON_SECRET=`. Untracked leftovers: `reports/tasdeeq-seed-*.json`. Optional: `npx impeccable update` (v4.8.1).
 
 ## Next session starts with
 
-Step 11 Deploy to Vercel free tier: re-enable Clerk email verification, set all env vars, set Clerk, Stream and GitHub App webhook URLs, run `npm run build`, confirm no secret leaks and free tier limits. Then the owed live checks: W2 to W6 manual tests, LL5, Tasdeeq live run, W9 live injection probe, AC-83 bilingual run, live GitHub webhook (including the unverified `requested_reviewer.id` payload). Resilience item: `/api/ai/process` returns 500 when Gemini times out and Groq fallback also fails (no `maxOutputTokens`; probe an ordered list of Groq fallback models).
+Step 11 is deployed at https://neurameet.vercel.app with env vars, cron, webhook and Clerk email verification done, and free tier limits confirmed. Next: the owed live checks on the deployment: W2 to W6 manual tests, LL5, Tasdeeq live run, W9 live injection probe, AC-83 bilingual run, live GitHub webhook (including the unverified `requested_reviewer.id` payload). Optional: set `RESEND_FROM` and `RESEND_WORKSPACE_FROM` in Vercel.
 
 ## Open questions
 

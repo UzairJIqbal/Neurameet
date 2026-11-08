@@ -287,7 +287,7 @@ Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview` after the research in `r
 
 ## Pending — Deploy
 
-- ⬜ **Step 11** — Deploy to Vercel free tier + harden (re-enable Clerk email verification, verify every path, confirm no secret leaks, confirm free-tier limits).
+- 🟨 **Step 11** — Deployed 2026-11-08 to https://neurameet.vercel.app (Vercel Hobby, project `neurameet`). Done: all production env vars (Clerk, Stream, Supabase, Gemini, Groq, Resend, GitHub App, minutes signing key, `CRON_SECRET`), daily cron in `vercel.json`, smoke checks, bundle scan (no real secret in client chunks), GitHub App URLs and a stronger webhook secret (signed ping to production returned 202), Clerk email verification re-enabled by the user, free tier limits confirmed (Vercel Hobby cron once a day, Supabase 500 MB and pause after a week idle, Resend 100 a day and 3,000 a month). The Groq fallback token budget and retry were already in `src/agent/models.ts`. Still owed on the deployment, by the user's decision: W2 to W6 manual tests, LL5, Tasdeeq live run, W9 live injection probe, AC-83 bilingual run, live GitHub webhook including `requested_reviewer.id`. Optional: `RESEND_FROM` and `RESEND_WORKSPACE_FROM` in Vercel (invite email to other people needs a verified Resend domain, copy link works without it).
 
 ## Key Decisions Locked
 
