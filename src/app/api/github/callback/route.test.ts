@@ -18,6 +18,7 @@ vi.mock("@/lib/github", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/github")>()),
   userToken: mockUserToken,
   userInstallations: mockUserInstallations,
+  appSlug: async () => "neuramet-app",
   githubUser: mockGithubUser,
 }));
 
@@ -64,6 +65,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetQueues();
   vi.stubEnv("GITHUB_APP_CLIENT_SECRET", "client-secret");
+  vi.stubEnv("GITHUB_APP_CLIENT_ID", "client-id");
   mockAuth.mockResolvedValue({ userId: "u1" });
   mockUserToken.mockResolvedValue("user-token");
   mockUserInstallations.mockResolvedValue([installation(1), installation(2)]);
@@ -135,10 +137,26 @@ describe("GET /api/github/callback", () => {
     expect(stored()).toEqual([]);
   });
 
-  it("stores nothing when the person has no installations", async () => {
+  it("sends someone with no installation straight to install the App", async () => {
     owner();
     mockUserInstallations.mockResolvedValue([]);
-    const { search } = await visit(valid());
+    const res = await GET(
+      new Request(
+        `http://localhost/api/github/callback?${new URLSearchParams(valid())}`,
+      ),
+    );
+    const location = new URL(res.headers.get("location") as string);
+    expect(location.origin + location.pathname).toBe(
+      "https://github.com/apps/neuramet-app/installations/new",
+    );
+    expect(location.searchParams.get("state")).toBeTruthy();
+    expect(stored()).toEqual([]);
+  });
+
+  it("stores nothing when an install finishes with no installations", async () => {
+    owner();
+    mockUserInstallations.mockResolvedValue([]);
+    const { search } = await visit(valid({ installation_id: "1" }));
     expect(search).toBe("?tab=github&github=not_yours");
     expect(stored()).toEqual([]);
   });

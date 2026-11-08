@@ -126,6 +126,15 @@ const GitHubTab = ({
 
   const reload = () => setRetryNonce((k) => k + 1);
 
+  // Changes made in the GitHub tab (Manage repositories) show up when you come back.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
   const change = async (repo: GitHubRepoChoice, action: "link" | "unlink") => {
     setBusyRepo(repo.repoId);
     try {
@@ -157,12 +166,14 @@ const GitHubTab = ({
           &quot;Closes {project.taskPrefix}-12&quot; into the default branch completes the task.
         </p>
         <div className="flex flex-wrap gap-3">
-          <a href={data.installUrl} className={primaryButton}>
-            Install the GitHub App
+          <a href={data.authorizeUrl} className={primaryButton}>
+            {data.repos.length === 0 ? "Connect GitHub" : "Reconnect GitHub"}
           </a>
-          <a href={data.authorizeUrl} className={secondaryButton}>
-            I already installed it
-          </a>
+          {data.repos.length > 0 && (
+            <a href={data.installUrl} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
+              Manage repositories on GitHub
+            </a>
+          )}
         </div>
       </div>
 
@@ -170,7 +181,7 @@ const GitHubTab = ({
         <h2 className="text-headline-sm font-semibold text-on-surface">Repositories</h2>
         {data.repos.length === 0 ? (
           <p className="text-body-md text-on-surface-variant">
-            No repositories yet. Install the App, or choose &quot;I already installed it&quot; if it is on your account.
+            No repositories yet. Choose Connect GitHub and pick the repositories to share. You come straight back here.
           </p>
         ) : (
           <ul className="divide-y divide-surface-variant rounded-xl border border-surface-variant bg-surface-container-lowest">

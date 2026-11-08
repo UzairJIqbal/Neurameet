@@ -406,7 +406,8 @@ The project builds by extending what works, so each slice leaves the app working
 - [ ] Apply the AGENTS.md API Contracts changes before the build (`/sync`): the lines added to the contract list in [index.md](index.md) for W8.
 - [ ] Set `RESEND_WORKSPACE_FROM` and `CRON_SECRET` in Vercel at Deploy.
 - [ ] Decide later whether Prepare should search the whole project through W7's project filter.
-- [ ] Verify at build against GitHub: listing a PR's commits and reading `GET /user` work with today's App permissions, and the `pull_request` `review_requested` payload carries `requested_reviewer.id`. The official pages I fetched did not state these. If a read needs more than Pull requests read, hide "Show commits" rather than widen the App.
+- [x] Verified live 2026-11-08 against a real GitHub App install: listing a PR's commits ("Show commits" returned the PR's commit) and reading `GET /user` (account connect stored the login) both work with today's App permissions (Pull requests, Contents, Metadata read).
+- [ ] Still owed at Deploy: the `pull_request` `review_requested` payload carrying `requested_reviewer.id`. It needs a public webhook URL, which the local App cannot have. The official pages did not state this payload shape, so confirm it then.
 - [ ] Set your GitHub App's user authorization callback to include `/api/github/callback` on both dev and production Apps. It already does for install, so this should need no change.
 - [ ] The lock on PDF items is yours to overrule. If you want any row under "What stays out of the PDF" back, tell me which one and I'll update this spec and the matching `AGENTS.md` line through `/sync`.
 

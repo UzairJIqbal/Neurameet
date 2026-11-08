@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { mockAuth, gh, mockSync } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   gh: {
+    appSlug: vi.fn(),
     installUrls: vi.fn(),
     installationRepos: vi.fn(),
   },
@@ -61,6 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetQueues();
   mockAuth.mockResolvedValue({ userId: "u1" });
+  gh.appSlug.mockResolvedValue("x");
   gh.installUrls.mockReturnValue({
     installUrl: "https://github.com/apps/x/installations/new?state=s",
     authorizeUrl: "https://github.com/login/oauth/authorize?state=s",

@@ -160,14 +160,14 @@ describe("GitHubTab", () => {
     },
   );
 
-  it("offers both GitHub links and a Private badge", async () => {
+  it("offers connect and manage links and a Private badge", async () => {
     render(<GitHubTab project={project} />);
     await screen.findByText("acme/app");
     expect(
-      screen.getByRole("link", { name: /Install the GitHub App/ }),
+      screen.getByRole("link", { name: /Reconnect GitHub/ }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: /I already installed it/ }),
+      screen.getByRole("link", { name: /Manage repositories on GitHub/ }),
     ).toBeTruthy();
     expect(screen.getByText("Private")).toBeTruthy();
     expect(toastMock.success).not.toHaveBeenCalled();

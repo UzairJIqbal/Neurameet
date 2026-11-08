@@ -101,8 +101,8 @@ test("W8 workspace shell", async ({ browser }) => {
   await test.step("4 invite creates a notification for the invited member", async () => {
     await addMember(a.page, b, projectId, "developer");
     const res = await api<{
-      notifications?: { title: string }[];
-      unread?: number;
+      items?: { title: string }[];
+      unreadCount?: number;
     }>(b.page, "/api/notifications");
     expect.soft(res.status).toBe(200);
     console.log(

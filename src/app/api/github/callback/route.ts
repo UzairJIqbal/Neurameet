@@ -3,7 +3,9 @@ import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getProjectRole } from "@/lib/project-auth";
 import {
+  appSlug,
   githubUser,
+  installUrls,
   isAccountState,
   readAccountState,
   readInstallState,
@@ -15,7 +17,8 @@ import type { GitHubInstallationListing } from "@/lib/github-types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type OutcomeCode = "connected" | "not_yours" | "requested" | "failed";
+type OutcomeCode =
+  "connected" | "not_yours" | "requested" | "failed" | "install";
 type Supabase = ReturnType<typeof supabaseServer>;
 
 async function storeClaims(
@@ -66,7 +69,8 @@ async function connect(
   if (claimedId && !listed.some((i) => String(i.id) === claimedId)) {
     return "not_yours";
   }
-  if (listed.length === 0) return "not_yours";
+  // Nothing installed yet and no install in progress: send them to install it.
+  if (listed.length === 0) return claimedId ? "not_yours" : "install";
 
   await storeClaims(supabase, userId, listed);
   return "connected";
@@ -155,7 +159,16 @@ export async function GET(request: Request) {
     const supabase = supabaseServer();
     const role = await getProjectRole(supabase, userId, state.projectId);
     if (role !== "owner") return toProject("failed");
-    return toProject(await connect(supabase, userId, params));
+    const outcome = await connect(supabase, userId, params);
+    if (outcome === "install") {
+      const { installUrl } = installUrls(
+        state.projectId,
+        userId,
+        await appSlug(),
+      );
+      return NextResponse.redirect(installUrl);
+    }
+    return toProject(outcome);
   } catch (err) {
     console.error(
       "[github] callback failed:",

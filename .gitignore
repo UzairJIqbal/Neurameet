@@ -62,3 +62,4 @@ test-results/
 /tmp-*.ts
 /*.png
 src/app/widgetpreviewtemp/
+scripts/.github-app-credentials.env

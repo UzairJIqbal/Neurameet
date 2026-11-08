@@ -249,12 +249,29 @@ export function readInstallState(
   }
 }
 
+let cachedSlug: string | null = null;
+
+/** The App's real slug from GitHub, so the install link always matches the credentials in use. Falls back to the env value. */
+export async function appSlug(): Promise<string> {
+  if (cachedSlug) return cachedSlug;
+  try {
+    const app = await ghFetch<{ slug?: string }>(`${API}/app`, appJwt());
+    if (app.slug) cachedSlug = app.slug;
+  } catch (err) {
+    console.error(
+      "[github] app slug lookup failed:",
+      err instanceof Error ? err.message : "unknown error",
+    );
+  }
+  return cachedSlug ?? requireEnv("NEXT_PUBLIC_GITHUB_APP_SLUG");
+}
+
 export function installUrls(
   projectId: string,
   userId: string,
+  slug: string = requireEnv("NEXT_PUBLIC_GITHUB_APP_SLUG"),
 ): { installUrl: string; authorizeUrl: string } {
   const state = encodeURIComponent(signInstallState(projectId, userId));
-  const slug = requireEnv("NEXT_PUBLIC_GITHUB_APP_SLUG");
   const clientId = requireEnv("GITHUB_APP_CLIENT_ID");
   return {
     installUrl: `https://github.com/apps/${slug}/installations/new?state=${state}`,

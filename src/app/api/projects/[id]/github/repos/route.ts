@@ -6,7 +6,7 @@ import {
   accessErrorResponse,
   requireProjectRole,
 } from "@/lib/project-auth";
-import { installUrls, installationRepos } from "@/lib/github";
+import { appSlug, installUrls, installationRepos } from "@/lib/github";
 import type {
   GitHubRepoChoice,
   GitHubRepoListing,
@@ -114,7 +114,7 @@ export async function GET(_request: Request, { params }: Params) {
 
     let urls: { installUrl: string; authorizeUrl: string };
     try {
-      urls = installUrls(id, userId);
+      urls = installUrls(id, userId, await appSlug());
     } catch (err) {
       console.error("[github] App is not configured:", err);
       return NextResponse.json(
