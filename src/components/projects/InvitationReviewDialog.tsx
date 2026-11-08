@@ -33,7 +33,10 @@ const InvitationReviewDialog = ({ invitations, onClose, onDecided }: Props) => {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const decide = async (invitation: MyInvitation, decision: MyInvitationDecision) => {
+  const decide = async (
+    invitation: MyInvitation,
+    decision: MyInvitationDecision,
+  ) => {
     setBusyId(invitation.id);
     try {
       const res = await decideMyInvitation(invitation.id, decision);
@@ -46,7 +49,10 @@ const InvitationReviewDialog = ({ invitations, onClose, onDecided }: Props) => {
       toast.success("Invitation declined");
     } catch (err) {
       // Revoked, expired, or no longer yours: the row can't be acted on again.
-      if (err instanceof ProjectClientError && [404, 410].includes(err.status)) {
+      if (
+        err instanceof ProjectClientError &&
+        [404, 410].includes(err.status)
+      ) {
         toast.error("This invite is no longer valid");
         onDecided(invitation.id);
         return;
@@ -63,14 +69,16 @@ const InvitationReviewDialog = ({ invitations, onClose, onDecided }: Props) => {
         role="dialog"
         aria-modal="true"
         aria-label="Project invitations"
-        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg border border-surface-variant bg-surface-container-lowest p-6"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-card bg-surface-container-lowest p-6 shadow-card"
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-headline-sm text-on-surface">Project invitations</h2>
+          <h2 className="text-headline-sm text-on-surface">
+            Project invitations
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+            className="rounded-full border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
           >
             Close
           </button>
@@ -79,11 +87,17 @@ const InvitationReviewDialog = ({ invitations, onClose, onDecided }: Props) => {
           {invitations.map((invitation) => (
             <li key={invitation.id} className="flex flex-col gap-3 py-3">
               <div className="flex items-start gap-3">
-                <ProjectIconTile icon={invitation.icon} color={invitation.color} />
+                <ProjectIconTile
+                  icon={invitation.icon}
+                  color={invitation.color}
+                />
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="break-words font-medium text-on-surface">{invitation.projectName}</span>
+                  <span className="break-words font-medium text-on-surface">
+                    {invitation.projectName}
+                  </span>
                   <span className="text-xs text-on-surface-variant">
-                    {invitation.inviterName} invited you {ageLabel(invitation.invitedAt)}
+                    {invitation.inviterName} invited you{" "}
+                    {ageLabel(invitation.invitedAt)}
                   </span>
                   <ProjectRoleChip role={invitation.role} />
                 </div>
@@ -94,7 +108,7 @@ const InvitationReviewDialog = ({ invitations, onClose, onDecided }: Props) => {
                   disabled={busyId !== null}
                   onClick={() => decide(invitation, "decline")}
                   aria-label={`Decline ${invitation.projectName}`}
-                  className="rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50"
+                  className="rounded-full border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50"
                 >
                   Decline
                 </button>
@@ -103,7 +117,7 @@ const InvitationReviewDialog = ({ invitations, onClose, onDecided }: Props) => {
                   disabled={busyId !== null}
                   onClick={() => decide(invitation, "accept")}
                   aria-label={`Accept ${invitation.projectName}`}
-                  className="rounded-lg bg-primary-container px-3 py-1.5 text-body-md text-on-primary hover:bg-primary disabled:opacity-50"
+                  className="rounded-full bg-primary-container px-3 py-1.5 text-body-md text-on-primary hover:bg-primary disabled:opacity-50"
                 >
                   Accept
                 </button>

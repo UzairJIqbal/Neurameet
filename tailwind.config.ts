@@ -26,19 +26,24 @@ const config = {
 				background: "hsl(var(--background))",
 
 				// Primary
-				primary: "#6500C4",
-				"primary-container": "#830EF9",
+				primary: "#6E3BB5",
+				"primary-container": "#834ACB",
 				"on-primary": "#FFFFFF",
-				"on-primary-container": "#E9D5FF",
+				"on-primary-container": "#F1E7FC",
+
+				// DotTime reference accents: lilac panels and the coral stat card
+				lilac: "#F1E7FC",
+				"lilac-soft": "#FDF4FE",
+				coral: "#E66F72",
 
 				// Secondary
-				secondary: "#525B8E",
-				"secondary-container": "#BBC3FD",
-				"on-secondary-container": "#464F81",
+				secondary: "#5B5B66",
+				"secondary-container": "#F1E7FC",
+				"on-secondary-container": "#4B2A86",
 
 				// Tertiary
-				tertiary: "#7B3500",
-				"tertiary-container": "#A04700",
+				tertiary: "#B8434B",
+				"tertiary-container": "#D6535B",
 
 				// Error
 				error: "#BA1A1A",
@@ -56,31 +61,31 @@ const config = {
 				"on-warning-container": "#3F2E00",
 
 				// Surface
-				surface: "#FAF8FF",
-				"surface-dim": "#D7D9EA",
-				"surface-bright": "#FAF8FF",
+				surface: "#FFFFFF",
+				"surface-dim": "#E6E6E6",
+				"surface-bright": "#FFFFFF",
 				"surface-container-lowest": "#FFFFFF",
-				"surface-container-low": "#F3F2FF",
-				"surface-container": "#EBEDFE",
-				"surface-container-high": "#E6E7F8",
-				"surface-container-highest": "#E0E1F3",
-				"surface-variant": "#E0E1F3",
+				"surface-container-low": "#F8F8F8",
+				"surface-container": "#F3F3F3",
+				"surface-container-high": "#EDEDED",
+				"surface-container-highest": "#E6E6E6",
+				"surface-variant": "#EDEDED",
 
 				// Text
-				"on-surface": "#181B27",
-				"on-surface-variant": "#4C4356",
+				"on-surface": "#0A0A0A",
+				"on-surface-variant": "#525252",
 
 				// Inverse (dark sidebar/shell)
-				"inverse-surface": "#2D303D",
-				"inverse-on-surface": "#EFF0FF",
-				"inverse-primary": "#D7BAFF",
+				"inverse-surface": "#1C1C1E",
+				"inverse-on-surface": "#F5F5F5",
+				"inverse-primary": "#CDB2F0",
 
 				// Outline
-				outline: "#7D7388",
-				"outline-variant": "#CEC2D9",
+				outline: "#8C8C8C",
+				"outline-variant": "#E6E6E6",
 
 				// Background (shadcn compat)
-				"on-background": "#181B27",
+				"on-background": "#0A0A0A",
 
 				// Shadcn semantic tokens — wired to :root CSS custom properties
 				// so bg-popover / text-popover-foreground / bg-accent /
@@ -94,7 +99,7 @@ const config = {
 				"muted-foreground": "hsl(var(--muted-foreground))",
 
 				// Sidebar active nav fill (Material 3 token from locked design)
-				"on-secondary-fixed-variant": "#3A4375",
+				"on-secondary-fixed-variant": "#4B2A86",
 
 				// Status — keep green-1 for small visual indicators (online dot)
 				green: {
@@ -102,20 +107,36 @@ const config = {
 				},
 			},
 			fontFamily: {
-				sans: ["var(--font-hanken-grotesk)", "ui-sans-serif", "system-ui", "sans-serif"],
+				sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
 				mono: ["var(--font-jetbrains-mono)", "ui-monospace", "monospace"],
 			},
 			fontSize: {
-				"display-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+				"display-lg": ["34px", { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" }],
 				"display-lg-mobile": ["26px", { lineHeight: "32px", fontWeight: "700" }],
-				"headline-md": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
-				"headline-sm": ["20px", { lineHeight: "28px", fontWeight: "600" }],
-				"body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
-				"body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
-				"label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
-				"label-mono": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }],
+				"headline-md": ["24px", { lineHeight: "34px", letterSpacing: "-0.01em", fontWeight: "600" }],
+				"headline-sm": ["20px", { lineHeight: "30px", fontWeight: "600" }],
+				"body-lg": ["16px", { lineHeight: "26px", fontWeight: "400" }],
+				"body-md": ["15px", { lineHeight: "24px", fontWeight: "400" }],
+				"label-caps": ["12px", { lineHeight: "18px", letterSpacing: "0.06em", fontWeight: "700" }],
+				"label-mono": ["13px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500" }],
+			},
+			borderRadius: {
+				card: "1.5rem",
+				tray: "2rem",
+			},
+			boxShadow: {
+				card: "0 1px 2px rgb(10 10 10 / 0.04), 0 8px 24px rgb(10 10 10 / 0.06)",
+				float: "0 16px 48px rgb(131 74 203 / 0.18)",
 			},
 			keyframes: {
+				marquee: {
+					from: { transform: "translateX(0)" },
+					to: { transform: "translateX(-50%)" },
+				},
+				"float-slow": {
+					"0%, 100%": { transform: "translateY(0)" },
+					"50%": { transform: "translateY(-8px)" },
+				},
 				"accordion-down": {
 					from: { height: "0" },
 					to: { height: "var(--radix-accordion-content-height)" },
@@ -126,6 +147,8 @@ const config = {
 				},
 			},
 			animation: {
+				marquee: "marquee 32s linear infinite",
+				"float-slow": "float-slow 6s ease-in-out infinite",
 				"accordion-down": "accordion-down 0.2s ease-out",
 				"accordion-up": "accordion-up 0.2s ease-out",
 			},

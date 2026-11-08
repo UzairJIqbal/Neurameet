@@ -40,7 +40,7 @@ export const LoadError = ({
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container"
+            className="rounded-card bg-surface-container-lowest shadow-card px-3 py-1 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container"
           >
             Retry
           </button>
@@ -58,7 +58,7 @@ export const LoadError = ({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
+            className="inline-flex items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
           >
             Retry
           </button>
@@ -66,14 +66,14 @@ export const LoadError = ({
         <button
           type="button"
           onClick={back}
-          className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container"
+          className="inline-flex items-center gap-2 rounded-card bg-surface-container-lowest shadow-card px-4 py-2 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container"
         >
           Back to Dashboard
         </button>
         {listHref && (
           <Link
             href={listHref}
-            className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container"
+            className="inline-flex items-center gap-2 rounded-card bg-surface-container-lowest shadow-card px-4 py-2 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container"
           >
             {listLabel ?? "Back to list"}
           </Link>

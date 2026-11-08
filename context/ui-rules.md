@@ -2,19 +2,19 @@
 
 Concise rules for building NeuraMeet UI. The supplied UI reference (Dashboard, Meeting Intelligence, Follow-ups, forms) is the source of truth for visual decisions on new AI-feature screens. Existing Meeting Room / Meeting Setup screens keep their current dark, full-bleed video-call styling — these rules apply to the Dashboard and Meeting Intelligence surfaces being added.
 
-**Phase W (2026-11-02):** new workspace screens (My Dashboard, My Tasks, My Projects, project tabs, Kanban, invitations, notifications) follow the layout and information architecture of the PDF `NeuraMeet UI Overview`, styled only with the locked tokens in `ui-tokens.md`. Never copy colours from the PDF. Kanban columns use status badges, not coloured column backgrounds. Every project tab needs a useful empty state. AI proposals show their evidence quote and are never shown as created until confirmed. Never show per developer rankings or contribution leaderboards.
+**Phase W (2026-11-02):** new workspace screens (My Dashboard, My Tasks, My Projects, project tabs, Kanban, invitations, notifications) follow the layout and information architecture of the PDF `NeuraMeet UI Overview`, styled only with the DotTime tokens in `ui-tokens.md` (adopted 2026-11-08). Never copy colours from the PDF. Kanban columns use status badges, not coloured column backgrounds. Every project tab needs a useful empty state. AI proposals show their evidence quote and are never shown as created until confirmed. Never show per developer rankings or contribution leaderboards.
 
 ---
 
 ## Font
 
-**Hanken Grotesk** (UI text) + **JetBrains Mono** (labels/meta — timestamps, meeting codes) via `next/font/google`, configured in `src/app/layout.tsx`. This supersedes the earlier `SUSE Mono` decision in `ui-tokens.md`. Never a third family.
+**Inter** (UI text) + **JetBrains Mono** (labels/meta — timestamps, meeting codes) via `next/font/google`, configured in `src/app/layout.tsx`. Hanken Grotesk and SUSE Mono are retired. Never a third family.
 
 ---
 
 ## Layout
 
-- Sidebar: fixed left, `bg-inverse-surface`, full height, matches existing `Sidebar.tsx`
+- Sidebar: fixed left, light (`bg-surface-container-lowest shadow-card`), full height, matches `Sidebar.tsx`. The content area behind it is `bg-surface-container-low` (the tray).
 - Main content max-width: 1440px
 - Main content padding: 24-32px
 - Gap between dashboard sections: 24px
@@ -26,8 +26,8 @@ Concise rules for building NeuraMeet UI. The supplied UI reference (Dashboard, M
 
 Items: Dashboard, Meeting Intelligence, AI Chat, Recordings, Follow-ups, Settings.
 
-- Active item: `bg-primary-container` background, `text-on-primary` (filled pill) or `text-inverse-primary` (text-only)
-- Inactive item: `text-inverse-on-surface`
+- Active item: `bg-lilac text-on-secondary-container font-medium`, `rounded-full` pill
+- Inactive item: `text-on-surface-variant`, hover `bg-surface-container-low text-on-surface`
 - No underline — active state is background + text color change only
 
 ---
@@ -36,9 +36,10 @@ Items: Dashboard, Meeting Intelligence, AI Chat, Recordings, Follow-ups, Setting
 
 ```
 background: bg-surface-container-lowest (#FFFFFF)
-border: 1px solid theme(colors.outline-variant)
-border-radius: 16px (rounded-lg, per ui-tokens.md)
+shadow: shadow-card (no border, hairline border-outline-variant only when there is no shadow)
+border-radius: 24px (rounded-card)
 padding: 24px (p-6)
+sit on a tray: bg-surface-container-low, rounded-tray (32px) where cards are grouped
 ```
 
 Dashboard quick-action cards and meeting-list rows follow the same card treatment. Meeting Room / Meeting Setup keep their existing dark full-bleed treatment — do not apply this card style there.
@@ -47,7 +48,7 @@ Dashboard quick-action cards and meeting-list rows follow the same card treatmen
 
 ## Typography Hierarchy
 
-**Page/section heading** — 18-24px, weight 600-700, `text-on-primary` on dark shell / `text-on-surface` on light cards
+**Page/section heading** — 18-24px, weight 600-700, `text-on-surface` (the shell is light now; only the Meeting Room is dark)
 **Body text** — 14px, weight 400-500, `text-on-surface`
 **Muted/label text** — 12-14px, `text-on-surface-variant`
 
@@ -84,7 +85,7 @@ Reuse the existing `Button` (`stateful-button.tsx`) component — do not create 
 
 ## AI Chat Panel
 
-- Message bubbles: user messages right-aligned `bg-primary-container text-on-primary`; AI messages left-aligned `bg-surface-container text-on-surface` (light card context) or `bg-inverse-surface text-inverse-on-surface` (dark shell)
+- Message bubbles: user messages right-aligned `bg-primary-container text-on-primary`; AI messages left-aligned `bg-surface-container text-on-surface` (light card context) or `bg-inverse-surface text-inverse-on-surface` (Meeting Room panels only)
 - Streaming responses render token-by-token via AI SDK `useChat` — always show a loading/typing indicator while streaming
 - Input bar pinned to bottom of the chat panel, matches mockup
 

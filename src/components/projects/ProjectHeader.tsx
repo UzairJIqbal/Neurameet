@@ -34,9 +34,9 @@ type Props = {
 };
 
 const outlineButton =
-  "inline-flex items-center gap-2 rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+  "inline-flex items-center gap-2 rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 const primaryButton =
-  "inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "inline-flex items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -51,7 +51,11 @@ export const ageLabel = (iso: string): string => {
 // means a private repo they may not see named.
 const GitHubStatus = ({ github }: { github: ProjectFull["github"] }) => {
   if (!github.connected) {
-    return <span className="text-body-md text-on-surface-variant">GitHub not connected</span>;
+    return (
+      <span className="text-body-md text-on-surface-variant">
+        GitHub not connected
+      </span>
+    );
   }
   const first = github.repos[0];
   return (
@@ -59,10 +63,14 @@ const GitHubStatus = ({ github }: { github: ProjectFull["github"] }) => {
       <Github className="h-4 w-4" aria-hidden />
       {first ? (
         <>
-          <span className="break-all font-mono text-label-mono text-on-surface">{first.fullName}</span>
+          <span className="break-all font-mono text-label-mono text-on-surface">
+            {first.fullName}
+          </span>
           {github.repos.length > 1 && <span>+{github.repos.length - 1}</span>}
           {github.lastSyncedAt && (
-            <span className={`${CHIP_CLASS} bg-success-container text-on-success-container`}>
+            <span
+              className={`${CHIP_CLASS} bg-success-container text-on-success-container`}
+            >
               Synced {ageLabel(github.lastSyncedAt)}
             </span>
           )}
@@ -97,16 +105,24 @@ const LeaveDialog = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="leave-project-title"
-        className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
+        className="flex w-full max-w-md flex-col gap-4 rounded-card bg-surface-container-lowest p-6 shadow-lg"
       >
-        <h2 id="leave-project-title" className="text-headline-sm text-on-surface">
+        <h2
+          id="leave-project-title"
+          className="text-headline-sm text-on-surface"
+        >
           Leave this project?
         </h2>
         <p className="text-body-md text-on-surface-variant">
           You lose access to this project and its meetings right away.
         </p>
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={onCancel} disabled={busy} className={outlineButton}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className={outlineButton}
+          >
             Cancel
           </button>
           <button
@@ -125,7 +141,13 @@ const LeaveDialog = ({
 
 // The header on every tab (AC-70g). Each control shows only where your role
 // allows it; the server checks the same rule again on each call.
-const ProjectHeader = ({ project, onAddMember, onSchedule, onOpenSettings, onChanged }: Props) => {
+const ProjectHeader = ({
+  project,
+  onAddMember,
+  onSchedule,
+  onOpenSettings,
+  onChanged,
+}: Props) => {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -137,7 +159,9 @@ const ProjectHeader = ({ project, onAddMember, onSchedule, onOpenSettings, onCha
 
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/projects/${project.id}`);
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/projects/${project.id}`,
+      );
       toast.success("Link copied");
     } catch {
       toast.error("Couldn't copy the link");
@@ -175,19 +199,27 @@ const ProjectHeader = ({ project, onAddMember, onSchedule, onOpenSettings, onCha
         <ProjectIconTile icon={project.icon} color={project.color} size="lg" />
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="break-words text-headline-md text-on-surface">{project.name}</h1>
+            <h1 className="break-words text-headline-md text-on-surface">
+              {project.name}
+            </h1>
             <ProjectStatusChip status={project.status} />
             <ProjectRoleChip role={role} />
           </div>
           {project.description && (
-            <p className="break-words text-body-md text-on-surface-variant">{project.description}</p>
+            <p className="break-words text-body-md text-on-surface-variant">
+              {project.description}
+            </p>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-body-md text-on-surface-variant">
             {project.ownerName && <span>Owner {project.ownerName}</span>}
             {project.avatars.length > 0 && (
               <span className="inline-flex items-center gap-2">
-                <AvatarStack avatars={project.avatars} total={project.memberCount} />
-                {project.memberCount} member{project.memberCount === 1 ? "" : "s"}
+                <AvatarStack
+                  avatars={project.avatars}
+                  total={project.memberCount}
+                />
+                {project.memberCount} member
+                {project.memberCount === 1 ? "" : "s"}
               </span>
             )}
             <GitHubStatus github={github} />
@@ -215,7 +247,11 @@ const ProjectHeader = ({ project, onAddMember, onSchedule, onOpenSettings, onCha
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {canManage && <DropdownMenuItem onSelect={onOpenSettings}>Project settings</DropdownMenuItem>}
+            {canManage && (
+              <DropdownMenuItem onSelect={onOpenSettings}>
+                Project settings
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={copyLink}>Copy link</DropdownMenuItem>
             {canManage && github.connected && (
               <DropdownMenuItem disabled={syncing} onSelect={runSync}>
@@ -225,14 +261,22 @@ const ProjectHeader = ({ project, onAddMember, onSchedule, onOpenSettings, onCha
             {role !== "owner" && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setLeaving(true)}>Leave project</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setLeaving(true)}>
+                  Leave project
+                </DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {leaving && <LeaveDialog busy={busyLeave} onCancel={() => setLeaving(false)} onConfirm={leave} />}
+      {leaving && (
+        <LeaveDialog
+          busy={busyLeave}
+          onCancel={() => setLeaving(false)}
+          onConfirm={leave}
+        />
+      )}
     </header>
   );
 };

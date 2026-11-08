@@ -30,7 +30,7 @@ const tabFrom = (value: string | null): TabKey =>
   TABS.find((t) => t.key === value)?.key ?? "account";
 
 const CARD =
-  "rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]";
+  "rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card";
 
 const PREFERENCES: Array<{
   key: PrefKey;
@@ -75,7 +75,9 @@ const Toggle = ({
   >
     <span
       className={`inline-block h-5 w-5 transform rounded-full transition-transform ${
-        checked ? "translate-x-5 bg-on-primary" : "translate-x-0.5 bg-on-surface-variant"
+        checked
+          ? "translate-x-5 bg-on-primary"
+          : "translate-x-0.5 bg-on-surface-variant"
       }`}
     />
   </button>
@@ -261,8 +263,7 @@ const SettingsContent = () => {
   };
 
   const fullName = user?.fullName ?? "NeuraMeet User";
-  const email =
-    user?.primaryEmailAddress?.emailAddress ?? "no email on file";
+  const email = user?.primaryEmailAddress?.emailAddress ?? "no email on file";
   const avatar = user?.imageUrl;
 
   return (

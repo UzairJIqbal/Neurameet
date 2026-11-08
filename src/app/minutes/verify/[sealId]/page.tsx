@@ -36,7 +36,7 @@ async function check(
 
 const Shell = ({ children }: { children: ReactNode }) => (
   <main className="flex min-h-screen items-start justify-center bg-surface px-4 py-12">
-    <div className="flex w-full max-w-xl flex-col gap-6 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+    <div className="flex w-full max-w-xl flex-col gap-6 rounded-card bg-surface-container-lowest p-6 shadow-card">
       {children}
     </div>
   </main>
@@ -150,7 +150,7 @@ export default async function VerifySealPage({
         />
         <button
           type="submit"
-          className="inline-flex w-fit items-center rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
+          className="inline-flex w-fit items-center rounded-full bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
         >
           Compare
         </button>

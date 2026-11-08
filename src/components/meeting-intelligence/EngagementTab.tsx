@@ -6,13 +6,10 @@ import { Users } from "lucide-react";
 import { LoaderOne } from "@/components/ui/loader";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { LoadError } from "@/components/ui/load-error";
-import {
-  SpeakerEngagementResponse,
-  SpeakerInsight,
-} from "@/lib/meeting-types";
+import { SpeakerEngagementResponse, SpeakerInsight } from "@/lib/meeting-types";
 
 const SpeakerCard = ({ speaker }: { speaker: SpeakerInsight }) => (
-  <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-5 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+  <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-5 shadow-card">
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
         <span className="text-body-lg font-semibold text-on-surface">
@@ -38,8 +35,8 @@ const SpeakerCard = ({ speaker }: { speaker: SpeakerInsight }) => (
       <p className="text-body-md text-on-surface-variant">
         {speaker.sessions} {speaker.sessions === 1 ? "session" : "sessions"} ·{" "}
         spoke {speaker.totalTalkTimeSeconds}s of {speaker.totalDurationSeconds}s
-        (~{Math.round(speaker.talkTimeRatio * 100)}%) · mic{" "}
-        {speaker.micToggles} · cam {speaker.cameraToggles}
+        (~{Math.round(speaker.talkTimeRatio * 100)}%) · mic {speaker.micToggles}{" "}
+        · cam {speaker.cameraToggles}
       </p>
     )}
 
@@ -152,7 +149,7 @@ const EngagementTab = ({ meetingId }: { meetingId: string }) => {
         <button
           type="button"
           onClick={() => setRetryNonce((k) => k + 1)}
-          className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10"
+          className="inline-flex w-fit items-center gap-2 rounded-full border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10"
         >
           Retry
         </button>
@@ -178,7 +175,7 @@ const EngagementTab = ({ meetingId }: { meetingId: string }) => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
         <h2 className="text-headline-md font-semibold text-on-surface">
           Engagement overview
         </h2>

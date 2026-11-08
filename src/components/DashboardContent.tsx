@@ -276,27 +276,27 @@ const DashboardContent = () => {
             <button
               type="button"
               onClick={() => router.push("/join-meeting")}
-              className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+              className="inline-flex items-center gap-2 rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low"
             >
               <Video className="h-4 w-4" /> Join Meeting
             </button>
             <button
               type="button"
               onClick={() => setMeetingModalType("isScheduleMeeting")}
-              className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+              className="inline-flex items-center gap-2 rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low"
             >
               <CalendarDays className="h-4 w-4" /> Schedule Meeting
             </button>
             <button
               type="button"
               onClick={() => setShowUploadModal(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+              className="inline-flex items-center gap-2 rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low"
             >
               <Upload className="h-4 w-4" /> Upload Transcript
             </button>
           </div>
 
-          <div className="mt-8 flex flex-col gap-4">
+          <div className="mt-10 flex flex-col gap-5">
             <CardState
               isLoading={projects.isLoading && !projects.data}
               failed={projects.failed && !projects.data}
@@ -322,9 +322,9 @@ const DashboardContent = () => {
           </div>
 
           {/* Meeting Intelligence + Follow-ups */}
-          <div className="mt-8 grid grid-cols-1 gap-8">
+          <div className="mt-10 grid grid-cols-1 gap-10">
             {/* Meeting Intelligence */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-5">
               <div className="flex items-end justify-between">
                 <h3 className="text-headline-sm font-semibold text-on-surface">
                   Meeting Intelligence
@@ -338,7 +338,7 @@ const DashboardContent = () => {
               </div>
 
               <div className="card-shadow flex-1 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest">
-                <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-3 text-label-caps uppercase tracking-wider text-on-surface-variant">
+                <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-4 text-label-caps uppercase tracking-wider text-on-surface-variant">
                   <div className="col-span-6 md:col-span-5">Meeting Title</div>
                   <div className="col-span-6 md:col-span-3">Date</div>
                   <div className="col-span-12 hidden text-right md:col-span-4 md:block">
@@ -366,7 +366,7 @@ const DashboardContent = () => {
                       <button
                         type="button"
                         onClick={() => setShowUploadModal(true)}
-                        className="rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
+                        className="rounded-full bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
                       >
                         Upload Transcript
                       </button>
@@ -375,7 +375,7 @@ const DashboardContent = () => {
                     visibleMeetings.map((m) => (
                       <div
                         key={m.id}
-                        className="grid grid-cols-12 items-center px-6 py-4 transition-colors hover:bg-surface-container-low/50"
+                        className="grid grid-cols-12 items-center px-6 py-5 transition-colors hover:bg-surface-container-low/50"
                       >
                         <div className="col-span-6 flex items-center gap-3 md:col-span-5">
                           <div className="flex h-8 w-8 items-center justify-center rounded bg-surface-container text-primary">
@@ -398,7 +398,7 @@ const DashboardContent = () => {
                             onClick={() =>
                               router.push(`/meeting-intelligence/${m.id}`)
                             }
-                            className="rounded-lg border border-primary-container/30 px-3 py-1.5 text-sm font-medium text-primary-container transition-colors hover:bg-primary-container/5"
+                            className="rounded-full border border-primary-container/30 px-4 py-2 text-sm font-medium text-primary-container transition-colors hover:bg-primary-container/5"
                           >
                             Open Insights
                           </button>
@@ -411,7 +411,7 @@ const DashboardContent = () => {
             </div>
 
             {/* Meeting Follow-ups */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-5">
               <div className="flex items-end justify-between">
                 <h3 className="text-headline-sm font-semibold text-on-surface">
                   Meeting Follow-ups
@@ -425,7 +425,7 @@ const DashboardContent = () => {
               </div>
 
               <div className="card-shadow flex-1 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest">
-                <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-3 text-label-caps uppercase tracking-wider text-on-surface-variant">
+                <div className="grid grid-cols-12 border-b border-surface-variant bg-surface-container-low px-6 py-4 text-label-caps uppercase tracking-wider text-on-surface-variant">
                   <div className="col-span-6 md:col-span-5">Action Item</div>
                   <div className="col-span-6 md:col-span-3">Due</div>
                   <div className="col-span-12 hidden text-right md:col-span-4 md:block">
@@ -455,7 +455,7 @@ const DashboardContent = () => {
                     visibleFollowUps.map((item) => (
                       <div
                         key={item.id}
-                        className="grid grid-cols-12 items-center px-6 py-4 transition-colors hover:bg-surface-container-low/50"
+                        className="grid grid-cols-12 items-center px-6 py-5 transition-colors hover:bg-surface-container-low/50"
                       >
                         <div className="col-span-6 flex items-center gap-3 md:col-span-5">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-surface-container text-primary">
@@ -481,7 +481,7 @@ const DashboardContent = () => {
                             onClick={() =>
                               router.push(`/follow-ups/${item.id}`)
                             }
-                            className="rounded-lg border border-primary-container/30 px-3 py-1.5 text-sm font-medium text-primary-container transition-colors hover:bg-primary-container/5"
+                            className="rounded-full border border-primary-container/30 px-4 py-2 text-sm font-medium text-primary-container transition-colors hover:bg-primary-container/5"
                           >
                             Open
                           </button>

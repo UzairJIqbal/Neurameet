@@ -3,7 +3,14 @@
 
 import React from "react";
 import Link from "next/link";
-import { CalendarDays, Clock, Download, FolderKanban, User, Video } from "lucide-react";
+import {
+  CalendarDays,
+  Clock,
+  Download,
+  FolderKanban,
+  User,
+  Video,
+} from "lucide-react";
 import {
   MEETING_TYPE_LABELS,
   type MeetingDetailData,
@@ -12,8 +19,10 @@ import {
 import { meetingSummaryText, summaryFileName } from "@/lib/meeting-export";
 import MeetingParticipants from "./MeetingParticipants";
 
-const CHIP = "inline-flex items-center rounded-full px-3 py-1 text-label-caps uppercase tracking-wider";
-const META = "inline-flex items-center gap-1.5 text-body-md text-on-surface-variant";
+const CHIP =
+  "inline-flex items-center rounded-full px-3 py-1 text-label-caps uppercase tracking-wider";
+const META =
+  "inline-flex items-center gap-1.5 text-body-md text-on-surface-variant";
 
 const timeOf = (date: Date) =>
   date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -35,9 +44,18 @@ const timeRange = (meeting: MeetingDetailData) => {
   return `${timeOf(start)} to ${timeOf(end)} (${durationLabel(minutes)})`;
 };
 
-const downloadSummary = (meeting: MeetingDetailData, insights: MeetingInsights) => {
-  const text = meetingSummaryText(meeting.title, meeting.startedAt ?? meeting.createdAt, insights);
-  const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+const downloadSummary = (
+  meeting: MeetingDetailData,
+  insights: MeetingInsights,
+) => {
+  const text = meetingSummaryText(
+    meeting.title,
+    meeting.startedAt ?? meeting.createdAt,
+    insights,
+  );
+  const url = URL.createObjectURL(
+    new Blob([text], { type: "text/plain;charset=utf-8" }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = summaryFileName(meeting.title);
@@ -52,10 +70,15 @@ type Props = {
   projectName: string | null;
 };
 
-const MeetingHeader = ({ meeting, insights, projectId, projectName }: Props) => {
+const MeetingHeader = ({
+  meeting,
+  insights,
+  projectId,
+  projectName,
+}: Props) => {
   const date = new Date(meeting.startedAt ?? meeting.createdAt);
   return (
-    <header className="flex flex-col gap-4 rounded-lg border border-surface-variant bg-surface-container-lowest p-6">
+    <header className="flex flex-col gap-4 rounded-card bg-surface-container-lowest p-6 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-container/15 text-primary-container">
@@ -63,32 +86,53 @@ const MeetingHeader = ({ meeting, insights, projectId, projectName }: Props) => 
           </span>
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="break-words text-headline-md text-on-surface">{meeting.title}</h1>
-              <span className={`${CHIP} bg-surface-container-low text-on-surface-variant`}>{meeting.status}</span>
+              <h1 className="break-words text-headline-md text-on-surface">
+                {meeting.title}
+              </h1>
+              <span
+                className={`${CHIP} bg-surface-container-low text-on-surface-variant`}
+              >
+                {meeting.status}
+              </span>
               {meeting.meetingType && (
-                <span className={`${CHIP} bg-secondary-container text-on-secondary-container`}>
+                <span
+                  className={`${CHIP} bg-secondary-container text-on-secondary-container`}
+                >
                   {MEETING_TYPE_LABELS[meeting.meetingType]}
                 </span>
               )}
               {insights?.category && (
-                <span className={`${CHIP} bg-primary-container/15 text-primary-container`}>{insights.category}</span>
+                <span
+                  className={`${CHIP} bg-primary-container/15 text-primary-container`}
+                >
+                  {insights.category}
+                </span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               {projectId && projectName && (
-                <Link href={`/projects/${projectId}`} className={`${META} hover:text-primary`}>
+                <Link
+                  href={`/projects/${projectId}`}
+                  className={`${META} hover:text-primary`}
+                >
                   <FolderKanban className="h-4 w-4" aria-hidden /> {projectName}
                 </Link>
               )}
               <span className={META}>
                 <CalendarDays className="h-4 w-4" aria-hidden />
-                {date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                {date.toLocaleDateString(undefined, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
               </span>
               <span className={META}>
                 <Clock className="h-4 w-4" aria-hidden /> {timeRange(meeting)}
               </span>
               <span className={META}>
-                <User className="h-4 w-4" aria-hidden /> Organised by {meeting.organizerName}
+                <User className="h-4 w-4" aria-hidden /> Organised by{" "}
+                {meeting.organizerName}
               </span>
             </div>
           </div>
@@ -97,14 +141,16 @@ const MeetingHeader = ({ meeting, insights, projectId, projectName }: Props) => 
           <button
             type="button"
             onClick={() => downloadSummary(meeting, insights)}
-            className="inline-flex items-center gap-2 rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
+            className="inline-flex items-center gap-2 rounded-full border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low"
           >
             <Download className="h-4 w-4" aria-hidden /> Export summary
           </button>
         )}
       </div>
       {meeting.description && (
-        <p className="whitespace-pre-wrap break-words text-body-md text-on-surface-variant">{meeting.description}</p>
+        <p className="whitespace-pre-wrap break-words text-body-md text-on-surface-variant">
+          {meeting.description}
+        </p>
       )}
       <MeetingParticipants
         projectId={projectId}

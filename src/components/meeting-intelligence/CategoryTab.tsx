@@ -32,8 +32,7 @@ const CategoryTab = ({
     return <TabEmptyState message="No category available yet." />;
   }
 
-  const current =
-    saved ?? (insights.category as MeetingCategory) ?? "General";
+  const current = saved ?? (insights.category as MeetingCategory) ?? "General";
 
   const handleSave = () => {
     startTransition(async () => {
@@ -50,7 +49,7 @@ const CategoryTab = ({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
         <h3 className="text-headline-sm font-semibold text-on-surface">
           Category
         </h3>
@@ -65,9 +64,7 @@ const CategoryTab = ({
             </span>
             <select
               value={selected}
-              onChange={(e) =>
-                setSelected(e.target.value as MeetingCategory)
-              }
+              onChange={(e) => setSelected(e.target.value as MeetingCategory)}
               className="rounded-md border border-outline-variant bg-surface px-3 py-2.5 text-body-md text-on-surface focus:border-primary-container focus:outline-none"
             >
               {MEETING_CATEGORIES.map((c) => (
@@ -88,7 +85,7 @@ const CategoryTab = ({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
         <h3 className="text-headline-sm font-semibold text-on-surface">
           Detected Topics
         </h3>

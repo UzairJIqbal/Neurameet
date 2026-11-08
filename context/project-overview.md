@@ -163,7 +163,7 @@ All Advanced features reuse the existing Gemini primary + Groq fallback and pgve
 - **Proof Chain:** a qualifying merge adds code evidence to the linked promise, the meeting shows an Outcome card, and the Activity timeline joins meetings, decisions, tasks, and PRs
 - **Project assistant:** answers only from the project's own meetings, promises, and tasks, with citations built by code and "not found in this project's records" when nothing matches
 - **Live meeting:** Live Ledger panel and a recording consent notice. Live captions are deferred (Stream captions are paid with no Urdu); the post call Whisper transcript stays the record
-- **Design:** the PDF sets layout and information architecture; colours stay the locked Stitch tokens, plus success and warning tokens
+- **Design:** the PDF sets layout and information architecture; colours are the DotTime tokens (adopted 2026-11-08, see `ui-tokens.md`), including success and warning tokens
 - **Cut:** development simulator, Contributors tab and per developer contribution views, a global assistant outside projects, sprints
 - Step W0 is `/architect conversations to code`. Zero cost: free GitHub App, Vercel Hobby, Supabase, Gemini/Groq/pgvector, Stream, Clerk, Resend free tiers only
 

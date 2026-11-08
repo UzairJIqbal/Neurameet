@@ -84,7 +84,7 @@ const SignInForm = () => {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface mb-2">
+        <h1 className="text-3xl font-light tracking-tight text-on-surface mb-2">
           Welcome back
         </h1>
         <p className="text-on-surface-variant text-base">
@@ -98,7 +98,7 @@ const SignInForm = () => {
           type="button"
           onClick={() => handleSocialLogin("google")}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-surface-variant rounded-lg py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-full py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
         >
           <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
             <path
@@ -126,7 +126,7 @@ const SignInForm = () => {
           type="button"
           onClick={() => handleSocialLogin("github")}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-surface-variant rounded-lg py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-full py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
         >
           <svg
             aria-hidden="true"
@@ -174,7 +174,7 @@ const SignInForm = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-container text-sm transition-shadow"
+            className="w-full bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-container text-sm transition-shadow"
           />
         </div>
 
@@ -206,7 +206,7 @@ const SignInForm = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg pl-10 pr-10 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-container text-sm transition-shadow"
+              className="w-full bg-surface-container-lowest border border-outline-variant rounded-full pl-10 pr-10 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-container text-sm transition-shadow"
             />
             <button
               type="button"
@@ -227,7 +227,7 @@ const SignInForm = () => {
           <button
             type="submit"
             disabled={loading || !isLoaded}
-            className="flex w-full justify-center rounded-lg bg-primary-container px-3 py-2.5 text-sm font-semibold text-on-primary shadow-sm hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-container transition-colors disabled:opacity-50"
+            className="flex w-full justify-center rounded-full bg-primary-container px-3 py-2.5 text-sm font-semibold text-on-primary shadow-sm hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-container transition-colors disabled:opacity-50"
           >
             {loading ? "Please wait..." : "Sign in"}
           </button>

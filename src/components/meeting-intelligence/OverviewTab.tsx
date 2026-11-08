@@ -2,7 +2,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { Calendar, CheckSquare, Tag, CircleDot, Download, FolderInput } from "lucide-react";
+import {
+  Calendar,
+  CheckSquare,
+  Tag,
+  CircleDot,
+  Download,
+  FolderInput,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
   ActionItem,
@@ -22,7 +29,7 @@ const StatCard = ({
   label: string;
   value: string;
 }) => (
-  <div className="flex flex-col gap-2 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+  <div className="flex flex-col gap-2 rounded-card bg-surface-container-lowest p-4 shadow-card">
     <div className="flex items-center gap-2 text-on-surface-variant">
       {icon}
       <span className="text-label-caps uppercase tracking-wider">{label}</span>
@@ -87,7 +94,7 @@ const OverviewTab = ({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <span className="text-body-md font-medium text-on-surface">
             Attendance Report
@@ -104,7 +111,7 @@ const OverviewTab = ({
           <a
             href={reportHref}
             download
-            className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-medium text-on-primary transition-colors hover:bg-primary"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-medium text-on-primary transition-colors hover:bg-primary"
           >
             <Download className="h-4 w-4" /> Download
           </a>
@@ -143,7 +150,7 @@ const OverviewTab = ({
       </div>
 
       {isOwner && (
-        <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-4 shadow-card">
           <div className="flex flex-col gap-1">
             <span className="text-body-md font-medium text-on-surface">
               Guest Admission
@@ -184,17 +191,20 @@ const OverviewTab = ({
       )}
 
       {canMove && (
-        <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-1">
-            <span className="text-body-md font-medium text-on-surface">Project</span>
+            <span className="text-body-md font-medium text-on-surface">
+              Project
+            </span>
             <span className="text-body-md text-on-surface-variant">
-              This is a personal meeting. Move it into a project to share it with the team.
+              This is a personal meeting. Move it into a project to share it
+              with the team.
             </span>
           </div>
           <button
             type="button"
             onClick={() => setShowMove(true)}
-            className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-medium text-on-primary transition-colors hover:bg-primary"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-medium text-on-primary transition-colors hover:bg-primary"
           >
             <FolderInput className="h-4 w-4" /> Move to project
           </button>
@@ -212,7 +222,7 @@ const OverviewTab = ({
       )}
 
       {summaryPreview ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
           <h2 className="text-headline-md font-semibold text-on-surface">
             Summary
           </h2>

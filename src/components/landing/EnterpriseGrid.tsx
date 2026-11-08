@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { IconVideo, IconSparkles, IconDatabase, IconShieldCheck } from "@tabler/icons-react";
+import {
+  IconVideo,
+  IconSparkles,
+  IconDatabase,
+  IconShieldCheck,
+} from "@tabler/icons-react";
 
 const items = [
   {
@@ -28,14 +33,15 @@ const items = [
 
 const EnterpriseGrid = () => {
   return (
-    <section id="stack" className="scroll-mt-20 bg-surface py-24 border-t border-outline-variant">
+    <section id="stack" className="scroll-mt-20 bg-surface py-24">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-on-surface mb-4">
+          <h2 className="text-3xl md:text-4xl font-light tracking-tight text-on-surface mb-4">
             A modern stack you can trust
           </h2>
           <p className="text-on-surface-variant text-base max-w-2xl mx-auto">
-            Every part of NeuraMeet is built on proven, free-tier infrastructure.
+            Every part of NeuraMeet is built on proven, free-tier
+            infrastructure.
           </p>
         </div>
 

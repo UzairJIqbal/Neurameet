@@ -16,9 +16,7 @@ const JoinMeetingPage = () => {
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ||
     (typeof window !== "undefined" ? window.location.origin : "");
-  const personalRoomLink = user?.id
-    ? `${baseUrl}/meeting/${user.id}`
-    : "";
+  const personalRoomLink = user?.id ? `${baseUrl}/meeting/${user.id}` : "";
 
   const handleJoin = () => {
     const meetingId = getMeetingIdFromLink(value.trim());
@@ -37,7 +35,7 @@ const JoinMeetingPage = () => {
 
   return (
     <div className="flex flex-1 min-h-0 items-center justify-center">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-6 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)] lg:p-8">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-6 rounded-card bg-surface-container-lowest p-6 shadow-card lg:p-8">
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container-low text-primary-container">
@@ -72,7 +70,7 @@ const JoinMeetingPage = () => {
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="https://meet.neurameet.com/abc-xyz"
-              className="h-12 w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-4 text-body-md font-body-md text-on-surface placeholder:text-outline transition-all focus:border-primary-container focus:outline-none focus:ring-2 focus:ring-primary-container/20"
+              className="h-12 w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-4 text-body-md font-body-md text-on-surface placeholder:text-outline transition-all focus:border-primary-container focus:outline-none focus:ring-2 focus:ring-primary-container/20"
             />
           </div>
           <button

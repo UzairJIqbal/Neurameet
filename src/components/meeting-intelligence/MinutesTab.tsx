@@ -38,7 +38,9 @@ const MinutesLineCard = ({ line }: { line: MinutesDraftLine }) => (
     <div className="flex flex-wrap items-center gap-2">
       <p className="font-body-md font-medium text-on-surface">{line.text}</p>
       {!line.supported && (
-        <span className={`${badgeBase} bg-error-container text-error`}>Unsupported</span>
+        <span className={`${badgeBase} bg-error-container text-error`}>
+          Unsupported
+        </span>
       )}
     </div>
 
@@ -82,7 +84,9 @@ const OpenReviewBar = ({
       await onOpened();
     } catch (err) {
       console.error("[tasdeeq] open review failed:", err);
-      toast.error(err instanceof Error ? err.message : "Could not open the review.");
+      toast.error(
+        err instanceof Error ? err.message : "Could not open the review.",
+      );
     } finally {
       setOpening(false);
     }
@@ -107,7 +111,7 @@ const OpenReviewBar = ({
         type="button"
         disabled={opening}
         onClick={() => void open()}
-        className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex w-fit items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
       >
         {opening ? "Opening review" : "Open review"}
       </button>
@@ -132,7 +136,9 @@ const DraftView = ({
   <div className="flex flex-col gap-6">
     <div className="flex flex-col gap-1 rounded-lg bg-surface-container-low px-4 py-3 text-body-md text-on-surface-variant">
       <span>{coverageText(draft.coverage)}</span>
-      {fromRecording && <span>Quotes are English translations of the recording</span>}
+      {fromRecording && (
+        <span>Quotes are English translations of the recording</span>
+      )}
     </div>
 
     {SECTIONS.map(({ section, title }) => {
@@ -140,7 +146,9 @@ const DraftView = ({
       if (lines.length === 0) return null;
       return (
         <section key={section} className="flex flex-col gap-3">
-          <h2 className="text-headline-sm font-semibold text-on-surface">{title}</h2>
+          <h2 className="text-headline-sm font-semibold text-on-surface">
+            {title}
+          </h2>
           <div className={cardShell}>
             <div className="divide-y divide-surface-variant">
               {lines.map((line, i) => (
@@ -201,13 +209,17 @@ const MinutesTab = ({ meetingId }: { meetingId: string }) => {
   }, [meetingId]);
 
   if (timedOut) {
-    return <LoadError message="We couldn't load the minutes." onRetry={retry} />;
+    return (
+      <LoadError message="We couldn't load the minutes." onRetry={retry} />
+    );
   }
 
   if (isLoading) return <LoaderOne />;
 
   if (failed || !data) {
-    return <LoadError message="We couldn't load the minutes." onRetry={retry} />;
+    return (
+      <LoadError message="We couldn't load the minutes." onRetry={retry} />
+    );
   }
 
   if (data.state === "not_open") {
@@ -221,7 +233,9 @@ const MinutesTab = ({ meetingId }: { meetingId: string }) => {
   }
 
   if (data.state === "review") {
-    return <MinutesReview meetingId={meetingId} state={data} onChanged={reload} />;
+    return (
+      <MinutesReview meetingId={meetingId} state={data} onChanged={reload} />
+    );
   }
 
   return (

@@ -50,15 +50,19 @@ export const ConfirmDelete = ({
 
   if (confirming) {
     return (
-      <div className={cn("inline-flex flex-wrap items-center gap-2", className)}>
+      <div
+        className={cn("inline-flex flex-wrap items-center gap-2", className)}
+      >
         {warning && (
-          <span className="w-full text-body-md text-on-surface-variant">{warning}</span>
+          <span className="w-full text-body-md text-on-surface-variant">
+            {warning}
+          </span>
         )}
         <button
           type="button"
           onClick={handleConfirm}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-error px-3 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-full bg-error px-3 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Check className={iconClass} />
           {confirmLabel}
@@ -67,7 +71,7 @@ export const ConfirmDelete = ({
           type="button"
           onClick={() => setConfirming(false)}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-surface-variant px-3 py-2 text-body-md font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-full border border-surface-variant px-3 py-2 text-body-md font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
         >
           <X className={iconClass} />
           {cancelLabel}

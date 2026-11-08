@@ -41,7 +41,8 @@ type Props = {
 };
 
 type RoleFilter = "all" | ProjectRole;
-type PendingAction = { kind: "remove"; member: ProjectMember } | { kind: "leave" };
+type PendingAction =
+  { kind: "remove"; member: ProjectMember } | { kind: "leave" };
 
 const ROLE_CHIPS: { value: RoleFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -51,16 +52,17 @@ const ROLE_CHIPS: { value: RoleFilter; label: string }[] = [
   { value: "viewer", label: "Viewers" },
 ];
 
-const HEAD = "px-3 py-2 text-left text-label-caps uppercase tracking-wider text-on-surface-variant";
+const HEAD =
+  "px-3 py-2 text-left text-label-caps uppercase tracking-wider text-on-surface-variant";
 const CELL = "px-3 py-2 align-middle text-body-md text-on-surface-variant";
 const INPUT =
-  "w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none sm:max-w-xs";
+  "w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none sm:max-w-xs";
 const SELECT =
   "rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface";
 const PRIMARY =
-  "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 const SECONDARY =
-  "rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+  "rounded-full border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -94,7 +96,7 @@ const ConfirmActionDialog = ({
         role="dialog"
         aria-modal="true"
         aria-label={isLeave ? "Leave project" : `Remove ${action.member.name}`}
-        className="flex w-full max-w-md flex-col gap-4 rounded-lg bg-surface-container-lowest p-5"
+        className="flex w-full max-w-md flex-col gap-4 rounded-card bg-surface-container-lowest p-5 shadow-card"
       >
         <h2 className="text-headline-sm text-on-surface">
           {isLeave ? "Leave this project?" : `Remove ${action.member.name}?`}
@@ -105,10 +107,20 @@ const ConfirmActionDialog = ({
             : "They lose access to this project and its meetings right away. Their open tasks go Unassigned."}
         </p>
         <div className="flex justify-end gap-2">
-          <button type="button" disabled={busy} onClick={onCancel} className={SECONDARY}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onCancel}
+            className={SECONDARY}
+          >
             Cancel
           </button>
-          <button type="button" disabled={busy} onClick={onConfirm} className={PRIMARY}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onConfirm}
+            className={PRIMARY}
+          >
             {isLeave ? "Leave project" : "Remove"}
           </button>
         </div>
@@ -119,7 +131,12 @@ const ConfirmActionDialog = ({
 
 // Every control here is a convenience: it shows only where your role allows,
 // and the server checks the same rule again on each call.
-const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }: Props) => {
+const MembersTab = ({
+  project,
+  onProjectChanged,
+  onAddMember,
+  invitesNonce = 0,
+}: Props) => {
   const router = useRouter();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [myRole, setMyRole] = useState<ProjectRole>(project.role);
@@ -133,7 +150,10 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [acting, setActing] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
-  const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -177,7 +197,9 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase();
     return members.filter(
-      (m) => (roleFilter === "all" || m.role === roleFilter) && (!query || matchesSearch(m, query)),
+      (m) =>
+        (roleFilter === "all" || m.role === roleFilter) &&
+        (!query || matchesSearch(m, query)),
     );
   }, [members, roleFilter, search]);
 
@@ -190,7 +212,9 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
     setBusyUser(member.userId);
     try {
       await changeMemberRole(project.id, member.userId, role);
-      setMembers((prev) => prev.map((m) => (m.userId === member.userId ? { ...m, role } : m)));
+      setMembers((prev) =>
+        prev.map((m) => (m.userId === member.userId ? { ...m, role } : m)),
+      );
       toast.success(`${member.name} is now ${ROLE_LABELS[role]}`);
     } catch (err) {
       toast.error(errorText(err, "Failed to change role"));
@@ -214,7 +238,10 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
       refresh();
       setPending(null);
     } catch (err) {
-      const fallback = pending.kind === "leave" ? "Failed to leave project" : "Failed to remove member";
+      const fallback =
+        pending.kind === "leave"
+          ? "Failed to leave project"
+          : "Failed to remove member";
       toast.error(errorText(err, fallback));
     } finally {
       setActing(false);
@@ -237,8 +264,10 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
   return (
     <div className="flex flex-col gap-6">
       {members.length === 1 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-surface-variant bg-surface-container-lowest p-5">
-          <p className="text-body-md text-on-surface-variant">Only you are here so far.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-surface-container-lowest p-5 shadow-card">
+          <p className="text-body-md text-on-surface-variant">
+            Only you are here so far.
+          </p>
           {canManageInvites(myRole) && onAddMember && (
             <button type="button" onClick={onAddMember} className={PRIMARY}>
               Add Member
@@ -274,14 +303,18 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
           ))}
         </div>
         {canManageInvites(myRole) && onAddMember && members.length > 1 && (
-          <button type="button" onClick={onAddMember} className={cn(PRIMARY, "ml-auto")}>
+          <button
+            type="button"
+            onClick={onAddMember}
+            className={cn(PRIMARY, "ml-auto")}
+          >
             Add Members
           </button>
         )}
       </div>
 
       {visible.length === 0 ? (
-        <p className="rounded-lg border border-surface-variant bg-surface-container-lowest p-5 text-body-md text-on-surface-variant">
+        <p className="rounded-card bg-surface-container-lowest p-5 text-body-md text-on-surface-variant shadow-card">
           No members match your search.
         </p>
       ) : (
@@ -309,13 +342,24 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
                   <tr key={m.userId}>
                     <td className={CELL}>
                       <div className="flex min-w-0 items-center gap-3">
-                        <MemberAvatar name={m.name} imageUrl={m.imageUrl} className="h-8 w-8" />
+                        <MemberAvatar
+                          name={m.name}
+                          imageUrl={m.imageUrl}
+                          className="h-8 w-8"
+                        />
                         <div className="flex min-w-0 flex-col">
                           <span className="truncate font-medium text-on-surface">
                             {m.name}
-                            {isMe && <span className="text-on-surface-variant"> (you)</span>}
+                            {isMe && (
+                              <span className="text-on-surface-variant">
+                                {" "}
+                                (you)
+                              </span>
+                            )}
                           </span>
-                          {m.email && <span className="truncate">{m.email}</span>}
+                          {m.email && (
+                            <span className="truncate">{m.email}</span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -325,10 +369,16 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
                           aria-label={`Role for ${m.name}`}
                           value={m.role}
                           disabled={busyUser === m.userId}
-                          onChange={(e) => handleRole(m, e.target.value as ProjectRole)}
+                          onChange={(e) =>
+                            handleRole(m, e.target.value as ProjectRole)
+                          }
                           className={SELECT}
                         >
-                          {!roles.includes(m.role) && <option value={m.role}>{ROLE_LABELS[m.role]}</option>}
+                          {!roles.includes(m.role) && (
+                            <option value={m.role}>
+                              {ROLE_LABELS[m.role]}
+                            </option>
+                          )}
                           {roles.map((r) => (
                             <option key={r} value={r}>
                               {ROLE_LABELS[r]}
@@ -350,7 +400,9 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
                       )}
                     </td>
                     <td className={`${CELL} font-mono`}>{m.openTaskCount}</td>
-                    <td className={CELL}>{new Date(m.joinedAt).toLocaleDateString()}</td>
+                    <td className={CELL}>
+                      {new Date(m.joinedAt).toLocaleDateString()}
+                    </td>
                     <td className={`${CELL} text-right`}>
                       {(removable || canLeave) && (
                         <DropdownMenu>
@@ -363,7 +415,11 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               onSelect={() =>
-                                setPending(canLeave ? { kind: "leave" } : { kind: "remove", member: m })
+                                setPending(
+                                  canLeave
+                                    ? { kind: "leave" }
+                                    : { kind: "remove", member: m },
+                                )
                               }
                             >
                               {canLeave ? "Leave project" : "Remove"}
@@ -381,7 +437,11 @@ const MembersTab = ({ project, onProjectChanged, onAddMember, invitesNonce = 0 }
       )}
 
       {canManageInvites(myRole) && (
-        <InvitesPanel projectId={project.id} reloadNonce={invitesNonce} onMembersChanged={refresh} />
+        <InvitesPanel
+          projectId={project.id}
+          reloadNonce={invitesNonce}
+          onMembersChanged={refresh}
+        />
       )}
 
       {pending && (

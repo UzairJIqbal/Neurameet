@@ -26,10 +26,10 @@ const steps = [
 
 const SocialProof = () => {
   return (
-    <section id="how-it-works" className="scroll-mt-20 bg-surface py-24 border-t border-outline-variant">
+    <section id="how-it-works" className="scroll-mt-20 bg-surface py-24">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-on-surface mb-4">
+          <h2 className="text-3xl md:text-4xl font-light tracking-tight text-on-surface mb-4">
             From call to clarity in three steps
           </h2>
           <p className="text-on-surface-variant text-base max-w-2xl mx-auto">
@@ -44,10 +44,10 @@ const SocialProof = () => {
             return (
               <div
                 key={step.title}
-                className="bg-surface-container-lowest rounded-xl p-8 border border-outline-variant"
+                className="bg-surface-container-lowest rounded-card p-8 shadow-card"
               >
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center border border-primary-container/20">
+                  <div className="w-12 h-12 rounded-full bg-lilac flex items-center justify-center">
                     <Icon
                       size={24}
                       className="text-primary-container"

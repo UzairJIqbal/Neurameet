@@ -18,7 +18,7 @@ const ActionItemsTab = ({
       {actionItems.length === 0 ? (
         <TabEmptyState message="No action items yet." />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card">
           <div className="divide-y divide-surface-variant">
             {actionItems.map((item) => (
               <div
@@ -51,7 +51,7 @@ const ActionItemsTab = ({
       )}
 
       {insights && insights.decisions.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
           <h3 className="text-headline-sm font-semibold text-on-surface">
             Decisions
           </h3>

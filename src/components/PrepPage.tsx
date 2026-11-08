@@ -46,12 +46,16 @@ const LedgerPrepRow = ({ item }: { item: PrepLedgerItem }) => {
           {isPromise ? "Promise" : "Decision"}
         </span>
         {item.derivedStatus === "overdue" && (
-          <span className={`${badgeBase} bg-error-container text-on-error-container`}>
+          <span
+            className={`${badgeBase} bg-error-container text-on-error-container`}
+          >
             Overdue
           </span>
         )}
       </div>
-      <p className="font-body-md font-medium text-on-surface">{item.statement}</p>
+      <p className="font-body-md font-medium text-on-surface">
+        {item.statement}
+      </p>
       <p className="flex gap-2 text-body-md text-on-surface-variant">
         <Quote className="mt-1 h-4 w-4 shrink-0 text-primary-container" />
         <span dir="auto" className="italic">
@@ -67,7 +71,8 @@ const LedgerPrepRow = ({ item }: { item: PrepLedgerItem }) => {
           )}
           {item.dueDate && (
             <span className="inline-flex items-center gap-1">
-              <CalendarDays className="h-4 w-4" /> Due {formatDate(item.dueDate)}
+              <CalendarDays className="h-4 w-4" /> Due{" "}
+              {formatDate(item.dueDate)}
             </span>
           )}
         </div>
@@ -139,9 +144,7 @@ const PrepPage = () => {
       console.error("Meeting prep failed:", err);
       setSuggestions(null);
       setLedgerItems([]);
-      setError(
-        err instanceof Error ? err.message : "Prep failed unexpectedly",
-      );
+      setError(err instanceof Error ? err.message : "Prep failed unexpectedly");
     } finally {
       if (controllerRef.current === controller) setIsLoading(false);
     }
@@ -171,14 +174,14 @@ const PrepPage = () => {
 
       <form
         onSubmit={handleSubmit}
-        className="flex w-full max-w-2xl flex-col gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-4"
+        className="flex w-full max-w-2xl flex-col gap-3 rounded-card bg-surface-container-lowest shadow-card px-4 py-4"
       >
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Meeting title (e.g. Q3 Roadmap Sync)"
-          className="w-full rounded-lg bg-surface-container px-3 py-2 text-body-lg text-on-surface outline-none placeholder:text-on-surface-variant"
+          className="w-full rounded-xl bg-surface-container px-3 py-2 text-body-lg text-on-surface outline-none placeholder:text-on-surface-variant"
           aria-label="Upcoming meeting title"
         />
         <textarea
@@ -186,13 +189,13 @@ const PrepPage = () => {
           onChange={(e) => setNotes(e.target.value)}
           placeholder="What's this meeting about? (optional notes, agenda, attendees)"
           rows={3}
-          className="w-full resize-y rounded-lg bg-surface-container px-3 py-2 text-body-lg text-on-surface outline-none placeholder:text-on-surface-variant"
+          className="w-full resize-y rounded-xl bg-surface-container px-3 py-2 text-body-lg text-on-surface outline-none placeholder:text-on-surface-variant"
           aria-label="Prep notes"
         />
         <button
           type="submit"
           disabled={isLoading || !title.trim()}
-          className="inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex w-fit items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -244,8 +247,8 @@ const PrepPage = () => {
             No prep suggestions yet.
           </p>
           <p className="text-body-md text-on-surface-variant">
-            Try a different title, or add notes about the meeting. If you have no
-            related past meetings, try a broader topic.
+            Try a different title, or add notes about the meeting. If you have
+            no related past meetings, try a broader topic.
           </p>
         </div>
       )}
@@ -258,7 +261,7 @@ const PrepPage = () => {
             return (
               <div
                 key={section.key}
-                className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]"
+                className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card"
               >
                 <div className="border-b border-surface-variant bg-surface-container-low/50 px-6 py-4">
                   <h2 className="font-body-md font-semibold text-primary-container">
@@ -280,7 +283,7 @@ const PrepPage = () => {
             );
           })}
           {ledgerItems.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+            <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card">
               <div className="border-b border-surface-variant bg-surface-container-low/50 px-6 py-4">
                 <h2 className="font-body-md font-semibold text-primary-container">
                   Open promises and decisions

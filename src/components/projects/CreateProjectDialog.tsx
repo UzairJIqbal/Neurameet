@@ -20,7 +20,12 @@ import {
   type ProjectIcon,
   type ProjectType,
 } from "@/lib/project-types";
-import { PROJECT_COLOR_CLASSES, PROJECT_ICON_MAP, ProjectIconTile, ProjectRoleChip } from "./project-visuals";
+import {
+  PROJECT_COLOR_CLASSES,
+  PROJECT_ICON_MAP,
+  ProjectIconTile,
+  ProjectRoleChip,
+} from "./project-visuals";
 
 type Props = {
   onClose: () => void;
@@ -29,12 +34,13 @@ type Props = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
-const labelClass = "text-label-caps uppercase tracking-wider text-on-surface-variant";
+  "w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
+const labelClass =
+  "text-label-caps uppercase tracking-wider text-on-surface-variant";
 const primaryButton =
-  "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 const outlineButton =
-  "rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+  "rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 
 const SuccessScreen = ({
   project,
@@ -53,14 +59,21 @@ const SuccessScreen = ({
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       <CheckCircle2 className="h-10 w-10 text-success" aria-hidden />
-      <h2 id="create-project-title" className="text-headline-sm text-on-surface">
+      <h2
+        id="create-project-title"
+        className="text-headline-sm text-on-surface"
+      >
         {project.name} is ready
       </h2>
       <p className="text-body-md text-on-surface-variant">
         You&apos;re the Owner. Add members from the project page.
       </p>
       <div className="flex flex-wrap justify-center gap-3">
-        <button type="button" onClick={() => open("")} className={connectGitHub ? outlineButton : primaryButton}>
+        <button
+          type="button"
+          onClick={() => open("")}
+          className={connectGitHub ? outlineButton : primaryButton}
+        >
           Open project
         </button>
         {connectGitHub && (
@@ -90,7 +103,10 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
   const [prefixEdited, setPrefixEdited] = useState(false);
   const [connectGitHub, setConnectGitHub] = useState(false);
   const [created, setCreated] = useState<ProjectCard | null>(null);
-  const [error, setError] = useState<{ field: "name" | "prefix"; message: string } | null>(null);
+  const [error, setError] = useState<{
+    field: "name" | "prefix";
+    message: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -122,9 +138,13 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
       setCreated(project);
       onCreated(project);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create project";
+      const message =
+        err instanceof Error ? err.message : "Failed to create project";
       if (err instanceof ProjectClientError && err.status === 422) {
-        setError({ field: /prefix/i.test(message) ? "prefix" : "name", message });
+        setError({
+          field: /prefix/i.test(message) ? "prefix" : "name",
+          message,
+        });
       } else {
         toast.error(message);
       }
@@ -140,9 +160,13 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-project-title"
-          className="w-full max-w-md rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
+          className="w-full max-w-md rounded-card bg-surface-container-lowest p-6 shadow-lg"
         >
-          <SuccessScreen project={created} connectGitHub={connectGitHub} onClose={onClose} />
+          <SuccessScreen
+            project={created}
+            connectGitHub={connectGitHub}
+            onClose={onClose}
+          />
         </div>
       </div>
     );
@@ -155,10 +179,13 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
         aria-modal="true"
         aria-labelledby="create-project-title"
         onSubmit={handleSubmit}
-        className="flex max-h-full w-full max-w-4xl flex-col gap-5 overflow-y-auto rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
+        className="flex max-h-full w-full max-w-4xl flex-col gap-5 overflow-y-auto rounded-card bg-surface-container-lowest p-6 shadow-lg"
       >
         <div className="flex items-center justify-between">
-          <h2 id="create-project-title" className="text-headline-sm text-on-surface">
+          <h2
+            id="create-project-title"
+            className="text-headline-sm text-on-surface"
+          >
             New Project
           </h2>
           <button
@@ -186,7 +213,9 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
                 autoFocus
               />
               {error?.field === "name" && (
-                <span role="alert" className="text-body-md text-error">{error.message}</span>
+                <span role="alert" className="text-body-md text-error">
+                  {error.message}
+                </span>
               )}
             </label>
 
@@ -213,7 +242,9 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
                     key={type}
                     className={cn(
                       "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-body-md text-on-surface",
-                      projectType === type ? "border-primary bg-surface-container-low" : "border-surface-variant",
+                      projectType === type
+                        ? "border-primary bg-surface-container-low"
+                        : "border-surface-variant",
                     )}
                   >
                     <input
@@ -244,7 +275,9 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
                         onClick={() => setIcon(key)}
                         className={cn(
                           "flex h-9 w-9 items-center justify-center rounded-lg border text-on-surface",
-                          icon === key ? "border-primary bg-surface-container-low" : "border-surface-variant",
+                          icon === key
+                            ? "border-primary bg-surface-container-low"
+                            : "border-surface-variant",
                         )}
                       >
                         <Icon className="h-4 w-4" aria-hidden />
@@ -266,7 +299,9 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
                       className={cn(
                         "h-9 w-9 rounded-full border-2",
                         PROJECT_COLOR_CLASSES[key],
-                        color === key ? "border-on-surface" : "border-transparent",
+                        color === key
+                          ? "border-on-surface"
+                          : "border-transparent",
                       )}
                     />
                   ))}
@@ -279,14 +314,20 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
             <span className={labelClass}>Preview</span>
             <div className="flex flex-col gap-3 rounded-lg border border-surface-variant p-4">
               <ProjectIconTile icon={icon} color={color} />
-              <p className="break-words font-medium text-on-surface">{name.trim() || "Untitled project"}</p>
+              <p className="break-words font-medium text-on-surface">
+                {name.trim() || "Untitled project"}
+              </p>
               <p className="break-words text-body-md text-on-surface-variant">
                 {description.trim() || "Your description will appear here."}
               </p>
-              <p className="text-body-md text-on-surface-variant">{PROJECT_TYPE_LABELS[projectType]}</p>
+              <p className="text-body-md text-on-surface-variant">
+                {PROJECT_TYPE_LABELS[projectType]}
+              </p>
               <div className="flex items-center gap-2">
                 <ProjectRoleChip role="owner" />
-                <span className="text-body-md text-on-surface-variant">You</span>
+                <span className="text-body-md text-on-surface-variant">
+                  You
+                </span>
               </div>
               <p className="inline-flex items-center gap-2 text-body-md text-on-surface-variant">
                 <Github className="h-4 w-4" aria-hidden />
@@ -308,10 +349,13 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
                 className={`${inputClass} font-mono uppercase`}
               />
               <span className="text-body-md text-on-surface-variant">
-                2 to 5 capital letters. Task keys look like {prefix || "NM"}-1. You can&apos;t change it later.
+                2 to 5 capital letters. Task keys look like {prefix || "NM"}-1.
+                You can&apos;t change it later.
               </span>
               {error?.field === "prefix" && (
-                <span role="alert" className="text-body-md text-error">{error.message}</span>
+                <span role="alert" className="text-body-md text-error">
+                  {error.message}
+                </span>
               )}
             </label>
 
@@ -332,10 +376,19 @@ const CreateProjectDialog = ({ onClose, onCreated }: Props) => {
         </p>
 
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose} disabled={busy} className={outlineButton}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className={outlineButton}
+          >
             Cancel
           </button>
-          <button type="submit" disabled={busy || name.trim().length === 0} className={primaryButton}>
+          <button
+            type="submit"
+            disabled={busy || name.trim().length === 0}
+            className={primaryButton}
+          >
             {busy ? "Creating..." : "Create Project"}
           </button>
         </div>

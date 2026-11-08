@@ -32,7 +32,7 @@
 }
 
 .str-video__participant-list {
-  background-color: #2D303D;
+  background-color: #1C1C1E;
   padding: 10px;
   border-radius: 10px;
   color: white;
@@ -107,7 +107,7 @@
   height: 40px;
 }
 .cl-dividerLine {
-  background: #CEC2D9;
+  background: #E6E6E6;
   height: 2px;
 }
 
@@ -221,7 +221,11 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    line-height: 1.6;
   }
 }
 

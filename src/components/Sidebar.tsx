@@ -100,11 +100,11 @@ const NavLink = ({
     aria-label={collapsed ? link.label : undefined}
     title={collapsed ? link.label : undefined}
     className={cn(
-      "flex items-center gap-3 rounded-lg px-4 py-2.5 transition-colors",
+      "flex items-center gap-3 rounded-full px-4 py-2.5 transition-colors",
       collapsed && "lg:justify-center lg:px-0",
       isActivePath(pathname, link.href)
-        ? "border-l-4 border-primary-container bg-on-secondary-fixed-variant text-on-primary"
-        : "text-outline hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary",
+        ? "bg-lilac font-medium text-on-secondary-container"
+        : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
     )}
   >
     <span className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -125,7 +125,7 @@ const NavLink = ({
           collapsed && "lg:hidden",
           link.countFilled
             ? "bg-primary-container text-on-primary"
-            : "bg-on-secondary-fixed-variant text-on-primary",
+            : "bg-lilac text-on-secondary-container",
         )}
       >
         {formatCount(count)}
@@ -181,7 +181,7 @@ const Sidebar = ({
     <>
       <aside
         className={cn(
-          "absolute inset-y-0 left-0 z-50 flex w-[260px] shrink-0 flex-col bg-inverse-surface py-5 transition-[transform,width] duration-300 ease-in-out lg:fixed lg:translate-x-0",
+          "absolute inset-y-0 left-0 z-50 flex w-[260px] shrink-0 flex-col bg-surface-container-lowest py-5 shadow-card transition-[transform,width] duration-300 ease-in-out lg:fixed lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
           collapsed && "lg:w-[76px]",
         )}
@@ -197,10 +197,10 @@ const Sidebar = ({
             N
           </span>
           <div className={cn("min-w-0 flex-1", collapsed && "lg:hidden")}>
-            <h1 className="text-headline-md font-bold leading-tight text-on-primary">
+            <h1 className="text-headline-md font-bold leading-tight text-on-surface">
               NeuraMeet
             </h1>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-inverse-on-surface/60">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               AI Intelligence
             </p>
           </div>
@@ -209,7 +209,7 @@ const Sidebar = ({
             onClick={onToggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-pressed={collapsed}
-            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary lg:flex"
+            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface lg:flex"
           >
             {collapsed ? (
               <PanelLeftOpen className="h-5 w-5" />
@@ -221,7 +221,7 @@ const Sidebar = ({
             type="button"
             onClick={onClose}
             aria-label="Close menu"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-primary transition-colors hover:bg-on-secondary-fixed-variant/50 lg:hidden"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface transition-colors hover:bg-surface-container-low lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
@@ -249,7 +249,7 @@ const Sidebar = ({
           >
             <p
               className={cn(
-                "text-label-caps text-outline",
+                "text-label-caps text-on-surface-variant",
                 collapsed && "lg:hidden",
               )}
             >
@@ -259,7 +259,7 @@ const Sidebar = ({
               type="button"
               onClick={() => setCreating(true)}
               aria-label="New Project"
-              className="flex h-6 w-6 items-center justify-center rounded text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary"
+              className="flex h-6 w-6 items-center justify-center rounded text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -272,14 +272,14 @@ const Sidebar = ({
               aria-label={collapsed ? project.name : undefined}
               title={collapsed ? project.name : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-4 py-2 transition-colors",
+                "flex items-center gap-3 rounded-full px-4 py-2 transition-colors",
                 collapsed && "lg:justify-center lg:px-0",
                 isActivePath(pathname, `/projects/${project.id}`)
-                  ? "bg-on-secondary-fixed-variant text-on-primary"
-                  : "text-outline hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary",
+                  ? "bg-lilac text-on-secondary-container"
+                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
               )}
             >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-on-secondary-fixed-variant text-[11px] font-bold text-on-primary">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-lilac text-[11px] font-bold text-on-secondary-container">
                 {project.name.charAt(0).toUpperCase()}
               </span>
               <span
@@ -296,7 +296,7 @@ const Sidebar = ({
             href="/projects"
             onClick={onClose}
             className={cn(
-              "rounded-lg px-4 py-2 text-body-md text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary",
+              "rounded-full px-4 py-2 text-body-md text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface",
               collapsed && "lg:hidden",
             )}
           >
@@ -306,7 +306,7 @@ const Sidebar = ({
           {/* More */}
           <p
             className={cn(
-              "mt-4 px-4 text-label-caps text-outline",
+              "mt-4 px-4 text-label-caps text-on-surface-variant",
               collapsed && "lg:hidden",
             )}
           >
@@ -314,7 +314,7 @@ const Sidebar = ({
           </p>
           <div
             className={cn(
-              "mx-1 my-3 hidden border-t border-outline/30",
+              "mx-1 my-3 hidden border-t border-outline-variant",
               collapsed && "lg:block",
             )}
           />
@@ -330,7 +330,7 @@ const Sidebar = ({
         </nav>
 
         {/* Settings + user profile + account menu */}
-        <div className="mt-3 flex flex-col gap-1 border-t border-outline/30 px-3 pt-3">
+        <div className="mt-3 flex flex-col gap-1 border-t border-outline-variant px-3 pt-3">
           <NavLink
             link={sidebarSettingsLink}
             pathname={pathname}
@@ -342,7 +342,7 @@ const Sidebar = ({
               <button
                 type="button"
                 className={cn(
-                  "group flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-outline transition-colors hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-container",
+                  "group flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-left text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-container",
                   collapsed && "lg:justify-center lg:px-0",
                 )}
               >
@@ -353,14 +353,16 @@ const Sidebar = ({
                   className="h-8 w-8 shrink-0 rounded-full object-cover"
                 />
                 <div className={cn("min-w-0 flex-1", collapsed && "lg:hidden")}>
-                  <p className="truncate text-[13px] font-bold text-on-primary">
+                  <p className="truncate text-[13px] font-bold text-on-surface">
                     {fullName}
                   </p>
-                  <p className="truncate text-[10px] text-outline">{email}</p>
+                  <p className="truncate text-[10px] text-on-surface-variant">
+                    {email}
+                  </p>
                 </div>
                 <ChevronDown
                   className={cn(
-                    "h-4 w-4 shrink-0 text-outline transition-transform group-data-[state=open]:rotate-180",
+                    "h-4 w-4 shrink-0 text-on-surface-variant transition-transform group-data-[state=open]:rotate-180",
                     collapsed && "lg:hidden",
                   )}
                 />
@@ -369,18 +371,18 @@ const Sidebar = ({
             <DropdownMenuContent
               side="top"
               align="start"
-              className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[232px] border border-outline/30 bg-inverse-surface text-on-primary"
+              className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[232px] border border-outline-variant bg-surface-container-lowest text-on-surface shadow-card"
             >
               <DropdownMenuItem
-                className="text-body-md hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary focus:bg-on-secondary-fixed-variant focus:text-on-primary"
+                className="text-body-md hover:bg-surface-container-low hover:text-on-surface focus:bg-lilac focus:text-on-secondary-container"
                 onSelect={() => router.push("/profile")}
               >
                 <User className="h-4 w-4" />
                 My Profile
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-outline/30" />
+              <DropdownMenuSeparator className="bg-outline-variant" />
               <DropdownMenuItem
-                className="text-body-md hover:bg-on-secondary-fixed-variant/50 hover:text-on-primary focus:bg-on-secondary-fixed-variant focus:text-on-primary"
+                className="text-body-md hover:bg-surface-container-low hover:text-on-surface focus:bg-lilac focus:text-on-secondary-container"
                 onSelect={() => void signOut({ redirectUrl: "/sign-in" })}
               >
                 <LogOut className="h-4 w-4" />
@@ -469,7 +471,7 @@ export const Sidebar_Com = ({
       />
       <div
         className={cn(
-          "flex flex-1 min-h-0 min-w-0 flex-col overflow-y-auto bg-surface transition-[margin] duration-300 ease-in-out",
+          "flex flex-1 min-h-0 min-w-0 flex-col overflow-y-auto bg-surface-container-low transition-[margin] duration-300 ease-in-out",
           collapsed ? "lg:ml-[76px]" : "lg:ml-[260px]",
         )}
       >

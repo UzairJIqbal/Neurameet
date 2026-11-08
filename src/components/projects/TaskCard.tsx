@@ -19,9 +19,11 @@ const quoteTooltip = (task: Task) => {
 // One board card (AC-70p). Viewers never get the quote, comment count, or PR
 // refs, so those simply never render for them.
 const TaskCard = ({ task }: { task: Task }) => (
-  <div className="flex flex-col gap-2 rounded-lg border border-surface-variant bg-surface-container-lowest p-3">
+  <div className="flex flex-col gap-2 rounded-card bg-surface-container-lowest p-3 shadow-card">
     <div className="flex items-center justify-between gap-2">
-      <span className="font-mono text-label-mono text-on-surface-variant">{task.key}</span>
+      <span className="font-mono text-label-mono text-on-surface-variant">
+        {task.key}
+      </span>
       <PriorityBadge priority={task.priority} />
     </div>
     <p className="break-words text-body-md text-on-surface">{task.title}</p>

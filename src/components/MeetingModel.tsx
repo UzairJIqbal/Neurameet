@@ -125,8 +125,9 @@ const MeetingModel = ({
   const [meetingType, setMeetingType] = useState<ProjectMeetingType | "">("");
   // null until the list loads; the server then defaults to all active members.
   const [invitedUserIds, setInvitedUserIds] = useState<string[] | null>(null);
-  const [guestAdmissionMode, setGuestAdmissionMode] =
-    useState<"open" | "approval">("approval");
+  const [guestAdmissionMode, setGuestAdmissionMode] = useState<
+    "open" | "approval"
+  >("approval");
   // W3: null means a personal meeting (today's flow, unchanged).
   const [projectId, setProjectId] = useState<string | null>(initialProjectId);
   const client = useStreamVideoClient();
@@ -193,7 +194,11 @@ const MeetingModel = ({
               owner_id: user.id,
             },
             settings_override: {
-              frame_recording: { mode: "available", quality: "720p", capture_interval_in_seconds: 2 },
+              frame_recording: {
+                mode: "available",
+                quality: "720p",
+                capture_interval_in_seconds: 2,
+              },
               individual_recording: { mode: "available" },
             },
           },
@@ -229,7 +234,9 @@ const MeetingModel = ({
       setCreating(false);
     } catch (error) {
       console.error("Error occured in creating meeting", error);
-      toast.error("Couldn't start the meeting. Check your connection and try again.");
+      toast.error(
+        "Couldn't start the meeting. Check your connection and try again.",
+      );
       setCreating(false);
     }
   };
@@ -278,7 +285,11 @@ const MeetingModel = ({
               owner_id: user.id,
             },
             settings_override: {
-              frame_recording: { mode: "available", quality: "720p", capture_interval_in_seconds: 2 },
+              frame_recording: {
+                mode: "available",
+                quality: "720p",
+                capture_interval_in_seconds: 2,
+              },
               individual_recording: { mode: "available" },
             },
           },
@@ -307,7 +318,9 @@ const MeetingModel = ({
       }
     } catch (error) {
       console.error("Error occur in scheduling meeting", error);
-      toast.error("Couldn't schedule the meeting. Check your connection and try again.");
+      toast.error(
+        "Couldn't schedule the meeting. Check your connection and try again.",
+      );
     }
   };
 
@@ -432,7 +445,7 @@ const MeetingModel = ({
                     setValues({ ...values, title: e.target.value })
                   }
                   placeholder="e.g. Weekly product sync"
-                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none"
+                  className="rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-2.5">
@@ -440,7 +453,7 @@ const MeetingModel = ({
                   Add a description
                 </label>
                 <textarea
-                  className="min-h-24 resize-y rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface text-balance focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="min-h-24 resize-y rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface text-balance focus-visible:ring-0 focus-visible:ring-offset-0"
                   value={values.description}
                   maxLength={MEETING_DESCRIPTION_MAX}
                   onChange={(e) =>
@@ -463,7 +476,7 @@ const MeetingModel = ({
                   timeIntervals={1}
                   timeCaption="time"
                   dateFormat="MMMM d, yyyy h:mm aa"
-                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
+                  className="w-full rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface focus:outline-none"
                 />
               </div>
               <div className="mt-4 flex w-full flex-col gap-2.5">
@@ -483,7 +496,7 @@ const MeetingModel = ({
                   timeIntervals={1}
                   timeCaption="time"
                   dateFormat="MMMM d, yyyy h:mm aa"
-                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
+                  className="w-full rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface focus:outline-none"
                 />
               </div>
               <div className="mt-4 flex flex-col gap-2.5">
@@ -499,7 +512,7 @@ const MeetingModel = ({
                   onChange={(e) =>
                     setMeetingType(e.target.value as ProjectMeetingType | "")
                   }
-                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none"
+                  className="rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface focus:outline-none"
                 >
                   <option value="">Choose a type</option>
                   {PROJECT_MEETING_TYPES.map((value) => (
@@ -572,7 +585,7 @@ const MeetingModel = ({
                   {values.title.trim()}
                 </p>
               )}
-              <div className="flex w-full max-w-sm items-center rounded-xl border border-outline-variant bg-surface-container-lowest p-2">
+              <div className="flex w-full max-w-sm items-center rounded-card bg-surface-container-lowest shadow-card p-2">
                 <input
                   readOnly
                   value={`${window.location.origin}/meeting/${callDetails.id}`}
@@ -597,8 +610,7 @@ const MeetingModel = ({
             <button
               className="w-full rounded-md border border-outline-variant bg-surface-container-lowest px-2 py-2 text-sm text-on-surface hover:bg-surface-container-low sm:w-28"
               onClick={() => {
-                if (callDetails?.id)
-                  router.push(`/meeting/${callDetails.id}`);
+                if (callDetails?.id) router.push(`/meeting/${callDetails.id}`);
               }}
             >
               Join

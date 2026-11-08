@@ -13,9 +13,14 @@ import type { ProjectMember } from "@/lib/project-types";
 import type { Proposal, ReviewProposalInput } from "@/lib/task-types";
 
 export const inputClass =
-  "rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none disabled:opacity-60";
+  "rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none disabled:opacity-60";
 
-export type Draft = { title: string; assigneeId: string; dueDate: string; priority: TaskPriority };
+export type Draft = {
+  title: string;
+  assigneeId: string;
+  dueDate: string;
+  priority: TaskPriority;
+};
 
 export const draftFor = (p: Proposal): Draft => ({
   title: p.title,
@@ -28,7 +33,10 @@ export const draftFor = (p: Proposal): Draft => ({
 /** True when the row has a transcript line behind it. */
 export const hasVerifiedQuote = (p: Proposal) => p.quoteVerified && !!p.quote;
 
-export const confirmInput = (p: Proposal, draft: Draft): ReviewProposalInput => ({
+export const confirmInput = (
+  p: Proposal,
+  draft: Draft,
+): ReviewProposalInput => ({
   decision: "confirm",
   title: draft.title.trim(),
   assigneeId: draft.assigneeId || null,
@@ -44,7 +52,12 @@ type FieldsProps = {
   onChange: (draft: Draft) => void;
 };
 
-export const ProposalFields = ({ draft, members, disabled, onChange }: FieldsProps) => (
+export const ProposalFields = ({
+  draft,
+  members,
+  disabled,
+  onChange,
+}: FieldsProps) => (
   <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
     <label className="flex flex-col gap-1 text-body-md text-on-surface">
       Title
@@ -78,7 +91,8 @@ export const ProposalFields = ({ draft, members, disabled, onChange }: FieldsPro
         value={draft.priority}
         disabled={disabled}
         onChange={(e) => {
-          if (isTaskPriority(e.target.value)) onChange({ ...draft, priority: e.target.value });
+          if (isTaskPriority(e.target.value))
+            onChange({ ...draft, priority: e.target.value });
         }}
         className={inputClass}
       >

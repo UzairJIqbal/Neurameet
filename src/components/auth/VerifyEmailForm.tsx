@@ -75,7 +75,7 @@ const VerifyEmailForm = () => {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface mb-2">
+        <h1 className="text-3xl font-light tracking-tight text-on-surface mb-2">
           Verify your email
         </h1>
         <p className="text-on-surface-variant text-base">
@@ -103,7 +103,7 @@ const VerifyEmailForm = () => {
             onChange={(e) => setCode(e.target.value)}
             required
             autoComplete="one-time-code"
-            className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200 text-center tracking-[0.3em] font-mono"
+            className="w-full bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200 text-center tracking-[0.3em] font-mono"
           />
         </div>
 
@@ -112,7 +112,7 @@ const VerifyEmailForm = () => {
           <button
             type="submit"
             disabled={loading || !isLoaded || code.length < 6}
-            className="flex w-full justify-center rounded-lg bg-primary-container px-3 py-2.5 text-sm font-semibold text-on-primary shadow-sm hover:bg-primary transition-colors disabled:opacity-50"
+            className="flex w-full justify-center rounded-full bg-primary-container px-3 py-2.5 text-sm font-semibold text-on-primary shadow-sm hover:bg-primary transition-colors disabled:opacity-50"
           >
             {loading ? "Verifying..." : "Verify Email"}
           </button>

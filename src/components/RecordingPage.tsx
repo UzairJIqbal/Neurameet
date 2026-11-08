@@ -28,9 +28,9 @@ interface LinkedMeeting {
 const RecordingPage = () => {
   const router = useRouter();
   const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [meetingLinks, setMeetingLinks] = useState<
-    Map<string, LinkedMeeting>
-  >(new Map());
+  const [meetingLinks, setMeetingLinks] = useState<Map<string, LinkedMeeting>>(
+    new Map(),
+  );
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -136,7 +136,9 @@ const RecordingPage = () => {
   const handleDeleteRecording = async (id?: string) => {
     if (!id) return;
     try {
-      const res = await fetch(`/api/recordings/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await fetch(`/api/recordings/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `Delete failed: ${res.status}`);
@@ -180,7 +182,7 @@ const RecordingPage = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter by name or meeting"
-            className="w-full rounded-lg border border-surface-variant bg-surface-container-lowest py-2 pl-9 pr-3 text-body-md text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none"
+            className="w-full rounded-xl border border-surface-variant bg-surface-container-lowest py-2 pl-9 pr-3 text-body-md text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none"
           />
         </div>
       )}
@@ -237,7 +239,7 @@ const RecordingPage = () => {
                         href={playUrl(recording)}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-surface-variant px-4 py-2 text-body-md font-medium text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-surface-variant px-4 py-2 text-body-md font-medium text-primary transition-colors hover:border-primary hover:bg-primary/5"
                       >
                         <Play className="h-4 w-4" />
                         Play
@@ -275,7 +277,7 @@ const RecordingPage = () => {
                       }
                       className={
                         meeting
-                          ? "inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
+                          ? "inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
                           : "inline-flex cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-lg bg-surface-container px-4 py-2 text-body-md font-semibold text-on-surface-variant opacity-60"
                       }
                     >

@@ -26,7 +26,7 @@ const bullets = [
 
 const MeetingHistory = () => {
   return (
-    <section className="bg-surface py-24 border-t border-outline-variant">
+    <section className="bg-surface py-24">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex flex-col-reverse lg:flex-row items-center gap-16">
           {/* Left — text */}
@@ -97,7 +97,8 @@ const MeetingHistory = () => {
                       {
                         label: "Client Discussion",
                         date: "Jul 28, 2024",
-                        color: "bg-secondary-container text-on-secondary-container",
+                        color:
+                          "bg-secondary-container text-on-secondary-container",
                       },
                       {
                         label: "Weekly Standup",

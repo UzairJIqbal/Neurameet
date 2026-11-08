@@ -8,7 +8,11 @@ import toast from "react-hot-toast";
 import { relativeTime } from "@/lib/chatHistory";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import { LoadError } from "@/components/ui/load-error";
-import { getGitHubSummary, syncGitHub, unlinkGitHubRepo } from "@/lib/project-client";
+import {
+  getGitHubSummary,
+  syncGitHub,
+  unlinkGitHubRepo,
+} from "@/lib/project-client";
 import {
   PR_STATE_LABELS,
   syncSummary,
@@ -31,9 +35,10 @@ const SUB_VIEW_LABELS: Record<SubView, string> = {
 
 const OVERVIEW_ROWS = 5;
 const secondaryButton =
-  "rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+  "rounded-full border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 const badge = "rounded-full px-2 py-0.5 text-xs font-medium";
-const HEAD = "px-3 py-2 text-left text-label-caps uppercase tracking-wider text-on-surface-variant";
+const HEAD =
+  "px-3 py-2 text-left text-label-caps uppercase tracking-wider text-on-surface-variant";
 const CELL = "px-3 py-2 align-top text-body-md text-on-surface-variant";
 
 const STATE_STYLES: Record<PrState, string> = {
@@ -47,7 +52,7 @@ const AUTOMATION_RULES = [
   "A pull request links to a task when its title, body, or branch names the task key.",
   "A draft pull request moves a To Do task to In Progress. A ready one moves it to In Review.",
   "A pull request closed without merging moves the task back to In Progress when no other open one is linked.",
-  "Merging a pull request that says \"Closes\" before the key into the default branch completes the task.",
+  'Merging a pull request that says "Closes" before the key into the default branch completes the task.',
   "A merge never marks a promise kept. It adds a suggestion, and an Owner or Admin confirms it.",
   "A revert reopens a task that its pull request completed.",
   "A pull request from a fork links to the task, and moves or blocks nothing until it is merged.",
@@ -55,12 +60,22 @@ const AUTOMATION_RULES = [
 ];
 
 const WEBHOOK_EVENTS = [
-  { name: "pull_request", detail: "Links pull requests, moves tasks, and completes them." },
-  { name: "installation", detail: "Stops processing when the App is removed or suspended." },
-  { name: "installation_repositories", detail: "Unlinks a repository the App can no longer reach." },
+  {
+    name: "pull_request",
+    detail: "Links pull requests, moves tasks, and completes them.",
+  },
+  {
+    name: "installation",
+    detail: "Stops processing when the App is removed or suspended.",
+  },
+  {
+    name: "installation_repositories",
+    detail: "Unlinks a repository the App can no longer reach.",
+  },
 ];
 
-const errorText = (err: unknown, fallback: string) => (err instanceof Error ? err.message : fallback);
+const errorText = (err: unknown, fallback: string) =>
+  err instanceof Error ? err.message : fallback;
 
 const syncLabel = (iso: string | null) => {
   if (!iso) return "Not synced yet";
@@ -71,7 +86,10 @@ const syncLabel = (iso: string | null) => {
 const mergeStatus = (pull: GitHubLinkedPull) => {
   if (pull.reverted) return "Reverted";
   if (!pull.mergedAt) return "Not merged";
-  const date = new Date(pull.mergedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const date = new Date(pull.mergedAt).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
   return `Merged ${date}`;
 };
 
@@ -89,8 +107,12 @@ const RepoCard = ({
   <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="break-all font-label-mono text-label-mono text-on-surface">{repo.fullName}</span>
-        <span className={`${badge} bg-surface-container-low text-on-surface-variant`}>
+        <span className="break-all font-label-mono text-label-mono text-on-surface">
+          {repo.fullName}
+        </span>
+        <span
+          className={`${badge} bg-surface-container-low text-on-surface-variant`}
+        >
           {repo.private ? "Private" : "Public"}
         </span>
       </div>
@@ -110,7 +132,7 @@ const RepoCard = ({
 );
 
 const StatCard = ({ label, value }: { label: string; value: number }) => (
-  <div className="flex flex-col gap-1 rounded-lg border border-surface-variant bg-surface-container-lowest p-4">
+  <div className="flex flex-col gap-1 rounded-card bg-surface-container-lowest p-4 shadow-card">
     <span className="text-xs text-on-surface-variant">{label}</span>
     <span className="text-headline-sm text-on-surface">{value}</span>
   </div>
@@ -140,14 +162,20 @@ const PullTable = ({ pulls }: { pulls: GitHubLinkedPull[] }) => (
               >
                 #{pull.number} {pull.title}
               </a>
-              <div className="break-all font-label-mono text-label-mono">{pull.repoFullName}</div>
+              <div className="break-all font-label-mono text-label-mono">
+                {pull.repoFullName}
+              </div>
             </td>
             <td className={CELL}>{pull.authorLogin}</td>
             <td className={CELL}>
-              <span className={`${badge} ${STATE_STYLES[pull.state]}`}>{PR_STATE_LABELS[pull.state]}</span>
+              <span className={`${badge} ${STATE_STYLES[pull.state]}`}>
+                {PR_STATE_LABELS[pull.state]}
+              </span>
             </td>
             <td className={CELL}>{mergeStatus(pull)}</td>
-            <td className={`${CELL} font-label-mono text-label-mono`}>{pull.taskKeys.join(", ")}</td>
+            <td className={`${CELL} font-label-mono text-label-mono`}>
+              {pull.taskKeys.join(", ")}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -155,18 +183,22 @@ const PullTable = ({ pulls }: { pulls: GitHubLinkedPull[] }) => (
   </div>
 );
 
-const NO_PULLS = "No pull requests are linked yet. Name a task key in a pull request to link it.";
+const NO_PULLS =
+  "No pull requests are linked yet. Name a task key in a pull request to link it.";
 
 const PullsNote = ({ data }: { data: GitHubSummaryResponse }) => (
   <p className="text-xs text-on-surface-variant">
-    Only pull requests linked to tasks are shown{data.truncated ? `, the latest ${data.pulls.length}` : ""}.
+    Only pull requests linked to tasks are shown
+    {data.truncated ? `, the latest ${data.pulls.length}` : ""}.
   </p>
 );
 
 const AutomationSettings = () => (
-  <div className="flex flex-col gap-4 rounded-lg border border-surface-variant bg-surface-container-lowest p-5">
+  <div className="flex flex-col gap-4 rounded-card bg-surface-container-lowest p-5 shadow-card">
     <div className="flex flex-col gap-2">
-      <h3 className="text-body-lg font-medium text-on-surface">Automation rules</h3>
+      <h3 className="text-body-lg font-medium text-on-surface">
+        Automation rules
+      </h3>
       <ul className="flex list-disc flex-col gap-1 pl-5 text-body-md text-on-surface-variant">
         {AUTOMATION_RULES.map((rule) => (
           <li key={rule}>{rule}</li>
@@ -174,11 +206,16 @@ const AutomationSettings = () => (
       </ul>
     </div>
     <div className="flex flex-col gap-2">
-      <h3 className="text-body-lg font-medium text-on-surface">Webhook events</h3>
+      <h3 className="text-body-lg font-medium text-on-surface">
+        Webhook events
+      </h3>
       <ul className="flex flex-col gap-1 text-body-md text-on-surface-variant">
         {WEBHOOK_EVENTS.map((event) => (
           <li key={event.name}>
-            <span className="font-label-mono text-label-mono text-on-surface">{event.name}</span> {event.detail}
+            <span className="font-label-mono text-label-mono text-on-surface">
+              {event.name}
+            </span>{" "}
+            {event.detail}
           </li>
         ))}
       </ul>
@@ -196,7 +233,9 @@ const GitHubPanel = ({ project, reloadKey, onChanged }: Props) => {
   const canSync = isOwner || project.role === "admin";
   const connected = project.github.connected;
   // Back from GitHub, the install result shows inside the connect flow.
-  const [managing, setManaging] = useState(() => isOwner && searchParams.has("github"));
+  const [managing, setManaging] = useState(
+    () => isOwner && searchParams.has("github"),
+  );
   const [view, setView] = useState<SubView>("overview");
   const [syncing, setSyncing] = useState(false);
 
@@ -232,25 +271,39 @@ const GitHubPanel = ({ project, reloadKey, onChanged }: Props) => {
 
   if (!connected && !isOwner) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-surface-variant bg-surface-container-lowest p-5">
+      <div className="flex flex-col gap-2 rounded-card bg-surface-container-lowest p-5 shadow-card">
         <p className="text-body-md text-on-surface">GitHub is not connected.</p>
-        <p className="text-body-md text-on-surface-variant">The project Owner connects it.</p>
+        <p className="text-body-md text-on-surface-variant">
+          The project Owner connects it.
+        </p>
       </div>
     );
   }
-  if (!connected) return <GitHubTab project={project} connected={false} onChanged={onChanged} />;
+  if (!connected)
+    return (
+      <GitHubTab project={project} connected={false} onChanged={onChanged} />
+    );
 
   const { data } = summary;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-end gap-2">
         {canSync && (
-          <button type="button" disabled={syncing} onClick={runSync} className={secondaryButton}>
+          <button
+            type="button"
+            disabled={syncing}
+            onClick={runSync}
+            className={secondaryButton}
+          >
             {syncing ? "Syncing..." : "Sync now"}
           </button>
         )}
         {isOwner && (
-          <button type="button" onClick={() => setManaging((open) => !open)} className={secondaryButton}>
+          <button
+            type="button"
+            onClick={() => setManaging((open) => !open)}
+            className={secondaryButton}
+          >
             {managing ? "Hide repositories" : "Manage repositories"}
           </button>
         )}
@@ -259,7 +312,11 @@ const GitHubPanel = ({ project, reloadKey, onChanged }: Props) => {
       {managing && <GitHubTab project={project} onChanged={onChanged} />}
 
       {!data && summary.failed && (
-        <LoadError compact message="We couldn't load the GitHub summary." onRetry={summary.retry} />
+        <LoadError
+          compact
+          message="We couldn't load the GitHub summary."
+          onRetry={summary.retry}
+        />
       )}
       {!data && !summary.failed && <SkeletonCard />}
 
@@ -283,7 +340,11 @@ const GitHubPanel = ({ project, reloadKey, onChanged }: Props) => {
             <StatCard label="Linked tasks" value={data.counts.linkedTasks} />
           </div>
 
-          <nav role="tablist" aria-label="GitHub views" className="flex gap-1 overflow-x-auto border-b border-surface-variant">
+          <nav
+            role="tablist"
+            aria-label="GitHub views"
+            className="flex gap-1 overflow-x-auto border-b border-surface-variant"
+          >
             {SUB_VIEWS.map((key) => (
               <button
                 key={key}
@@ -308,7 +369,13 @@ const GitHubPanel = ({ project, reloadKey, onChanged }: Props) => {
           )}
           {view !== "settings" && data.pulls.length > 0 && (
             <>
-              <PullTable pulls={view === "overview" ? data.pulls.slice(0, OVERVIEW_ROWS) : data.pulls} />
+              <PullTable
+                pulls={
+                  view === "overview"
+                    ? data.pulls.slice(0, OVERVIEW_ROWS)
+                    : data.pulls
+                }
+              />
               <PullsNote data={data} />
             </>
           )}

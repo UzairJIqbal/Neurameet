@@ -22,7 +22,8 @@ import { localToday } from "@/lib/ledger-client";
 // from the Dashboard, we recover that id here so the upload attaches to the
 // EXISTING call (attendance + recordings intact) instead of orphaning a new row.
 // This is what makes the recap-page and Dashboard upload paths behave identically.
-const MEETING_ID_FILENAME = /meeting-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})-transcript\.txt$/i;
+const MEETING_ID_FILENAME =
+  /meeting-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})-transcript\.txt$/i;
 
 function extractMeetingIdFromFilename(name: string): string | null {
   const match = MEETING_ID_FILENAME.exec(name);
@@ -180,7 +181,9 @@ const UploadTranscriptModal = ({
       // A participant may attach a transcript, but only the owner can run AI
       // processing on the meeting, so stop here instead of failing.
       if (canProcess === false) {
-        toast.success("Transcript uploaded. The meeting owner can generate insights.");
+        toast.success(
+          "Transcript uploaded. The meeting owner can generate insights.",
+        );
         onClose();
         router.push(`/meeting-intelligence/${returnedMeetingId}`);
         return;
@@ -191,7 +194,10 @@ const UploadTranscriptModal = ({
       const processRes = await fetch("/api/ai/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingId: returnedMeetingId, emailNotifications }),
+        body: JSON.stringify({
+          meetingId: returnedMeetingId,
+          emailNotifications,
+        }),
         signal: controller.signal,
       });
 
@@ -304,7 +310,7 @@ const UploadTranscriptModal = ({
                   placeholder="e.g. Q3 Planning Review"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
 
@@ -323,7 +329,7 @@ const UploadTranscriptModal = ({
                     value={meetingDate}
                     max={localToday()}
                     onChange={(e) => setMeetingDate(e.target.value)}
-                    className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
                   <p className="text-xs text-on-surface-variant">
                     Leave empty for today. Used to work out due dates like
@@ -341,7 +347,7 @@ const UploadTranscriptModal = ({
                   placeholder="Paste your transcript here..."
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
-                  className="min-h-28 resize-y rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="min-h-28 resize-y rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface placeholder:text-on-surface-variant focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
 
@@ -350,7 +356,7 @@ const UploadTranscriptModal = ({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest p-6 text-center transition-colors hover:border-primary-container"
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed bg-surface-container-lowest p-6 text-center transition-colors hover:border-primary-container shadow-card"
               >
                 <p className="text-sm text-on-surface-variant">
                   {fileName
@@ -371,8 +377,8 @@ const UploadTranscriptModal = ({
 
               {parsedMeetingId && !meetingId ? (
                 <p className="text-xs text-on-surface-variant">
-                  Recognized as a transcript from one of your meetings — it will be
-                  added to that meeting&apos;s attendance and recordings.
+                  Recognized as a transcript from one of your meetings — it will
+                  be added to that meeting&apos;s attendance and recordings.
                 </p>
               ) : null}
             </div>
@@ -381,13 +387,13 @@ const UploadTranscriptModal = ({
 
         <ModalFooter className="bg-surface-container-low">
           <button
-            className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm text-on-surface hover:bg-surface-container-low sm:w-28"
+            className="w-full rounded-card bg-surface-container-lowest shadow-card px-4 py-2 text-sm text-on-surface hover:bg-surface-container-low sm:w-28"
             onClick={handleCancel}
           >
             Cancel
           </button>
           <button
-            className="w-full rounded-xl bg-primary-container px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary sm:w-28 disabled:opacity-50"
+            className="w-full rounded-full bg-primary-container px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary sm:w-28 disabled:opacity-50"
             onClick={handleUpload}
             disabled={isProcessing}
           >

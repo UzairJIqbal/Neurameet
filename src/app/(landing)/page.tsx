@@ -1,5 +1,6 @@
 import LandingNav from "@/components/landing/LandingNav";
 import LandingHero from "@/components/landing/LandingHero";
+import TabbedShowcase from "@/components/landing/TabbedShowcase";
 import FeatureGrid from "@/components/landing/FeatureGrid";
 import SocialProof from "@/components/landing/SocialProof";
 import AiArchitecture from "@/components/landing/AiArchitecture";
@@ -13,9 +14,10 @@ export default function LandingPage() {
     <div className="bg-surface min-h-screen">
       <LandingNav />
       <LandingHero />
+      <AiArchitecture />
+      <TabbedShowcase />
       <FeatureGrid />
       <SocialProof />
-      <AiArchitecture />
       <EnterpriseGrid />
       <MeetingHistory />
       <LandingCTA />

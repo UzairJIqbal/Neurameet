@@ -32,9 +32,11 @@ type Props = {
 type ResentLink = { invitationId: string; link: string };
 
 const SECONDARY =
-  "rounded-lg border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
-const CARD = "flex flex-col gap-4 rounded-lg border border-surface-variant bg-surface-container-lowest p-5";
-const CHIP = "rounded-full bg-surface-container px-2 py-0.5 text-xs font-medium text-on-surface-variant";
+  "rounded-full border border-surface-variant px-3 py-1.5 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+const CARD =
+  "flex flex-col gap-4 rounded-card bg-surface-container-lowest p-5 shadow-card";
+const CHIP =
+  "rounded-full bg-surface-container px-2 py-0.5 text-xs font-medium text-on-surface-variant";
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -57,7 +59,11 @@ const copyLink = async (link: string) => {
 
 // Owner and Admin only (the parent decides). Pending invitations with Resend and
 // Revoke, and waiting join requests with Approve and Reject (AC-70j).
-const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) => {
+const InvitesPanel = ({
+  projectId,
+  reloadNonce = 0,
+  onMembersChanged,
+}: Props) => {
   const [invites, setInvites] = useState<InvitationSummary[]>([]);
   const [requests, setRequests] = useState<JoinRequestSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,7 +74,10 @@ const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) =
   const [busyInvite, setBusyInvite] = useState<string | null>(null);
   const [resent, setResent] = useState<ResentLink | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -129,11 +138,18 @@ const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) =
     }
   };
 
-  const handleDecide = async (req: JoinRequestSummary, decision: "approve" | "deny") => {
+  const handleDecide = async (
+    req: JoinRequestSummary,
+    decision: "approve" | "deny",
+  ) => {
     setBusyRequest(req.id);
     try {
       await decideJoinRequest(projectId, req.id, decision);
-      toast.success(decision === "approve" ? `${req.displayName} joined` : "Request rejected");
+      toast.success(
+        decision === "approve"
+          ? `${req.displayName} joined`
+          : "Request rejected",
+      );
       reload();
       if (decision === "approve") onMembersChanged();
     } catch (err) {
@@ -162,15 +178,23 @@ const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) =
     <div className="flex flex-col gap-6">
       {requests.length > 0 && (
         <section className={CARD} aria-labelledby="join-requests-title">
-          <h2 id="join-requests-title" className="flex items-center gap-2 text-headline-sm text-on-surface">
+          <h2
+            id="join-requests-title"
+            className="flex items-center gap-2 text-headline-sm text-on-surface"
+          >
             Join requests
             <span className={CHIP}>{requests.length}</span>
           </h2>
           <ul className="divide-y divide-surface-variant">
             {requests.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <li
+                key={r.id}
+                className="flex flex-wrap items-center justify-between gap-3 py-3"
+              >
                 <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-body-md font-medium text-on-surface">{r.displayName}</span>
+                  <span className="truncate text-body-md font-medium text-on-surface">
+                    {r.displayName}
+                  </span>
                   <span className="truncate text-body-md text-on-surface-variant">
                     {r.email ? `${r.email} · ` : ""}
                     {ROLE_LABELS[r.role]} · asked {dateOf(r.createdAt)}
@@ -201,12 +225,17 @@ const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) =
       )}
 
       <section className={CARD} aria-labelledby="pending-invites-title">
-        <h2 id="pending-invites-title" className="flex items-center gap-2 text-headline-sm text-on-surface">
+        <h2
+          id="pending-invites-title"
+          className="flex items-center gap-2 text-headline-sm text-on-surface"
+        >
           Pending invitations
           <span className={CHIP}>{invites.length}</span>
         </h2>
         {invites.length === 0 ? (
-          <p className="text-body-md text-on-surface-variant">No pending invitations.</p>
+          <p className="text-body-md text-on-surface-variant">
+            No pending invitations.
+          </p>
         ) : (
           <ul className="divide-y divide-surface-variant">
             {invites.map((i) => (
@@ -218,10 +247,15 @@ const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) =
                         {i.kind === "email" ? i.email : "Link"}
                       </span>
                       <span className={CHIP}>{ROLE_LABELS[i.role]}</span>
-                      <span className={CHIP}>{i.kind === "email" ? "Invited by email" : "Invitation link"}</span>
+                      <span className={CHIP}>
+                        {i.kind === "email"
+                          ? "Invited by email"
+                          : "Invitation link"}
+                      </span>
                     </div>
                     <span className="text-body-md text-on-surface-variant">
-                      Invited by {i.createdByName} {ageOf(i.createdAt)} · Expires {dateOf(i.expiresAt)}
+                      Invited by {i.createdByName} {ageOf(i.createdAt)} ·
+                      Expires {dateOf(i.expiresAt)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -240,15 +274,25 @@ const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) =
                       size="sm"
                       label="Revoke invite"
                       confirmLabel="Revoke"
-                      warning={i.kind === "link" ? "Waiting requests from this link are denied" : undefined}
+                      warning={
+                        i.kind === "link"
+                          ? "Waiting requests from this link are denied"
+                          : undefined
+                      }
                       onConfirm={() => handleRevoke(i)}
                     />
                   </div>
                 </div>
                 {resent?.invitationId === i.id && (
                   <div className="flex flex-wrap items-center gap-2 rounded-lg bg-warning-container p-3 text-body-md text-on-warning-container">
-                    <span>Email not sent, copy the link. It shows only once.</span>
-                    <button type="button" onClick={() => copyLink(resent.link)} className="underline">
+                    <span>
+                      Email not sent, copy the link. It shows only once.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyLink(resent.link)}
+                      className="underline"
+                    >
                       Copy link
                     </button>
                   </div>

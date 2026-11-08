@@ -123,7 +123,7 @@ const FollowUpList = () => {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card">
           <div className="grid grid-cols-12 gap-4 border-b border-surface-variant bg-surface-container-low/50 px-6 py-4 text-label-caps uppercase tracking-wider text-on-surface-variant">
             <div className="col-span-6 md:col-span-5">Action item</div>
             <div className="col-span-6 md:col-span-3">Meeting</div>
@@ -156,7 +156,7 @@ const FollowUpList = () => {
                 <div className="col-span-12 mt-2 flex flex-wrap justify-end gap-2 md:col-span-4 md:mt-0 md:flex-nowrap">
                   <Link
                     href={`/follow-ups/${fu.id}`}
-                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-surface-variant px-4 py-2 text-body-md text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-surface-variant px-4 py-2 text-body-md text-primary transition-colors hover:border-primary hover:bg-primary/5"
                   >
                     Open
                     <ArrowRight className="h-4 w-4" />

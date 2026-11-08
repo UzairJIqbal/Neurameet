@@ -4,7 +4,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckSquare, Clock, Github, Users, Video, type LucideIcon } from "lucide-react";
+import {
+  CalendarDays,
+  CheckSquare,
+  Clock,
+  Github,
+  Users,
+  Video,
+  type LucideIcon,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
@@ -17,7 +25,11 @@ import {
   ProjectClientError,
 } from "@/lib/project-client";
 import type { InvitePreview, ProjectAvatar } from "@/lib/project-types";
-import { AvatarStack, ProjectIconTile, ProjectRoleChip } from "./project-visuals";
+import {
+  AvatarStack,
+  ProjectIconTile,
+  ProjectRoleChip,
+} from "./project-visuals";
 
 type Props = { token: string };
 
@@ -26,11 +38,11 @@ type Props = { token: string };
 const FALLBACK = "This invite is no longer valid";
 
 const primaryButton =
-  "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 const secondaryButton =
-  "rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+  "rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 const cardClass =
-  "mx-auto flex w-full max-w-lg flex-col gap-4 rounded-lg border border-surface-variant bg-surface-container-lowest p-6";
+  "mx-auto flex w-full max-w-lg flex-col gap-4 rounded-card bg-surface-container-lowest p-6 shadow-card";
 
 const messageFor = (err: unknown) =>
   err instanceof ProjectClientError && [403, 410, 429].includes(err.status)
@@ -40,14 +52,26 @@ const messageFor = (err: unknown) =>
       : FALLBACK;
 
 const longDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
 const inviteAge = (iso: string) => {
   const age = relativeTime(new Date(iso).getTime());
   return age === "now" ? "Sent just now" : `Sent ${age} ago`;
 };
 
-const Stat = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: number }) => (
+const Stat = ({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+}) => (
   <div className="flex flex-col items-center gap-1 rounded-lg bg-surface-container-low px-2 py-3 text-center">
     <Icon className="h-4 w-4 text-on-surface-variant" aria-hidden />
     <span className="text-headline-sm text-on-surface">{value}</span>
@@ -55,10 +79,18 @@ const Stat = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; v
   </div>
 );
 
-const FactRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
+const FactRow = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
   <div className="flex items-center justify-between gap-4 text-body-md">
     <span className="shrink-0 text-on-surface-variant">{label}</span>
-    <span className="flex min-w-0 items-center gap-2 text-on-surface">{children}</span>
+    <span className="flex min-w-0 items-center gap-2 text-on-surface">
+      {children}
+    </span>
   </div>
 );
 
@@ -72,7 +104,9 @@ const RepoRow = ({ preview }: { preview: InvitePreview }) => (
   <FactRow label="Repository">
     <Github className="h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
     {preview.repoName ? (
-      <span className="truncate font-label-mono text-label-mono">{preview.repoName}</span>
+      <span className="truncate font-label-mono text-label-mono">
+        {preview.repoName}
+      </span>
     ) : (
       <span>Repository connected</span>
     )}
@@ -87,14 +121,22 @@ const InviteFacts = ({ preview }: { preview: InvitePreview }) => (
       <Stat icon={Video} label="Meetings" value={preview.meetingCount} />
     </div>
     <div className="flex flex-col gap-2 border-t border-surface-variant pt-4">
-      {preview.team && preview.team.length > 0 && <TeamRow team={preview.team} total={preview.memberCount} />}
+      {preview.team && preview.team.length > 0 && (
+        <TeamRow team={preview.team} total={preview.memberCount} />
+      )}
       {preview.repoConnected && <RepoRow preview={preview} />}
       <FactRow label="Created">
-        <CalendarDays className="h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
+        <CalendarDays
+          className="h-4 w-4 shrink-0 text-on-surface-variant"
+          aria-hidden
+        />
         <span>{longDate(preview.createdAt)}</span>
       </FactRow>
       <FactRow label="Invitation">
-        <Clock className="h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
+        <Clock
+          className="h-4 w-4 shrink-0 text-on-surface-variant"
+          aria-hidden
+        />
         <span>{inviteAge(preview.invitedAt)}</span>
       </FactRow>
     </div>
@@ -112,7 +154,10 @@ const InviteView = ({ token }: Props) => {
   const [joining, setJoining] = useState(false);
   const [declining, setDeclining] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
-  const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -193,7 +238,10 @@ const InviteView = ({ token }: Props) => {
         <p role="alert" className="text-body-lg text-on-surface">
           {problem ?? FALLBACK}
         </p>
-        <Link href="/projects" className="text-body-md text-primary hover:underline">
+        <Link
+          href="/projects"
+          className="text-body-md text-primary hover:underline"
+        >
           Go to projects
         </Link>
       </div>
@@ -207,11 +255,19 @@ const InviteView = ({ token }: Props) => {
           {preview.inviterName} invited you to collaborate
         </p>
         <div className="flex items-start gap-3">
-          <ProjectIconTile icon={preview.icon} color={preview.color} size="lg" />
+          <ProjectIconTile
+            icon={preview.icon}
+            color={preview.color}
+            size="lg"
+          />
           <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="break-words text-headline-sm text-on-surface">{preview.projectName}</h1>
+            <h1 className="break-words text-headline-sm text-on-surface">
+              {preview.projectName}
+            </h1>
             {preview.description && (
-              <p className="break-words text-body-md text-on-surface-variant">{preview.description}</p>
+              <p className="break-words text-body-md text-on-surface-variant">
+                {preview.description}
+              </p>
             )}
           </div>
         </div>
@@ -222,13 +278,21 @@ const InviteView = ({ token }: Props) => {
 
         {preview.status === "member" && (
           <>
-            <p className="text-body-md text-on-surface-variant">You&apos;re already in this project.</p>
+            <p className="text-body-md text-on-surface-variant">
+              You&apos;re already in this project.
+            </p>
             {preview.projectId ? (
-              <Link href={`/projects/${preview.projectId}`} className="text-body-md text-primary hover:underline">
+              <Link
+                href={`/projects/${preview.projectId}`}
+                className="text-body-md text-primary hover:underline"
+              >
                 Open the project
               </Link>
             ) : (
-              <Link href="/projects" className="text-body-md text-primary hover:underline">
+              <Link
+                href="/projects"
+                className="text-body-md text-primary hover:underline"
+              >
                 Go to projects
               </Link>
             )}
@@ -244,7 +308,9 @@ const InviteView = ({ token }: Props) => {
         {preview.status === "valid" && (
           <>
             {preview.kind === "link" && (
-              <p className="text-body-md text-on-surface-variant">An Owner or Admin approves each request.</p>
+              <p className="text-body-md text-on-surface-variant">
+                An Owner or Admin approves each request.
+              </p>
             )}
             <div className="flex justify-end gap-2 border-t border-surface-variant pt-4">
               <button
@@ -255,7 +321,12 @@ const InviteView = ({ token }: Props) => {
               >
                 {declining ? "Declining..." : "Decline"}
               </button>
-              <button type="button" onClick={handleJoin} disabled={joining || declining} className={primaryButton}>
+              <button
+                type="button"
+                onClick={handleJoin}
+                disabled={joining || declining}
+                className={primaryButton}
+              >
                 {joining ? "Accepting..." : "Accept"}
               </button>
             </div>
@@ -264,7 +335,8 @@ const InviteView = ({ token }: Props) => {
       </div>
       {preview.status === "valid" && (
         <p className="text-center text-xs text-on-surface-variant">
-          Opening this page doesn&apos;t grant access. You join only after accepting.
+          Opening this page doesn&apos;t grant access. You join only after
+          accepting.
         </p>
       )}
     </div>

@@ -142,7 +142,7 @@ const MeetingList = () => {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none"
+              className="w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none"
             >
               <option value="all">All meetings</option>
               <option value="personal">Personal</option>
@@ -191,7 +191,7 @@ const MeetingList = () => {
                   {m.streamCallId && (
                     <Link
                       href={`/meeting/${m.streamCallId}`}
-                      className="rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary"
+                      className="rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary"
                     >
                       Join
                     </Link>
@@ -211,14 +211,14 @@ const MeetingList = () => {
           </p>
           <button
             onClick={() => router.push("/dashboard")}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
+            className="inline-flex items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
           >
             <Upload className="h-4 w-4" />
             Upload Transcript
           </button>
         </div>
       ) : past.length === 0 ? null : (
-        <div className="shrink-0 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="shrink-0 overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card">
           <div className="grid grid-cols-12 gap-4 border-b border-surface-variant bg-surface-container-low/50 px-6 py-4 text-label-caps uppercase tracking-wider text-on-surface-variant">
             <div className="col-span-6 md:col-span-4">Meeting</div>
             <div className="col-span-6 md:col-span-2">Date</div>
@@ -269,7 +269,7 @@ const MeetingList = () => {
                 <div className="col-span-12 mt-2 flex flex-wrap justify-end gap-2 md:col-span-4 md:mt-0 md:flex-nowrap">
                   <button
                     onClick={() => router.push(`/meeting-intelligence/${m.id}`)}
-                    className="inline-flex items-center whitespace-nowrap gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
+                    className="inline-flex items-center whitespace-nowrap gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
                   >
                     Insights
                   </button>

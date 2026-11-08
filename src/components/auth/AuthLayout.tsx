@@ -73,9 +73,11 @@ const AuthLayout = ({ children, variant }: AuthLayoutProps) => {
   return (
     <div className="flex min-h-screen w-full flex-col md:flex-row">
       {/* Left panel: the form, half the width on desktop */}
-      <div className="relative z-10 flex flex-1 flex-col bg-surface-container-lowest px-6 py-8 sm:px-10 md:w-1/2 md:flex-none">
+      <div className="relative z-10 flex flex-1 flex-col bg-surface-container-low px-6 py-8 sm:px-10 md:w-1/2 md:flex-none">
         <div className="flex flex-1 flex-col justify-center">
-          <div className="mx-auto w-full max-w-[400px]">{children}</div>
+          <div className="mx-auto w-full max-w-[440px] rounded-tray bg-surface-container-lowest p-8 shadow-card">
+            {children}
+          </div>
         </div>
         <p className="mt-8 text-xs text-on-surface-variant">© 2026 NeuraMeet</p>
       </div>

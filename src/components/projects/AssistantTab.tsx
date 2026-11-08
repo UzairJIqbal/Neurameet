@@ -68,7 +68,9 @@ const AssistantMessage = ({ message }: { message: UIMessage }) => {
                 href={source.href}
                 className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1 text-body-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
               >
-                <span className="font-mono text-label-mono text-primary">{source.marker}</span>
+                <span className="font-mono text-label-mono text-primary">
+                  {source.marker}
+                </span>
                 {source.label}
               </Link>
             </li>
@@ -96,7 +98,8 @@ const AssistantTab = ({ projectId, heading, prefill, aboveInput }: Props) => {
   const chatId = `project:${projectId}`;
 
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/ai/chat", body: { projectId } }),
+    () =>
+      new DefaultChatTransport({ api: "/api/ai/chat", body: { projectId } }),
     [projectId],
   );
   const initialMessages = useMemo(() => loadMessages(chatId), [chatId]);
@@ -142,10 +145,12 @@ const AssistantTab = ({ projectId, heading, prefill, aboveInput }: Props) => {
   };
 
   return (
-    <div className="flex h-[60vh] min-w-0 flex-1 flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+    <div className="flex h-[60vh] min-w-0 flex-1 flex-col rounded-card bg-surface-container-lowest shadow-card shadow-card">
       <div className="flex items-center justify-between gap-3 border-b border-outline-variant px-4 py-3">
         {heading ? (
-          <h2 className="min-w-0 break-words text-headline-sm text-on-surface">{heading}</h2>
+          <h2 className="min-w-0 break-words text-headline-sm text-on-surface">
+            {heading}
+          </h2>
         ) : (
           <span />
         )}
@@ -160,22 +165,29 @@ const AssistantTab = ({ projectId, heading, prefill, aboveInput }: Props) => {
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
         {messages.length === 0 && (
           <p className="text-body-md text-on-surface-variant">
-            Ask about this project&apos;s meetings, tasks, decisions, and promises.
+            Ask about this project&apos;s meetings, tasks, decisions, and
+            promises.
           </p>
         )}
 
         {messages
           // Same guard as ChatPanel: hydration can leave two entries with one id.
-          .filter((message, index, all) => all.findIndex((m) => m.id === message.id) === index)
+          .filter(
+            (message, index, all) =>
+              all.findIndex((m) => m.id === message.id) === index,
+          )
           .map((message) => (
             <div
               key={message.id}
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {message.role === "user" ? (
-                <div className="max-w-[80%] rounded-lg bg-primary-container px-4 py-3 text-on-primary">
+                <div className="max-w-[80%] rounded-full bg-primary-container px-4 py-3 text-on-primary">
                   <div className={cn("text-body-md leading-relaxed", mdClass)}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={safeMarkdown}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={safeMarkdown}
+                    >
                       {textOf(message)}
                     </ReactMarkdown>
                   </div>
@@ -200,9 +212,16 @@ const AssistantTab = ({ projectId, heading, prefill, aboveInput }: Props) => {
         <div ref={bottomRef} />
       </div>
 
-      {aboveInput && <div className="border-t border-outline-variant px-4 pt-3">{aboveInput}</div>}
+      {aboveInput && (
+        <div className="border-t border-outline-variant px-4 pt-3">
+          {aboveInput}
+        </div>
+      )}
 
-      <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-outline-variant p-4">
+      <form
+        onSubmit={handleSend}
+        className="flex items-center gap-2 border-t border-outline-variant p-4"
+      >
         <input
           ref={inputRef}
           aria-label="Ask about this project"

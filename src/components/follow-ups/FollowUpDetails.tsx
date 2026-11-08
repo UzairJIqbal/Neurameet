@@ -181,7 +181,7 @@ const FollowUpDetails = ({ id }: { id: string }) => {
         />
       </header>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
         <h3 className="text-headline-sm font-semibold text-on-surface">
           Details
         </h3>
@@ -223,15 +223,13 @@ const FollowUpDetails = ({ id }: { id: string }) => {
               <dt className="text-label-caps uppercase tracking-wider text-on-surface-variant">
                 Notes
               </dt>
-              <dd className="text-body-md text-on-surface">
-                {followUp.notes}
-              </dd>
+              <dd className="text-body-md text-on-surface">{followUp.notes}</dd>
             </div>
           )}
         </dl>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
         <h3 className="text-headline-sm font-semibold text-on-surface">
           Status
         </h3>

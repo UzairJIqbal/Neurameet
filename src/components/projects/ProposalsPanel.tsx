@@ -7,16 +7,30 @@ import toast from "react-hot-toast";
 import { Quote } from "lucide-react";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
-import { listMembers, listProposals, ProjectClientError, reviewProposal } from "@/lib/project-client";
+import {
+  listMembers,
+  listProposals,
+  ProjectClientError,
+  reviewProposal,
+} from "@/lib/project-client";
 import type { ProjectDetail, ProjectMember } from "@/lib/project-types";
-import type { Proposal, ProposalDecision, ReviewProposalInput } from "@/lib/task-types";
+import type {
+  Proposal,
+  ProposalDecision,
+  ReviewProposalInput,
+} from "@/lib/task-types";
 import MeetingProposals from "./MeetingProposals";
-import { ProposalFields, confirmInput, draftFor, type Draft } from "./proposal-draft";
+import {
+  ProposalFields,
+  confirmInput,
+  draftFor,
+  type Draft,
+} from "./proposal-draft";
 
 const primaryButton =
-  "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 const secondaryButton =
-  "rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+  "rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -29,12 +43,22 @@ type CardProps = {
   onDecide: (p: Proposal, input: ReviewProposalInput) => void;
 };
 
-const ProposalCard = ({ proposal: p, members, canReview, busy, onDecide }: CardProps) => {
+const ProposalCard = ({
+  proposal: p,
+  members,
+  canReview,
+  busy,
+  onDecide,
+}: CardProps) => {
   const [draft, setDraft] = useState<Draft>(() => draftFor(p));
   const disabled = !canReview || busy;
 
   const confirm = () => {
-    if (!p.quoteVerified && !window.confirm("Confirm without a transcript line?")) return;
+    if (
+      !p.quoteVerified &&
+      !window.confirm("Confirm without a transcript line?")
+    )
+      return;
     onDecide(p, confirmInput(p, draft));
   };
 
@@ -44,19 +68,29 @@ const ProposalCard = ({ proposal: p, members, canReview, busy, onDecide }: CardP
       : onDecide(p, { decision });
 
   return (
-    <li className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-4">
+    <li className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-4 shadow-card">
       <p className="text-body-md text-on-surface-variant">
         {p.meetingTitle}
-        {p.meetingDate && <span className="font-mono text-label-mono"> · {p.meetingDate.slice(0, 10)}</span>}
+        {p.meetingDate && (
+          <span className="font-mono text-label-mono">
+            {" "}
+            · {p.meetingDate.slice(0, 10)}
+          </span>
+        )}
       </p>
 
       {p.quoteVerified && p.quote ? (
         <blockquote className="flex gap-2 rounded-lg bg-surface-container-low p-3 text-body-md text-on-surface">
-          <Quote className="mt-1 h-4 w-4 shrink-0 text-primary-container" aria-hidden />
+          <Quote
+            className="mt-1 h-4 w-4 shrink-0 text-primary-container"
+            aria-hidden
+          />
           <span>
             &ldquo;{p.quote}&rdquo;
             <span className="block font-mono text-label-mono text-on-surface-variant">
-              {[p.quoteSpeaker, p.quoteLine ? `line ${p.quoteLine}` : null].filter(Boolean).join(", ")}
+              {[p.quoteSpeaker, p.quoteLine ? `line ${p.quoteLine}` : null]
+                .filter(Boolean)
+                .join(", ")}
             </span>
           </span>
         </blockquote>
@@ -64,21 +98,38 @@ const ProposalCard = ({ proposal: p, members, canReview, busy, onDecide }: CardP
         <p className="text-body-md text-error">No matching transcript line</p>
       )}
 
-      <ProposalFields draft={draft} members={members} disabled={disabled} onChange={setDraft} />
+      <ProposalFields
+        draft={draft}
+        members={members}
+        disabled={disabled}
+        onChange={setDraft}
+      />
 
       {p.duplicate && (
         <p className="text-body-md text-on-surface-variant">
-          Looks like <span className="font-mono text-label-mono">{p.duplicate.key}</span> {p.duplicate.title}
+          Looks like{" "}
+          <span className="font-mono text-label-mono">{p.duplicate.key}</span>{" "}
+          {p.duplicate.title}
         </p>
       )}
 
       {canReview && (
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" disabled={busy} onClick={() => decide("reject")} className={secondaryButton}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => decide("reject")}
+            className={secondaryButton}
+          >
             Reject
           </button>
           {p.duplicate && (
-            <button type="button" disabled={busy} onClick={() => decide("merge")} className={secondaryButton}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => decide("merge")}
+              className={secondaryButton}
+            >
               Merge into {p.duplicate.key}
             </button>
           )}
@@ -117,7 +168,10 @@ const ProposalsPanel = ({
   const [retryNonce, setRetryNonce] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  const { timedOut } = useLoadingTimeout(isLoading && !loaded, { timeoutMs: 12000, retryNonce });
+  const { timedOut } = useLoadingTimeout(isLoading && !loaded, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   const fetchProposals = useCallback(
     async (signal?: AbortSignal) => {
@@ -158,7 +212,9 @@ const ProposalsPanel = ({
 
   useEffect(() => {
     const onFocus = () => {
-      fetchProposals().catch((err) => console.error("Proposals refresh failed:", err));
+      fetchProposals().catch((err) =>
+        console.error("Proposals refresh failed:", err),
+      );
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -170,7 +226,10 @@ const ProposalsPanel = ({
       const res = await reviewProposal(p.id, input);
       setProposals((prev) => prev.filter((x) => x.id !== p.id));
       if (input.decision === "reject") toast.success("Proposal rejected");
-      else if (res.task) toast.success(`${res.task.key} ${input.decision === "merge" ? "updated" : "created"}`);
+      else if (res.task)
+        toast.success(
+          `${res.task.key} ${input.decision === "merge" ? "updated" : "created"}`,
+        );
       if (input.decision !== "reject") onChanged?.();
     } catch (err) {
       toast.error(errorText(err, "Failed to review the proposal"));
@@ -184,11 +243,27 @@ const ProposalsPanel = ({
 
   const reload = useCallback(() => setRetryNonce((k) => k + 1), []);
 
-  if (timedOut) return <LoadError compact message="We couldn't load the proposals." onRetry={reload} />;
+  if (timedOut)
+    return (
+      <LoadError
+        compact
+        message="We couldn't load the proposals."
+        onRetry={reload}
+      />
+    );
   if (!loaded && isLoading) return <SkeletonCard />;
-  if (!loaded) return <LoadError compact message="We couldn't load the proposals." onRetry={reload} />;
+  if (!loaded)
+    return (
+      <LoadError
+        compact
+        message="We couldn't load the proposals."
+        onRetry={reload}
+      />
+    );
 
-  const visible = meetingId ? proposals.filter((p) => p.meetingId === meetingId) : proposals;
+  const visible = meetingId
+    ? proposals.filter((p) => p.meetingId === meetingId)
+    : proposals;
   if (visible.length === 0) return null;
 
   if (meetingId) {
@@ -219,7 +294,9 @@ const ProposalsPanel = ({
         </span>
       </h3>
       {!canReview && (
-        <p className="text-body-md text-on-surface-variant">An Owner or Admin reviews these proposals.</p>
+        <p className="text-body-md text-on-surface-variant">
+          An Owner or Admin reviews these proposals.
+        </p>
       )}
       <ul className="flex flex-col gap-3">
         {visible.map((p) => (

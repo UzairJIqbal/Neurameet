@@ -14,8 +14,14 @@ const SUGGESTIONS = [
 
 // AC-70n: the W7 panel, with suggested questions and what it can answer from.
 const ProjectAssistant = ({ project }: { project: ProjectFull }) => {
-  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(null);
-  const taskCount = Object.values(project.taskTotals ?? {}).reduce((sum, n) => sum + n, 0);
+  const [prefill, setPrefill] = useState<{
+    text: string;
+    nonce: number;
+  } | null>(null);
+  const taskCount = Object.values(project.taskTotals ?? {}).reduce(
+    (sum, n) => sum + n,
+    0,
+  );
   const memory = [
     ["Processed meetings", project.processedMeetingCount ?? 0],
     ["Decisions", project.decisionCount ?? 0],
@@ -29,7 +35,12 @@ const ProjectAssistant = ({ project }: { project: ProjectFull }) => {
         <button
           key={text}
           type="button"
-          onClick={() => setPrefill((current) => ({ text, nonce: (current?.nonce ?? 0) + 1 }))}
+          onClick={() =>
+            setPrefill((current) => ({
+              text,
+              nonce: (current?.nonce ?? 0) + 1,
+            }))
+          }
           className="rounded-full border border-surface-variant px-3 py-1 text-body-md text-on-surface-variant hover:bg-surface-container-low"
         >
           {text}
@@ -48,13 +59,20 @@ const ProjectAssistant = ({ project }: { project: ProjectFull }) => {
       />
       <aside
         aria-label="Project Memory"
-        className="flex flex-col gap-3 rounded-lg border border-surface-variant bg-surface-container-lowest p-4 lg:w-72 lg:shrink-0"
+        className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-4 lg:w-72 lg:shrink-0 shadow-card"
       >
-        <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">Project Memory</h3>
-        <p className="break-words text-body-md text-on-surface-variant">Answers come only from {project.name} records:</p>
+        <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">
+          Project Memory
+        </h3>
+        <p className="break-words text-body-md text-on-surface-variant">
+          Answers come only from {project.name} records:
+        </p>
         <dl className="flex flex-col gap-2">
           {memory.map(([label, count]) => (
-            <div key={label} className="flex items-center justify-between gap-3 text-body-md">
+            <div
+              key={label}
+              className="flex items-center justify-between gap-3 text-body-md"
+            >
               <dt className="text-on-surface-variant">{label}</dt>
               <dd className="font-medium text-on-surface">{count}</dd>
             </div>

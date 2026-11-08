@@ -36,15 +36,19 @@ type Props = {
   onProjectChanged: () => void;
 };
 
-const CARD = "flex flex-col gap-4 rounded-lg border border-surface-variant bg-surface-container-lowest p-5";
-const FIELD = "rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface disabled:opacity-60";
-const LABEL = "text-label-caps uppercase tracking-wider text-on-surface-variant";
+const CARD =
+  "flex flex-col gap-4 rounded-card bg-surface-container-lowest p-5 shadow-card";
+const FIELD =
+  "rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface disabled:opacity-60";
+const LABEL =
+  "text-label-caps uppercase tracking-wider text-on-surface-variant";
 const MUTED = "text-body-md text-on-surface-variant";
 const PRIMARY_BUTTON =
-  "self-start rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "self-start rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 const OUTLINE_BUTTON =
-  "rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
-const DANGER_BUTTON = "rounded-lg bg-error px-4 py-2 text-body-md text-on-primary hover:opacity-90 disabled:opacity-50";
+  "rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50";
+const DANGER_BUTTON =
+  "rounded-lg bg-error px-4 py-2 text-body-md text-on-primary hover:opacity-90 disabled:opacity-50";
 
 const errorText = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -54,7 +58,9 @@ const DetailsCard = ({ project, onProjectChanged }: Props) => {
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
   const [status, setStatus] = useState<ProjectStatus>(project.status);
-  const [projectType, setProjectType] = useState<ProjectType>(project.projectType);
+  const [projectType, setProjectType] = useState<ProjectType>(
+    project.projectType,
+  );
   const [icon, setIcon] = useState<ProjectIcon>(project.icon);
   const [color, setColor] = useState<ProjectColor>(project.color);
   const [saving, setSaving] = useState(false);
@@ -158,7 +164,9 @@ const DetailsCard = ({ project, onProjectChanged }: Props) => {
                   onClick={() => setIcon(key)}
                   className={cn(
                     "flex h-9 w-9 items-center justify-center rounded-lg border text-on-surface disabled:opacity-60",
-                    icon === key ? "border-primary bg-surface-container-low" : "border-surface-variant",
+                    icon === key
+                      ? "border-primary bg-surface-container-low"
+                      : "border-surface-variant",
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
@@ -190,7 +198,11 @@ const DetailsCard = ({ project, onProjectChanged }: Props) => {
       </div>
 
       {canEdit && (
-        <button type="submit" disabled={saving || name.trim().length === 0} className={PRIMARY_BUTTON}>
+        <button
+          type="submit"
+          disabled={saving || name.trim().length === 0}
+          className={PRIMARY_BUTTON}
+        >
           {saving ? "Saving..." : "Save changes"}
         </button>
       )}
@@ -199,7 +211,12 @@ const DetailsCard = ({ project, onProjectChanged }: Props) => {
 };
 
 const TransferCard = ({ project, onProjectChanged }: Props) => {
-  const load = useCardLoad(useCallback((signal: AbortSignal) => listMembers(project.id, signal), [project.id]));
+  const load = useCardLoad(
+    useCallback(
+      (signal: AbortSignal) => listMembers(project.id, signal),
+      [project.id],
+    ),
+  );
   const [transferTo, setTransferTo] = useState("");
 
   const transfer = async () => {
@@ -214,14 +231,24 @@ const TransferCard = ({ project, onProjectChanged }: Props) => {
     }
   };
 
-  const admins = load.data ? load.data.members.filter((m) => m.role === "admin" && m.userId !== load.data?.me) : [];
+  const admins = load.data
+    ? load.data.members.filter(
+        (m) => m.role === "admin" && m.userId !== load.data?.me,
+      )
+    : [];
 
   return (
     <section className={CARD} aria-label="Transfer ownership">
       <h2 className="text-headline-sm text-on-surface">Transfer ownership</h2>
-      <p className={MUTED}>Choose an Admin. They become the Owner and you become an Admin.</p>
+      <p className={MUTED}>
+        Choose an Admin. They become the Owner and you become an Admin.
+      </p>
       {load.failed ? (
-        <LoadError compact message="We couldn't load the members." onRetry={load.retry} />
+        <LoadError
+          compact
+          message="We couldn't load the members."
+          onRetry={load.retry}
+        />
       ) : !load.data ? (
         <SkeletonCard />
       ) : admins.length === 0 ? (
@@ -241,7 +268,12 @@ const TransferCard = ({ project, onProjectChanged }: Props) => {
               </option>
             ))}
           </select>
-          <button type="button" disabled={!transferTo} onClick={transfer} className={OUTLINE_BUTTON}>
+          <button
+            type="button"
+            disabled={!transferTo}
+            onClick={transfer}
+            className={OUTLINE_BUTTON}
+          >
             Transfer ownership
           </button>
         </div>
@@ -274,8 +306,10 @@ const DeleteCard = ({ project }: { project: ProjectFull }) => {
     >
       <h2 className="text-headline-sm text-on-surface">Delete project</h2>
       <p className={MUTED}>
-        This deletes the project and all {project.meetingCount} of its meetings, with their transcripts, insights, and
-        ledger. Type <span className="font-medium text-on-surface">{project.name}</span> to confirm.
+        This deletes the project and all {project.meetingCount} of its meetings,
+        with their transcripts, insights, and ledger. Type{" "}
+        <span className="font-medium text-on-surface">{project.name}</span> to
+        confirm.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <input

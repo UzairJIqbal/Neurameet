@@ -28,12 +28,18 @@ type Props = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
+  "w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
 const primaryButton =
-  "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
 // Developer or higher: a task by hand, with the next key (AC-38).
-const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, onCreated }: Props) => {
+const NewTaskDialog = ({
+  projectId,
+  members,
+  initialStatus = "todo",
+  onClose,
+  onCreated,
+}: Props) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -54,7 +60,10 @@ const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, on
   const moveToColumn = async (task: Task): Promise<Task> => {
     if (initialStatus === "todo") return task;
     try {
-      const moved = await updateTask(task.id, { status: initialStatus, ifVersion: task.version });
+      const moved = await updateTask(task.id, {
+        status: initialStatus,
+        ifVersion: task.version,
+      });
       return moved.task;
     } catch (err) {
       console.error("Failed to move the new task:", err);
@@ -78,7 +87,9 @@ const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, on
       toast.success(`${task.key} created`);
       onCreated(await moveToColumn(task));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create the task");
+      setError(
+        err instanceof Error ? err.message : "Failed to create the task",
+      );
     } finally {
       setBusy(false);
     }
@@ -91,7 +102,7 @@ const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, on
         aria-modal="true"
         aria-labelledby="new-task-title"
         onSubmit={handleSubmit}
-        className="flex w-full max-w-md flex-col gap-5 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
+        className="flex w-full max-w-md flex-col gap-5 rounded-card bg-surface-container-lowest p-6 shadow-lg"
       >
         <div className="flex items-center justify-between">
           <h2 id="new-task-title" className="text-headline-sm text-on-surface">
@@ -130,7 +141,11 @@ const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, on
         </label>
         <label className="flex flex-col gap-1 text-body-md text-on-surface">
           Assignee
-          <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={inputClass}>
+          <select
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+            className={inputClass}
+          >
             <option value="">Unassigned</option>
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>
@@ -157,7 +172,12 @@ const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, on
         </label>
         <label className="flex flex-col gap-1 text-body-md text-on-surface">
           Due date
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} />
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className={inputClass}
+          />
         </label>
 
         {error && (
@@ -166,7 +186,11 @@ const NewTaskDialog = ({ projectId, members, initialStatus = "todo", onClose, on
           </p>
         )}
 
-        <button type="submit" disabled={busy || title.trim().length === 0} className={primaryButton}>
+        <button
+          type="submit"
+          disabled={busy || title.trim().length === 0}
+          className={primaryButton}
+        >
           {busy ? "Creating..." : "Create task"}
         </button>
       </form>

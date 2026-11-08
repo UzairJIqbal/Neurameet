@@ -54,14 +54,14 @@ const Navbar = ({
   const initials = initialsOf(user?.fullName ?? "") || "N";
 
   return (
-    <header className="sticky top-0 z-40 flex w-full shrink-0 items-center justify-between gap-3 border-b border-outline-variant bg-surface-container-lowest px-3 py-2 sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-40 flex w-full shrink-0 items-center justify-between gap-3 bg-surface-container-lowest shadow-card px-3 py-2 sm:px-6 lg:px-10">
       <div className="flex min-w-0 items-center gap-2">
         {onMenu && (
           <button
             type="button"
             onClick={onMenu}
             aria-label="Open menu"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-on-surface transition-colors hover:bg-surface-container-low lg:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-low lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -97,13 +97,13 @@ const Navbar = ({
           type="button"
           onClick={() => window.dispatchEvent(new Event(OPEN_PALETTE_EVENT))}
           aria-label="Search projects, tasks, meetings"
-          className="flex h-10 items-center gap-2 rounded-lg border-outline-variant px-2.5 text-body-md text-on-surface-variant transition-colors hover:bg-surface-container-low md:w-72 md:border md:bg-surface-container-low"
+          className="flex h-10 items-center gap-2 rounded-full px-3 text-body-md text-on-surface-variant transition-colors hover:bg-surface-container-low md:w-72 md:bg-surface-container-low"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="hidden flex-1 truncate text-left md:inline">
             Search projects, tasks, meetings...
           </span>
-          <kbd className="hidden shrink-0 rounded border border-outline-variant bg-surface-container-lowest px-1.5 font-label-mono text-[11px] md:inline">
+          <kbd className="hidden shrink-0 rounded-full bg-surface-container-lowest px-2 font-label-mono text-[11px] md:inline">
             Ctrl K
           </kbd>
         </button>
@@ -112,7 +112,7 @@ const Navbar = ({
           type="button"
           onClick={() => setHelpOpen(true)}
           aria-label="Help"
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-low"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-low"
         >
           <CircleHelp className="h-5 w-5" />
         </button>
@@ -139,7 +139,7 @@ const Navbar = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="min-w-52 border border-outline-variant bg-surface-container-lowest text-on-surface"
+            className="min-w-52 rounded-card border-0 bg-surface-container-lowest text-on-surface shadow-float"
           >
             <DropdownMenuItem onSelect={() => router.push("/profile")}>
               <User className="h-4 w-4" />

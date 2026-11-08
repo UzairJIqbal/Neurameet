@@ -8,8 +8,17 @@ import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
-import { fetchPalette, GO_TO_LINKS, OPEN_PALETTE_EVENT, searchHref } from "@/lib/palette-client";
-import { EMPTY_PALETTE, type PaletteGroups, type PaletteRow } from "@/lib/palette-types";
+import {
+  fetchPalette,
+  GO_TO_LINKS,
+  OPEN_PALETTE_EVENT,
+  searchHref,
+} from "@/lib/palette-client";
+import {
+  EMPTY_PALETTE,
+  type PaletteGroups,
+  type PaletteRow,
+} from "@/lib/palette-types";
 
 const DEBOUNCE_MS = 200;
 const GROUPS: Array<{ key: keyof PaletteGroups; heading: string }> = [
@@ -33,7 +42,10 @@ const CommandPalette = () => {
   const [failed, setFailed] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
-  const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -95,9 +107,16 @@ const CommandPalette = () => {
   if (!open) return null;
 
   const renderRow = (row: PaletteRow) => (
-    <Command.Item key={row.id} value={`${row.id}`} onSelect={() => go(row.href)} className={ITEM}>
+    <Command.Item
+      key={row.id}
+      value={`${row.id}`}
+      onSelect={() => go(row.href)}
+      className={ITEM}
+    >
       <span className="truncate">{row.title}</span>
-      <span className="truncate text-xs text-on-surface-variant">{row.subtitle}</span>
+      <span className="truncate text-xs text-on-surface-variant">
+        {row.subtitle}
+      </span>
     </Command.Item>
   );
 
@@ -110,12 +129,15 @@ const CommandPalette = () => {
       onClick={close}
     >
       <div
-        className="w-full max-w-xl overflow-hidden rounded-lg border border-outline-variant bg-surface-container-lowest"
+        className="w-full max-w-xl overflow-hidden rounded-card bg-surface-container-lowest shadow-card"
         onClick={(e) => e.stopPropagation()}
       >
         <Command shouldFilter={false} label="Search">
           <div className="flex items-center gap-2 border-b border-surface-variant px-3">
-            <Search className="h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
+            <Search
+              className="h-4 w-4 shrink-0 text-on-surface-variant"
+              aria-hidden
+            />
             <Command.Input
               autoFocus
               value={query}
@@ -128,27 +150,46 @@ const CommandPalette = () => {
             {q.length < 2 && (
               <Command.Group heading="Go to" className={HEADING}>
                 {GO_TO_LINKS.map((l) => (
-                  <Command.Item key={l.href} value={l.href} onSelect={() => go(l.href)} className={ITEM}>
+                  <Command.Item
+                    key={l.href}
+                    value={l.href}
+                    onSelect={() => go(l.href)}
+                    className={ITEM}
+                  >
                     {l.label}
                   </Command.Item>
                 ))}
               </Command.Group>
             )}
             {timedOut || failed ? (
-              <LoadError compact message="We could not search right now." onRetry={() => setRetryNonce((n) => n + 1)} />
+              <LoadError
+                compact
+                message="We could not search right now."
+                onRetry={() => setRetryNonce((n) => n + 1)}
+              />
             ) : isLoading ? (
-              <p className="px-3 py-2 text-body-md text-on-surface-variant">Searching...</p>
+              <p className="px-3 py-2 text-body-md text-on-surface-variant">
+                Searching...
+              </p>
             ) : (
               GROUPS.map(({ key, heading }) =>
                 groups[key].length > 0 ? (
-                  <Command.Group key={key} heading={heading} className={HEADING}>
+                  <Command.Group
+                    key={key}
+                    heading={heading}
+                    className={HEADING}
+                  >
                     {groups[key].map(renderRow)}
                   </Command.Group>
                 ) : null,
               )
             )}
             {q.length >= 2 && (
-              <Command.Item value="__content" onSelect={() => go(searchHref(q))} className={ITEM}>
+              <Command.Item
+                value="__content"
+                onSelect={() => go(searchHref(q))}
+                className={ITEM}
+              >
                 Search meeting content for &quot;{q}&quot;
               </Command.Item>
             )}

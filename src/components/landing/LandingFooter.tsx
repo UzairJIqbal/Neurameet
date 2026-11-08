@@ -59,8 +59,8 @@ const legalLinks: FooterLink[] = [
 
 const LandingFooter = () => {
   return (
-    <footer className="bg-surface pt-20 pb-10 border-t border-outline-variant">
-      <div className="max-w-7xl mx-auto px-6">
+    <footer className="bg-surface px-4 pb-6">
+      <div className="max-w-6xl mx-auto bg-surface-container-low rounded-tray px-8 pt-14 pb-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-16">
           {/* Logo + description */}
           <div className="col-span-2">
@@ -123,7 +123,7 @@ const LandingFooter = () => {
                         </span>
                       </span>
                     </li>
-                  )
+                  ),
                 )}
               </ul>
             </div>
@@ -155,7 +155,7 @@ const LandingFooter = () => {
                     Soon
                   </span>
                 </span>
-              )
+              ),
             )}
           </div>
         </div>

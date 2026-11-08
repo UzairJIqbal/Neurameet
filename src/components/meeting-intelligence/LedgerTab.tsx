@@ -29,10 +29,22 @@ import TabEmptyState from "./EmptyState";
 const formatDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString();
 
-export const STATUS_BADGE: Record<LedgerDerivedStatus, { label: string; className: string }> = {
-  open: { label: "Open", className: "bg-surface-container-high text-on-surface-variant" },
-  overdue: { label: "Overdue", className: "bg-error-container text-on-error-container" },
-  kept: { label: "Kept", className: "bg-primary-container/15 text-primary-container" },
+export const STATUS_BADGE: Record<
+  LedgerDerivedStatus,
+  { label: string; className: string }
+> = {
+  open: {
+    label: "Open",
+    className: "bg-surface-container-high text-on-surface-variant",
+  },
+  overdue: {
+    label: "Overdue",
+    className: "bg-error-container text-on-error-container",
+  },
+  kept: {
+    label: "Kept",
+    className: "bg-primary-container/15 text-primary-container",
+  },
   reversed: { label: "Reversed", className: "bg-error-container text-error" },
 };
 
@@ -45,7 +57,9 @@ const LIVE_BADGE = `${badgeBase} border border-primary-container text-primary-co
 const LiveBadge = () => <span className={LIVE_BADGE}>Marked live</span>;
 
 const quoteMeta = (speaker: string | null, lineNumber: number | null): string =>
-  [speaker, lineNumber === null ? null : `line ${lineNumber}`].filter(Boolean).join(" · ");
+  [speaker, lineNumber === null ? null : `line ${lineNumber}`]
+    .filter(Boolean)
+    .join(" · ");
 
 const itemMeta = (item: LedgerItemView): string =>
   item.source === "live_agreement"
@@ -55,9 +69,9 @@ const itemMeta = (item: LedgerItemView): string =>
 const HIDDEN_QUOTE = "Hidden for viewers";
 
 const primaryButton =
-  "inline-flex w-fit items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex w-fit items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60";
 const outlineButton =
-  "inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex w-fit items-center gap-2 rounded-full border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60";
 
 type ReviewHandler = (linkId: string, decision: LedgerReviewDecision) => void;
 
@@ -83,7 +97,12 @@ const CodeLinkControls = ({
   if (link.state !== "suggested") {
     if (reverted) return null;
     return (
-      <button type="button" disabled={busy} onClick={() => onReview(link.id, "reset")} className={`${outlineButton} mt-1`}>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onReview(link.id, "reset")}
+        className={`${outlineButton} mt-1`}
+      >
         {savingLabel(saving, "reset", "Undo")}
       </button>
     );
@@ -91,11 +110,21 @@ const CodeLinkControls = ({
   return (
     <div className="mt-1 flex flex-wrap gap-2">
       {!reverted && (
-        <button type="button" disabled={busy} onClick={() => onReview(link.id, "confirm")} className={primaryButton}>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onReview(link.id, "confirm")}
+          className={primaryButton}
+        >
           {savingLabel(saving, "confirm", "Confirm")}
         </button>
       )}
-      <button type="button" disabled={busy} onClick={() => onReview(link.id, "reject")} className={outlineButton}>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onReview(link.id, "reject")}
+        className={outlineButton}
+      >
         {savingLabel(saving, "reject", "Not a match")}
       </button>
     </div>
@@ -116,7 +145,9 @@ const CodeLinkRow = ({
 }) => (
   <li className="flex flex-col gap-1 text-body-md text-on-surface-variant">
     <span className="text-label-caps font-medium uppercase tracking-wider">
-      Merged PR{link.pr ? ` · ${link.pr.repoFullName} #${link.pr.prNumber}` : ""} · {link.relation} · {link.state}
+      Merged PR
+      {link.pr ? ` · ${link.pr.repoFullName} #${link.pr.prNumber}` : ""} ·{" "}
+      {link.relation} · {link.state}
       {link.pr?.reverted ? " · reverted" : ""}
     </span>
     {link.pr ? (
@@ -132,7 +163,9 @@ const CodeLinkRow = ({
     ) : (
       <span dir="auto">{link.quote ?? HIDDEN_QUOTE}</span>
     )}
-    {canManage && <CodeLinkControls link={link} saving={saving} onReview={onReview} />}
+    {canManage && (
+      <CodeLinkControls link={link} saving={saving} onReview={onReview} />
+    )}
   </li>
 );
 
@@ -164,11 +197,15 @@ const LedgerItemCard = ({
         >
           {isPromise ? "Promise" : "Decision"}
         </span>
-        <span className={`${badgeBase} ${status.className}`}>{status.label}</span>
+        <span className={`${badgeBase} ${status.className}`}>
+          {status.label}
+        </span>
         {item.liveMark && <LiveBadge />}
       </div>
 
-      <p className="font-body-md font-medium text-on-surface">{item.statement}</p>
+      <p className="font-body-md font-medium text-on-surface">
+        {item.statement}
+      </p>
 
       <blockquote className="flex gap-2 rounded-lg bg-surface-container-low px-4 py-3 text-body-md text-on-surface-variant">
         <Quote className="mt-1 h-4 w-4 shrink-0 text-primary-container" />
@@ -189,7 +226,8 @@ const LedgerItemCard = ({
           )}
           {item.dueDate && (
             <span className="inline-flex items-center gap-1">
-              <CalendarDays className="h-4 w-4" /> Due {formatDate(item.dueDate)}
+              <CalendarDays className="h-4 w-4" /> Due{" "}
+              {formatDate(item.dueDate)}
             </span>
           )}
         </div>
@@ -207,7 +245,10 @@ const LedgerItemCard = ({
                 onReview={onReview}
               />
             ) : (
-              <li key={link.id} className="flex flex-col gap-1 text-body-md text-on-surface-variant">
+              <li
+                key={link.id}
+                className="flex flex-col gap-1 text-body-md text-on-surface-variant"
+              >
                 <span className="text-label-caps font-medium uppercase tracking-wider">
                   Later meeting · {link.relation} · {link.state}
                 </span>
@@ -227,7 +268,9 @@ const LedgerItemCard = ({
         </ul>
       )}
 
-      {item.outcome && <OutcomeCard outcome={item.outcome} onOpenTask={onOpenTask} />}
+      {item.outcome && (
+        <OutcomeCard outcome={item.outcome} onOpenTask={onOpenTask} />
+      )}
     </div>
   );
 };
@@ -248,7 +291,9 @@ const QuoteBlock = ({
   meta: string;
 }) => (
   <blockquote className="flex flex-col gap-1 rounded-lg bg-surface-container-low px-4 py-3 text-body-md text-on-surface-variant">
-    <span className="text-label-caps font-medium uppercase tracking-wider">{label}</span>
+    <span className="text-label-caps font-medium uppercase tracking-wider">
+      {label}
+    </span>
     <span dir="auto" className="italic text-on-surface">
       {quote ?? HIDDEN_QUOTE}
     </span>
@@ -293,8 +338,12 @@ const MatchCard = ({
   return (
     <div className="flex flex-col gap-3 px-6 py-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`${badgeBase} ${relation.className}`}>{relation.label}</span>
-        <span className={`${badgeBase} bg-surface-container-high text-on-surface-variant`}>
+        <span className={`${badgeBase} ${relation.className}`}>
+          {relation.label}
+        </span>
+        <span
+          className={`${badgeBase} bg-surface-container-high text-on-surface-variant`}
+        >
           {LINK_STATE_LABEL[link.state]}
         </span>
         {link.liveMark && <LiveBadge />}
@@ -303,42 +352,44 @@ const MatchCard = ({
         </span>
       </div>
 
-      <p className="font-body-md font-medium text-on-surface">{link.item.statement}</p>
+      <p className="font-body-md font-medium text-on-surface">
+        {link.item.statement}
+      </p>
 
       <LinkQuotes link={link} />
 
       {canManage && (
-      <div className="flex flex-wrap gap-2">
-        {link.state === "suggested" ? (
-          <>
+        <div className="flex flex-wrap gap-2">
+          {link.state === "suggested" ? (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onReview(link.id, "confirm")}
+                className={primaryButton}
+              >
+                {label("confirm", "Confirm")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onReview(link.id, "reject")}
+                className={outlineButton}
+              >
+                {label("reject", "Not a match")}
+              </button>
+            </>
+          ) : (
             <button
               type="button"
               disabled={busy}
-              onClick={() => onReview(link.id, "confirm")}
-              className={primaryButton}
-            >
-              {label("confirm", "Confirm")}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onReview(link.id, "reject")}
+              onClick={() => onReview(link.id, "reset")}
               className={outlineButton}
             >
-              {label("reject", "Not a match")}
+              {label("reset", "Undo")}
             </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onReview(link.id, "reset")}
-            className={outlineButton}
-          >
-            {label("reset", "Undo")}
-          </button>
-        )}
-      </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -349,9 +400,12 @@ const LiveOnlyCard = ({ entry }: { entry: LedgerLiveOnlyMark }) => (
     <div className="flex flex-wrap items-center gap-2">
       <LiveBadge />
     </div>
-    <p className="font-body-md font-medium text-on-surface">{entry.item.statement}</p>
+    <p className="font-body-md font-medium text-on-surface">
+      {entry.item.statement}
+    </p>
     <p className="text-body-md text-on-surface-variant">
-      Marked live as {entry.mark === "open" ? "still open" : entry.mark}, no transcript evidence found
+      Marked live as {entry.mark === "open" ? "still open" : entry.mark}, no
+      transcript evidence found
     </p>
     <QuoteBlock
       label={`Earlier · ${entry.sourceMeeting.title} · ${new Date(entry.sourceMeeting.startedAt).toLocaleDateString()}`}
@@ -393,7 +447,10 @@ const LedgerTab = ({
   const [failed, setFailed] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [checking, setChecking] = useState(false);
-  const [saving, setSaving] = useState<{ linkId: string; decision: LedgerReviewDecision } | null>(null);
+  const [saving, setSaving] = useState<{
+    linkId: string;
+    decision: LedgerReviewDecision;
+  } | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const { timedOut } = useLoadingTimeout(isLoading, { retryNonce });
 
@@ -494,13 +551,17 @@ const LedgerTab = ({
             disabled={checking}
             className={outlineButton}
           >
-            <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${checking ? "animate-spin" : ""}`}
+            />
             {checking ? "Checking…" : "Check again"}
           </button>
         )}
       </div>
 
-      {data.reversalCount > 0 && reversed.length > 0 && <ReversalCard links={reversed} />}
+      {data.reversalCount > 0 && reversed.length > 0 && (
+        <ReversalCard links={reversed} />
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-headline-sm font-semibold text-on-surface">
@@ -509,7 +570,7 @@ const LedgerTab = ({
         {data.incoming.length === 0 && liveOnly.length === 0 ? (
           <TabEmptyState message="No earlier promises were mentioned here yet." />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+          <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card">
             <div className="divide-y divide-surface-variant">
               {data.incoming.map((link) => (
                 <MatchCard
@@ -535,7 +596,7 @@ const LedgerTab = ({
         {data.items.length === 0 ? (
           <TabEmptyState message="No decisions or promises found in this meeting." />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+          <div className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card">
             <div className="divide-y divide-surface-variant">
               {data.items.map((item) => (
                 <LedgerItemCard
@@ -552,7 +613,9 @@ const LedgerTab = ({
         )}
       </div>
 
-      {openTaskId && <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+      {openTaskId && (
+        <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
+      )}
     </div>
   );
 };

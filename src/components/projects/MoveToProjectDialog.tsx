@@ -17,9 +17,9 @@ type Props = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
+  "w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
 const primaryButton =
-  "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
 // AC-24, AC-25: the creator moves a personal meeting into a project where they
 // are Developer or higher. It never moves back out.
@@ -31,7 +31,10 @@ const MoveToProjectDialog = ({ meetingId, onClose, onMoved }: Props) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  const { timedOut } = useLoadingTimeout(isLoading, { timeoutMs: 12000, retryNonce });
+  const { timedOut } = useLoadingTimeout(isLoading, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -79,7 +82,9 @@ const MoveToProjectDialog = ({ meetingId, onClose, onMoved }: Props) => {
       toast.success("Meeting moved to the project");
       onMoved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to move the meeting");
+      setError(
+        err instanceof Error ? err.message : "Failed to move the meeting",
+      );
     } finally {
       setBusy(false);
     }
@@ -87,13 +92,16 @@ const MoveToProjectDialog = ({ meetingId, onClose, onMoved }: Props) => {
 
   const body = () => {
     if (timedOut || (!isLoading && projects === null)) {
-      return <LoadError message="We couldn't load your projects." onRetry={reload} />;
+      return (
+        <LoadError message="We couldn't load your projects." onRetry={reload} />
+      );
     }
     if (isLoading || projects === null) return <LoaderOne />;
     if (projects.length === 0) {
       return (
         <p className="text-body-md text-on-surface-variant">
-          You need Developer access or higher in a project to move a meeting into it.
+          You need Developer access or higher in a project to move a meeting
+          into it.
         </p>
       );
     }
@@ -101,7 +109,11 @@ const MoveToProjectDialog = ({ meetingId, onClose, onMoved }: Props) => {
       <>
         <label className="flex flex-col gap-1 text-body-md text-on-surface">
           Project
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={inputClass}>
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className={inputClass}
+          >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -110,15 +122,20 @@ const MoveToProjectDialog = ({ meetingId, onClose, onMoved }: Props) => {
           </select>
         </label>
         <p className="text-body-md text-on-surface-variant">
-          Project members will see this meeting. Its follow ups become proposals for an Owner or Admin to review,
-          and the meeting can&apos;t move back out.
+          Project members will see this meeting. Its follow ups become proposals
+          for an Owner or Admin to review, and the meeting can&apos;t move back
+          out.
         </p>
         {error && (
           <p role="alert" className="text-body-md text-error">
             {error}
           </p>
         )}
-        <button type="submit" disabled={busy || !projectId} className={primaryButton}>
+        <button
+          type="submit"
+          disabled={busy || !projectId}
+          className={primaryButton}
+        >
           {busy ? "Moving..." : "Move meeting"}
         </button>
       </>
@@ -132,10 +149,13 @@ const MoveToProjectDialog = ({ meetingId, onClose, onMoved }: Props) => {
         aria-modal="true"
         aria-labelledby="move-meeting-title"
         onSubmit={handleSubmit}
-        className="flex w-full max-w-md flex-col gap-5 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
+        className="flex w-full max-w-md flex-col gap-5 rounded-card bg-surface-container-lowest p-6 shadow-lg"
       >
         <div className="flex items-center justify-between">
-          <h2 id="move-meeting-title" className="text-headline-sm text-on-surface">
+          <h2
+            id="move-meeting-title"
+            className="text-headline-sm text-on-surface"
+          >
             Move to project
           </h2>
           <button

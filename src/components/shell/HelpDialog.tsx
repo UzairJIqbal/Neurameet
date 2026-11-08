@@ -37,7 +37,7 @@ const HelpDialog = ({ onClose }: { onClose: () => void }) => {
       onClick={onClose}
     >
       <div
-        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-outline-variant bg-surface-container-lowest p-6"
+        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-card bg-surface-container-lowest shadow-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3">

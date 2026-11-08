@@ -20,8 +20,7 @@ import {
   ProjectIconTile,
 } from "@/components/projects/project-visuals";
 
-export const CARD =
-  "rounded-lg border border-surface-variant bg-surface-container-lowest p-4";
+export const CARD = "rounded-card bg-surface-container-lowest p-4 shadow-card";
 const VIEW_ALL =
   "flex shrink-0 items-center gap-1 whitespace-nowrap text-body-md text-primary-container hover:underline";
 
@@ -35,7 +34,9 @@ export const CardHeading = ({
   linkLabel?: string;
 }) => (
   <div className="mb-3 flex items-center justify-between gap-2">
-    <h3 className="min-w-0 text-headline-sm font-semibold text-on-surface">{title}</h3>
+    <h3 className="min-w-0 text-headline-sm font-semibold text-on-surface">
+      {title}
+    </h3>
     {href && (
       <Link href={href} className={VIEW_ALL}>
         {linkLabel ?? "View all"} <ArrowRight className="h-4 w-4" aria-hidden />
@@ -150,7 +151,7 @@ export const UpcomingMeetingCard = ({
             {next.streamCallId && (
               <Link
                 href={`/meeting/${next.streamCallId}`}
-                className="mt-3 inline-flex rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary"
+                className="mt-3 inline-flex rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary"
               >
                 Join
               </Link>
@@ -184,7 +185,7 @@ export type QuickActionItem = {
 };
 
 const ACTION_CLASS =
-  "flex flex-col items-start gap-1 rounded-lg border border-surface-variant bg-surface-container-lowest p-3 text-left transition-colors hover:border-primary-container";
+  "flex flex-col items-start gap-1 rounded-card bg-surface-container-lowest p-3 text-left transition-colors hover:border-primary-container shadow-card";
 
 export const QuickActionsCard = ({
   actions,

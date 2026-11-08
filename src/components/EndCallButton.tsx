@@ -31,7 +31,10 @@ const EndCallButton = () => {
         // recording a short grace window to finalize before ending the call.
         await new Promise((r) => setTimeout(r, 2500));
       } catch (err) {
-        console.error("EndCallButton: failed to stop recording before ending call:", err);
+        console.error(
+          "EndCallButton: failed to stop recording before ending call:",
+          err,
+        );
       }
     }
     call?.endCall();
@@ -70,7 +73,7 @@ const EndCallButton = () => {
   return (
     <button
       onClick={handleEndCall}
-      className="flex min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-error px-3 py-2 text-on-primary hover:bg-error/90 sm:min-w-[120px] sm:px-4"
+      className="flex min-w-[44px] cursor-pointer items-center justify-center gap-2 rounded-full bg-error px-3 py-2 text-on-primary hover:bg-error/90 sm:min-w-[120px] sm:px-4"
     >
       <PhoneOff size={20} aria-hidden />
       <span className="hidden sm:inline">End call for everyone</span>

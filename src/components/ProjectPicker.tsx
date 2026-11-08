@@ -69,7 +69,7 @@ export function ProjectPicker({
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
         disabled={disabled}
-        className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-on-surface focus:outline-none disabled:opacity-60"
+        className="rounded-card bg-surface-container-lowest shadow-card p-3 text-on-surface focus:outline-none disabled:opacity-60"
       >
         <option value="">Personal</option>
         {projects.map((p) => (

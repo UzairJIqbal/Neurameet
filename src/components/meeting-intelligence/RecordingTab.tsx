@@ -74,7 +74,9 @@ const RecordingTab = ({ meeting }: { meeting: MeetingDetailData }) => {
 
   if (isLoading) {
     return (
-      <p className="text-body-md text-on-surface-variant">Loading recordings…</p>
+      <p className="text-body-md text-on-surface-variant">
+        Loading recordings…
+      </p>
     );
   }
 
@@ -107,7 +109,10 @@ const RecordingTab = ({ meeting }: { meeting: MeetingDetailData }) => {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container text-primary">
                   <Play className="h-4 w-4" />
                 </div>
-                <span className="font-body-md font-medium text-on-surface" title={rec.filename ?? undefined}>
+                <span
+                  className="font-body-md font-medium text-on-surface"
+                  title={rec.filename ?? undefined}
+                >
                   {cleanRecordingName(i)}
                 </span>
               </div>
@@ -116,7 +121,7 @@ const RecordingTab = ({ meeting }: { meeting: MeetingDetailData }) => {
                   href={playUrl(rec)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-semibold text-on-primary transition-colors hover:bg-primary"
                 >
                   <Play className="h-4 w-4" />
                   Play

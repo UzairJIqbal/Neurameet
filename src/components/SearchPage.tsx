@@ -102,7 +102,9 @@ const SearchPage = () => {
 
   // AC-78a: the palette opens /search?q=<text>; run that search once on arrival.
   useEffect(() => {
-    const initial = new URLSearchParams(window.location.search).get("q")?.trim();
+    const initial = new URLSearchParams(window.location.search)
+      .get("q")
+      ?.trim();
     if (!initial) return;
     setQuery(initial);
     runSearch(initial);
@@ -129,7 +131,7 @@ const SearchPage = () => {
 
       <form
         onSubmit={handleSearch}
-        className="flex w-full max-w-2xl items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3"
+        className="flex w-full max-w-2xl items-center gap-2 rounded-card bg-surface-container-lowest shadow-card px-4 py-3"
       >
         <Search className="h-5 w-5 shrink-0 text-on-surface-variant" />
         <input
@@ -147,7 +149,7 @@ const SearchPage = () => {
         <button
           type="submit"
           disabled={isLoading || !query.trim()}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md font-body-md font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -209,7 +211,7 @@ const SearchPage = () => {
         groups.map((group) => (
           <div
             key={group.meetingId}
-            className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]"
+            className="overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest shadow-card"
           >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-variant bg-surface-container-low/50 px-6 py-4">
               <Link

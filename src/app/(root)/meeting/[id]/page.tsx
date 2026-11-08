@@ -31,7 +31,7 @@ export default function Meeting() {
     );
   }
 
-  if (!isLoaded || callLoading) return <LoaderOne />;
+  if (!isLoaded || callLoading) return <LoaderOne tone="dark" />;
   if (lookupFailed) {
     return (
       <LoadError message="We couldn't load this meeting." onRetry={retry} />

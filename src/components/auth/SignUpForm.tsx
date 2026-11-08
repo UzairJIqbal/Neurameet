@@ -110,7 +110,9 @@ const SignUpForm = () => {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface mb-2">Get Started</h1>
+        <h1 className="text-3xl font-light tracking-tight text-on-surface mb-2">
+          Get Started
+        </h1>
         <p className="text-on-surface-variant text-base">
           Create your account to start optimizing meetings.
         </p>
@@ -122,7 +124,7 @@ const SignUpForm = () => {
           type="button"
           onClick={() => handleSocialLogin("google")}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-surface-variant rounded-lg py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-full py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
         >
           <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
             <path
@@ -150,7 +152,7 @@ const SignUpForm = () => {
           type="button"
           onClick={() => handleSocialLogin("github")}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-surface-variant rounded-lg py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-full py-2.5 px-4 hover:bg-surface-container-low transition-colors group disabled:opacity-50"
         >
           <svg
             aria-hidden="true"
@@ -198,7 +200,7 @@ const SignUpForm = () => {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
-            className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
+            className="w-full bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
           />
         </div>
 
@@ -217,7 +219,7 @@ const SignUpForm = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
+            className="w-full bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
           />
         </div>
 
@@ -238,7 +240,7 @@ const SignUpForm = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-4 py-2.5 pr-10 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
+              className="w-full bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-2.5 pr-10 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
             />
             <button
               type="button"
@@ -268,7 +270,7 @@ const SignUpForm = () => {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-4 py-2.5 pr-10 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
+              className="w-full bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-2.5 pr-10 text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 text-sm transition-all duration-200"
             />
             <button
               type="button"
@@ -319,7 +321,7 @@ const SignUpForm = () => {
           <button
             type="submit"
             disabled={loading || !isLoaded}
-            className="w-full bg-primary-container text-on-primary rounded-lg py-2.5 text-base font-semibold mt-2 flex justify-center items-center gap-2 hover:bg-primary hover:shadow-[0_4px_14px_rgba(131,14,249,0.25)] transition-all duration-200 transform hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+            className="w-full bg-primary-container text-on-primary rounded-full py-2.5 text-base font-semibold mt-2 flex justify-center items-center gap-2 hover:bg-primary hover:shadow-[0_4px_14px_rgba(131,14,249,0.25)] transition-all duration-200 transform hover:scale-[1.01] active:scale-95 disabled:opacity-50"
           >
             {loading ? "Please wait..." : "Create Account"}
             {!loading && (

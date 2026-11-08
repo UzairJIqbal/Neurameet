@@ -60,9 +60,7 @@ function GuestLobby() {
   const meetingId = params?.id ?? "";
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [guestUserId, setGuestUserId] = useState<string | null>(null);
-  const [guestDisplayName, setGuestDisplayName] = useState<string | null>(
-    null,
-  );
+  const [guestDisplayName, setGuestDisplayName] = useState<string | null>(null);
   const [guestToken, setGuestToken] = useState<string | null>(null);
   const [phase, setPhase] = useState<JoinPhase>("lobby");
   const [pollError, setPollError] = useState<string | null>(null);
@@ -219,7 +217,7 @@ function GuestCallFlow({
     // if `camera_default_on` is true in call settings (Stream SDK default).
     // Without disabling first, this logs "[devices]: Failed to get video stream"
     // when no camera is available — the same bug class as useGetCallbyId & MeetingModel.
-    ;(async () => {
+    (async () => {
       await c.camera.disable().catch(() => {});
       await c.microphone.disable().catch(() => {});
       if (!cancelled) {
@@ -235,7 +233,9 @@ function GuestCallFlow({
           });
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [client, meetingId, callType, setPhase]);
 
   // When the owner admits (phase becomes "admitted"), fire call.join({ create: false })
@@ -268,7 +268,13 @@ function GuestCallFlow({
   // an infinite spinner. The call object exists even in the waiting
   // phase (it was fetched via call.get() without joining).
   useEffect(() => {
-    if (!call || phase === "admitted" || phase === "denied" || phase === "expired") return;
+    if (
+      !call ||
+      phase === "admitted" ||
+      phase === "denied" ||
+      phase === "expired"
+    )
+      return;
     const offEnded = call.on("call.ended", () => {
       setCallEnded(true);
     });
@@ -292,7 +298,10 @@ function GuestCallFlow({
   if (phase === "error" && joinError) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
-        <LoadError message={joinError} onRetry={() => window.location.reload()} />
+        <LoadError
+          message={joinError}
+          onRetry={() => window.location.reload()}
+        />
       </div>
     );
   }
@@ -357,12 +366,7 @@ function GuestCallFlow({
   // DeviceSetup is NOT rendered during waiting — the right panel shows a spinner.
   // The call object is reused across phases (no StreamCall remount).
   if (phase === "waiting") {
-    return (
-      <GuestWaitingScreen
-        guestToken={guestToken}
-        setPhase={setPhase}
-      />
-    );
+    return <GuestWaitingScreen guestToken={guestToken} setPhase={setPhase} />;
   }
 
   // Admitted phase: MeetingRoom renders inside StreamCall. call.join() has already
@@ -390,7 +394,7 @@ function GuestCallFlow({
       }
       return (
         <div className="flex min-h-screen items-center justify-center bg-surface">
-          <LoaderOne />
+          <LoaderOne tone="dark" />
         </div>
       );
     }
@@ -433,7 +437,7 @@ function GuestCallFlow({
       <StreamCall call={call}>
         <StreamTheme>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-            <div className="relative w-full max-w-[420px] rounded-xl border border-outline-variant bg-surface-container-lowest px-4 sm:px-8 py-6 text-center shadow-xl">
+            <div className="relative w-full max-w-[420px] rounded-card bg-surface-container-lowest shadow-card px-4 sm:px-8 py-6 text-center shadow-xl">
               <div className="flex items-center justify-center gap-3 text-body-md text-on-surface-variant">
                 <svg
                   className="animate-spin h-5 w-5 text-primary-container"
@@ -488,9 +492,7 @@ function GuestCallFlow({
             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
           ></path>
         </svg>
-        <p className="text-body-md text-on-surface-variant">
-          Loading meeting…
-        </p>
+        <p className="text-body-md text-on-surface-variant">Loading meeting…</p>
       </div>
     </div>
   );
@@ -567,7 +569,7 @@ function GuestWaitingScreen({
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface">
-      <div className="w-full max-w-2xl rounded-xl border border-outline-variant bg-surface-container-lowest px-4 sm:px-6 py-4 shadow-xl text-center">
+      <div className="w-full max-w-2xl rounded-card bg-surface-container-lowest shadow-card px-4 sm:px-6 py-4 shadow-xl text-center">
         <h1 className="text-display-sm font-semibold text-on-surface mb-4">
           Waiting for the host
         </h1>
@@ -700,7 +702,9 @@ function NameModal({
       }
 
       const data = await res.json();
-      setCallType(isStreamCallType(data.callType) ? data.callType : DEFAULT_CALL_TYPE);
+      setCallType(
+        isStreamCallType(data.callType) ? data.callType : DEFAULT_CALL_TYPE,
+      );
       setAccessToken(data.access_token);
       setGuestUserId(data.user.id);
       // Capture the server-minted display name (authoritative, not client-supplied)
@@ -756,7 +760,7 @@ function NameModal({
   if (phase === "requesting") {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 sm:px-8 py-6 text-center shadow-xl max-w-sm">
+        <div className="rounded-card bg-surface-container-lowest shadow-card px-4 sm:px-8 py-6 text-center shadow-xl max-w-sm">
           <div className="flex items-center justify-center gap-3 text-body-md text-on-surface-variant">
             <svg
               className="animate-spin h-5 w-5 text-primary-container"
@@ -788,7 +792,7 @@ function NameModal({
   // Default: show the name/email modal
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 sm:p-6 shadow-xl">
+      <div className="relative w-full max-w-sm rounded-card bg-surface-container-lowest shadow-card p-4 sm:p-6 shadow-xl">
         <h2 className="mb-4 text-sm font-medium text-on-surface">
           Enter your name to join
         </h2>
@@ -887,7 +891,9 @@ function TerminalScreen({
         <p
           className={cn(
             "text-body-md mb-6",
-            errorVariant ? "text-on-error-container/80" : "text-on-surface-variant",
+            errorVariant
+              ? "text-on-error-container/80"
+              : "text-on-surface-variant",
           )}
         >
           {message}

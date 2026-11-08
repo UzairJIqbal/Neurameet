@@ -33,7 +33,7 @@ const SummaryTab = ({
               }
             }}
             disabled={retrying}
-            className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-fit items-center gap-2 rounded-full border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {retrying ? "Retrying…" : "Retry summary generation"}
           </button>
@@ -44,7 +44,7 @@ const SummaryTab = ({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
         <h2 className="text-headline-md font-semibold text-on-surface">
           Summary
         </h2>
@@ -54,7 +54,7 @@ const SummaryTab = ({
       </div>
 
       {insights.keyPoints.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
           <h3 className="flex items-center gap-2 text-headline-sm font-semibold text-on-surface">
             <ListChecks className="h-5 w-5 text-primary" /> Key Points
           </h3>
@@ -73,7 +73,7 @@ const SummaryTab = ({
       )}
 
       {insights.decisions.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col gap-3 rounded-card bg-surface-container-lowest p-6 shadow-card">
           <h3 className="flex items-center gap-2 text-headline-sm font-semibold text-on-surface">
             <Lightbulb className="h-5 w-5 text-primary" /> Decisions
           </h3>

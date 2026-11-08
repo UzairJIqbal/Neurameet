@@ -119,7 +119,7 @@ const ChatPanel = ({
   const rootClass = cn(
     isEmbedded
       ? "flex flex-col min-h-0"
-      : "flex h-[60vh] flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_20px_rgba(0,0,0,0.04)]",
+      : "flex h-[60vh] flex-col rounded-card bg-surface-container-lowest shadow-card shadow-card",
     className,
   );
   const scrollClass = isEmbedded
@@ -172,36 +172,38 @@ const ChatPanel = ({
             return all.slice(0, index).every((m) => m.id !== message.id);
           })
           .map((message: UIMessage) => {
-          const text = message.parts
-            .filter(
-              (part): part is { type: "text"; text: string } =>
-                part.type === "text",
-            )
-            .map((part) => part.text)
-            .join("");
+            const text = message.parts
+              .filter(
+                (part): part is { type: "text"; text: string } =>
+                  part.type === "text",
+              )
+              .map((part) => part.text)
+              .join("");
 
-          const isUser = message.role === "user";
+            const isUser = message.role === "user";
 
-          return (
-            <div
-              key={message.id}
-              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-            >
+            return (
               <div
-                className={cn(
-                  "max-w-[80%] rounded-lg px-4 py-3",
-                  isUser ? "bg-primary-container text-on-primary" : aiBubbleClass,
-                )}
+                key={message.id}
+                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
               >
-                <div className={cn("text-body-md leading-relaxed", mdClass)}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {text}
-                  </ReactMarkdown>
+                <div
+                  className={cn(
+                    "max-w-[80%] rounded-lg px-4 py-3",
+                    isUser
+                      ? "bg-primary-container text-on-primary"
+                      : aiBubbleClass,
+                  )}
+                >
+                  <div className={cn("text-body-md leading-relaxed", mdClass)}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {text}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
 
         {status === "submitted" && (
           <div className="flex justify-start">
@@ -234,11 +236,7 @@ const ChatPanel = ({
           <Trash2 className="h-4 w-4" />
         </button>
         {isStreaming ? (
-          <button
-            type="button"
-            onClick={() => stop()}
-            className={stopClass}
-          >
+          <button type="button" onClick={() => stop()} className={stopClass}>
             <Square className="h-4 w-4" /> Stop
           </button>
         ) : (

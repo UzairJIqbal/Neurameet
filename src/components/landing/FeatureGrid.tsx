@@ -51,11 +51,14 @@ const features = [
 
 const FeatureGrid = () => {
   return (
-    <section id="features" className="bg-surface py-24">
+    <section
+      id="features"
+      className="scroll-mt-20 bg-surface-container-low py-24"
+    >
       <div className="max-w-7xl mx-auto px-6">
         {/* Heading */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-on-surface mb-4">
+          <h2 className="text-3xl md:text-4xl font-light tracking-tight text-on-surface mb-4">
             Everything you need to run smarter meetings
           </h2>
           <p className="text-on-surface-variant text-base max-w-2xl mx-auto">
@@ -71,9 +74,9 @@ const FeatureGrid = () => {
             return (
               <div
                 key={feature.title}
-                className="bg-surface-container-lowest rounded-xl p-8 border border-outline-variant hover:-translate-y-1 transition-transform duration-300"
+                className="bg-surface-container-lowest rounded-card p-8 shadow-card motion-safe:hover:-translate-y-1 transition-transform duration-300"
               >
-                <div className="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center mb-6 border border-primary-container/20">
+                <div className="w-12 h-12 rounded-full bg-lilac flex items-center justify-center mb-6">
                   <Icon
                     size={24}
                     className="text-primary-container"

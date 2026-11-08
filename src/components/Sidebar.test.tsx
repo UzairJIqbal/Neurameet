@@ -235,7 +235,7 @@ describe("Sidebar_Com workspace shell (AC-77a)", () => {
     const link = within(getAside(container)).getByRole("link", {
       name: /My Projects/,
     });
-    expect(link.className).toContain("border-primary-container");
+    expect(link.className).toContain("bg-lilac");
   });
 
   it("caps project shortcuts at 5, plus All projects", async () => {

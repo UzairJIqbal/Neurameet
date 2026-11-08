@@ -13,9 +13,9 @@ type Props = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
+  "w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
 const primaryButton =
-  "rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
+  "rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
 // Asked when a card lands in Completed: a manual completion always carries a
 // link or a note (AC-39, AC-41). Cancel puts the card back.
@@ -36,7 +36,8 @@ const CompleteTaskDialog = ({ taskKey, busy, onCancel, onConfirm }: Props) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (trimmed.length >= 1 && trimmed.length <= EVIDENCE_MAX_CHARS) onConfirm(trimmed);
+    if (trimmed.length >= 1 && trimmed.length <= EVIDENCE_MAX_CHARS)
+      onConfirm(trimmed);
   };
 
   return (
@@ -46,7 +47,7 @@ const CompleteTaskDialog = ({ taskKey, busy, onCancel, onConfirm }: Props) => {
         aria-modal="true"
         aria-labelledby="complete-title"
         onSubmit={handleSubmit}
-        className="flex w-full max-w-md flex-col gap-5 rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-lg"
+        className="flex w-full max-w-md flex-col gap-5 rounded-card bg-surface-container-lowest p-6 shadow-lg"
       >
         <div className="flex items-center justify-between">
           <h2 id="complete-title" className="text-headline-sm text-on-surface">
@@ -78,11 +79,15 @@ const CompleteTaskDialog = ({ taskKey, busy, onCancel, onConfirm }: Props) => {
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded-lg border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50"
+            className="rounded-full border border-surface-variant px-4 py-2 text-body-md text-on-surface hover:bg-surface-container-low disabled:opacity-50"
           >
             Cancel
           </button>
-          <button type="submit" disabled={busy || trimmed.length === 0} className={primaryButton}>
+          <button
+            type="submit"
+            disabled={busy || trimmed.length === 0}
+            className={primaryButton}
+          >
             {busy ? "Saving..." : "Mark completed"}
           </button>
         </div>

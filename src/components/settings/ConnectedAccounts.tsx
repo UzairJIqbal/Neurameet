@@ -34,8 +34,7 @@ const OUTCOMES: Record<string, Outcome> = {
   },
 };
 
-const CARD =
-  "rounded-xl border border-surface-variant bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)]";
+const CARD = "rounded-card bg-surface-container-lowest p-6 shadow-card";
 const ROW =
   "mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-surface-variant px-4 py-3";
 const OUTLINE_BUTTON =

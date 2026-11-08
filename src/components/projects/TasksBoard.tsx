@@ -5,11 +5,22 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { LayoutGrid, List, Plus, Search } from "lucide-react";
-import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import {
+  DragDropContext,
+  Draggable,
+  Droppable,
+  type DropResult,
+} from "@hello-pangea/dnd";
 import { LoaderOne } from "@/components/ui/loader";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
-import { getTask, listMembers, listTasks, ProjectClientError, updateTask } from "@/lib/project-client";
+import {
+  getTask,
+  listMembers,
+  listTasks,
+  ProjectClientError,
+  updateTask,
+} from "@/lib/project-client";
 import { patchDenial } from "@/lib/task-rules";
 import { readStoredView, writeStoredView } from "@/lib/user-prefs";
 import {
@@ -23,7 +34,11 @@ import {
   isTaskStatus,
   type TaskStatus,
 } from "@/lib/tasks";
-import type { ProjectDetail, ProjectMember, ProjectRole } from "@/lib/project-types";
+import type {
+  ProjectDetail,
+  ProjectMember,
+  ProjectRole,
+} from "@/lib/project-types";
 import type { Task, TasksResponse } from "@/lib/task-types";
 import TaskCard from "./TaskCard";
 import TasksList from "./TasksList";
@@ -34,10 +49,9 @@ import NewTaskDialog from "./NewTaskDialog";
 type PendingComplete = { task: Task; position: number };
 
 const inputClass =
-  "rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
+  "rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none";
 const primaryButton =
-  "inline-flex items-center gap-2 rounded-lg bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
-
+  "inline-flex items-center gap-2 rounded-full bg-primary-container px-4 py-2 text-body-md text-on-primary hover:bg-primary disabled:opacity-50";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -51,7 +65,13 @@ const errorText = (err: unknown, fallback: string) =>
 // The Kanban board (AC-41). Every move is optimistic and sends ifVersion; a
 // 409 puts the card back and refetches. The server checks the same role rules
 // the board uses to refuse a drop early.
-const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reloadKey?: number }) => {
+const TasksBoard = ({
+  project,
+  reloadKey = 0,
+}: {
+  project: ProjectDetail;
+  reloadKey?: number;
+}) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -76,7 +96,10 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const busyRef = useRef(false);
-  const { timedOut } = useLoadingTimeout(isLoading && !loaded, { timeoutMs: 12000, retryNonce });
+  const { timedOut } = useLoadingTimeout(isLoading && !loaded, {
+    timeoutMs: 12000,
+    retryNonce,
+  });
 
   busyRef.current = pending !== null || saving;
 
@@ -185,12 +208,16 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
 
   // A PATCH answer has no board fields, so the card keeps the ones it holds.
   const replaceTask = (next: Task) =>
-    setTasks((prev) => prev.map((t) => (t.id === next.id ? { ...t, ...next } : t)));
+    setTasks((prev) =>
+      prev.map((t) => (t.id === next.id ? { ...t, ...next } : t)),
+    );
 
   const changeCommentCount = (taskId: string, delta: number) =>
     setTasks((prev) =>
       prev.map((t) =>
-        t.id === taskId ? { ...t, commentCount: Math.max(0, (t.commentCount ?? 0) + delta) } : t,
+        t.id === taskId
+          ? { ...t, commentCount: Math.max(0, (t.commentCount ?? 0) + delta) }
+          : t,
       ),
     );
 
@@ -229,7 +256,11 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
   const handleDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
     if (!destination || !isTaskStatus(destination.droppableId)) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    )
+      return;
     const original = tasks.find((t) => t.id === draggableId);
     if (!original) return;
     const status = destination.droppableId;
@@ -245,7 +276,12 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
       return;
     }
 
-    const position = dropPosition(tasks, original.id, status, destination.index);
+    const position = dropPosition(
+      tasks,
+      original.id,
+      status,
+      destination.index,
+    );
     replaceTask({ ...original, status, position });
 
     if (status === "completed" && original.status !== "completed") {
@@ -268,24 +304,33 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
 
   const reload = useCallback(() => setRetryNonce((k) => k + 1), []);
 
-  if (timedOut) return <LoadError message="We couldn't load the board." onRetry={reload} />;
+  if (timedOut)
+    return <LoadError message="We couldn't load the board." onRetry={reload} />;
   if (!loaded && isLoading) return <LoaderOne />;
-  if (!loaded) return <LoadError message="We couldn't load the board." onRetry={reload} />;
+  if (!loaded)
+    return <LoadError message="We couldn't load the board." onRetry={reload} />;
 
   const canCreate = role !== "viewer";
   // AC-70p: positions are relative to the full column, not a filtered part of it.
-  const filterOn = Boolean(query.trim() || assignee || priority || statusFilter);
+  const filterOn = Boolean(
+    query.trim() || assignee || priority || statusFilter,
+  );
   const canDrag = role !== "viewer" && !filterOn;
   const isEmpty = tasks.length === 0 && !filterOn;
   const isTruncated = Object.keys(truncated).length > 0;
-  const columns = TASK_STATUSES.filter((status) => !statusFilter || status === statusFilter);
+  const columns = TASK_STATUSES.filter(
+    (status) => !statusFilter || status === statusFilter,
+  );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <label className="relative flex items-center">
           <span className="sr-only">Search tasks</span>
-          <Search className="pointer-events-none absolute left-3 h-4 w-4 text-on-surface-variant" aria-hidden />
+          <Search
+            className="pointer-events-none absolute left-3 h-4 w-4 text-on-surface-variant"
+            aria-hidden
+          />
           <input
             type="search"
             placeholder={`Search, or ${project.taskPrefix}-12`}
@@ -353,7 +398,11 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
             })}
           </div>
           {canCreate && !isEmpty && (
-            <button type="button" onClick={() => setNewStatus("todo")} className={primaryButton}>
+            <button
+              type="button"
+              onClick={() => setNewStatus("todo")}
+              className={primaryButton}
+            >
               <Plus className="h-4 w-4" />
               Add Task
             </button>
@@ -362,16 +411,23 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
       </div>
 
       {filterOn && view === "board" && role !== "viewer" && (
-        <p className="text-body-md text-on-surface-variant">Dragging is off while a filter is on.</p>
+        <p className="text-body-md text-on-surface-variant">
+          Dragging is off while a filter is on.
+        </p>
       )}
 
       {isEmpty && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-variant bg-surface-container-lowest p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-surface-container-lowest p-5 shadow-card">
           <p className="text-body-md text-on-surface-variant">
-            No tasks yet. Tasks come from reviewed proposals, or you can add one.
+            No tasks yet. Tasks come from reviewed proposals, or you can add
+            one.
           </p>
           {canCreate && (
-            <button type="button" onClick={() => setNewStatus("todo")} className={primaryButton}>
+            <button
+              type="button"
+              onClick={() => setNewStatus("todo")}
+              className={primaryButton}
+            >
               Add Task
             </button>
           )}
@@ -381,88 +437,111 @@ const TasksBoard = ({ project, reloadKey = 0 }: { project: ProjectDetail; reload
       {view === "list" && !isEmpty && (
         <div className="flex flex-col gap-2">
           {tasks.length === 0 ? (
-            <p className="rounded-xl border border-surface-variant bg-surface-container-lowest p-5 text-body-md text-on-surface-variant">
+            <p className="rounded-card bg-surface-container-lowest p-5 text-body-md text-on-surface-variant shadow-card">
               No tasks match these filters.
             </p>
           ) : (
-            <TasksList tasks={tasks} showRestricted={role !== "viewer"} onOpen={setOpenTaskId} />
+            <TasksList
+              tasks={tasks}
+              showRestricted={role !== "viewer"}
+              onOpen={setOpenTaskId}
+            />
           )}
           {isTruncated && (
-            <p className="text-body-md text-on-surface-variant">Long columns show their first tasks only.</p>
+            <p className="text-body-md text-on-surface-variant">
+              Long columns show their first tasks only.
+            </p>
           )}
         </div>
       )}
 
-      {view === "board" && <DragDropContext onDragEnd={handleDragEnd}>
-        <div className={`grid grid-cols-1 gap-4 ${statusFilter ? "" : "md:grid-cols-2 xl:grid-cols-5"}`}>
-          {columns.map((status) => {
-            const cards = columnCards(tasks, status);
-            const total = truncated[status];
-            return (
-              <section
-                key={status}
-                aria-label={TASK_STATUS_LABELS[status]}
-                className="flex min-w-0 flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-low p-3"
-              >
-                <header className="flex items-center justify-between">
-                  <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">
-                    {TASK_STATUS_LABELS[status]}
-                  </h3>
-                  <span className="flex items-center gap-2">
-                    <span className="font-mono text-label-mono text-on-surface-variant">{total ?? cards.length}</span>
-                    {/* Completing needs an evidence note, so Completed has no `+`. */}
-                    {canCreate && status !== "completed" && (
-                      <button
-                        type="button"
-                        aria-label={`Add a task to ${TASK_STATUS_LABELS[status]}`}
-                        onClick={() => setNewStatus(status)}
-                        className="rounded p-0.5 text-on-surface-variant hover:bg-surface-container"
+      {view === "board" && (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div
+            className={`grid grid-cols-1 gap-4 ${statusFilter ? "" : "md:grid-cols-2 xl:grid-cols-5"}`}
+          >
+            {columns.map((status) => {
+              const cards = columnCards(tasks, status);
+              const total = truncated[status];
+              return (
+                <section
+                  key={status}
+                  aria-label={TASK_STATUS_LABELS[status]}
+                  className="flex min-w-0 flex-col gap-3 rounded-xl border border-surface-variant bg-surface-container-low p-3"
+                >
+                  <header className="flex items-center justify-between">
+                    <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">
+                      {TASK_STATUS_LABELS[status]}
+                    </h3>
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-label-mono text-on-surface-variant">
+                        {total ?? cards.length}
+                      </span>
+                      {/* Completing needs an evidence note, so Completed has no `+`. */}
+                      {canCreate && status !== "completed" && (
+                        <button
+                          type="button"
+                          aria-label={`Add a task to ${TASK_STATUS_LABELS[status]}`}
+                          onClick={() => setNewStatus(status)}
+                          className="rounded p-0.5 text-on-surface-variant hover:bg-surface-container"
+                        >
+                          <Plus className="h-4 w-4" aria-hidden />
+                        </button>
+                      )}
+                    </span>
+                  </header>
+                  <Droppable droppableId={status}>
+                    {(drop) => (
+                      <div
+                        ref={drop.innerRef}
+                        {...drop.droppableProps}
+                        className="flex min-h-24 flex-col gap-2"
                       >
-                        <Plus className="h-4 w-4" aria-hidden />
-                      </button>
+                        {cards.map((task, index) => (
+                          <Draggable
+                            key={task.id}
+                            draggableId={task.id}
+                            index={index}
+                            isDragDisabled={!canDrag || saving}
+                          >
+                            {(drag) => (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                ref={drag.innerRef}
+                                {...drag.draggableProps}
+                                {...drag.dragHandleProps}
+                                aria-label={`Open ${task.key}`}
+                                onClick={(e) => {
+                                  // The drag library cancels the click that ends a drag.
+                                  if (!e.defaultPrevented)
+                                    setOpenTaskId(task.id);
+                                }}
+                                onKeyUp={(e) => {
+                                  if (e.key === "Enter" && !e.defaultPrevented)
+                                    setOpenTaskId(task.id);
+                                }}
+                              >
+                                <TaskCard task={task} />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {drop.placeholder}
+                      </div>
                     )}
-                  </span>
-                </header>
-                <Droppable droppableId={status}>
-                  {(drop) => (
-                    <div ref={drop.innerRef} {...drop.droppableProps} className="flex min-h-24 flex-col gap-2">
-                      {cards.map((task, index) => (
-                        <Draggable key={task.id} draggableId={task.id} index={index} isDragDisabled={!canDrag || saving}>
-                          {(drag) => (
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              ref={drag.innerRef}
-                              {...drag.draggableProps}
-                              {...drag.dragHandleProps}
-                              aria-label={`Open ${task.key}`}
-                              onClick={(e) => {
-                                // The drag library cancels the click that ends a drag.
-                                if (!e.defaultPrevented) setOpenTaskId(task.id);
-                              }}
-                              onKeyUp={(e) => {
-                                if (e.key === "Enter" && !e.defaultPrevented) setOpenTaskId(task.id);
-                              }}
-                            >
-                              <TaskCard task={task} />
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {drop.placeholder}
-                    </div>
+                  </Droppable>
+                  {total !== undefined && (
+                    <p className="text-body-md text-on-surface-variant">
+                      Showing {cards.length} of {total}
+                    </p>
                   )}
-                </Droppable>
-                {total !== undefined && (
-                  <p className="text-body-md text-on-surface-variant">
-                    Showing {cards.length} of {total}
-                  </p>
-                )}
-              </section>
-            );
-          })}
-        </div>
-      </DragDropContext>}
+                </section>
+              );
+            })}
+          </div>
+        </DragDropContext>
+      )}
 
       {pending && (
         <CompleteTaskDialog

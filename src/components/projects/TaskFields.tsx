@@ -25,7 +25,9 @@ export type DrawerAccess = {
   members: ProjectMember[];
 };
 
-export type TaskSave = (patch: Omit<TaskPatchInput, "ifVersion">) => Promise<boolean>;
+export type TaskSave = (
+  patch: Omit<TaskPatchInput, "ifVersion">,
+) => Promise<boolean>;
 
 type Props = {
   task: Task;
@@ -39,26 +41,51 @@ type Props = {
 const LABEL = "text-body-md text-on-surface-variant";
 const VALUE = "text-body-md text-on-surface";
 const INPUT =
-  "w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none disabled:opacity-50";
+  "w-full rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none disabled:opacity-50";
 const LINK_BUTTON = "text-body-md text-primary underline disabled:opacity-50";
 
-const denied = (access: DrawerAccess | null, task: Task, patch: { status?: TaskStatus }) =>
+const denied = (
+  access: DrawerAccess | null,
+  task: Task,
+  patch: { status?: TaskStatus },
+) =>
   !access ||
-  patchDenial(access.role, access.me, { status: task.status, assignee_id: task.assigneeId }, patch) !== null;
+  patchDenial(
+    access.role,
+    access.me,
+    { status: task.status, assignee_id: task.assigneeId },
+    patch,
+  ) !== null;
 
 /** Who this person may pick. The route refuses anything else (AC-40). */
-const assigneeOptions = (access: DrawerAccess, task: Task): Array<{ id: string; name: string }> => {
+const assigneeOptions = (
+  access: DrawerAccess,
+  task: Task,
+): Array<{ id: string; name: string }> => {
   const named = access.members.map((m) => ({
     id: m.userId,
     name: m.userId === access.me ? `${m.name} (you)` : m.name,
   }));
-  const allowed = isManagerRole(access.role) ? named : named.filter((m) => m.id === access.me);
+  const allowed = isManagerRole(access.role)
+    ? named
+    : named.filter((m) => m.id === access.me);
   const current = task.assigneeId;
   if (!current || allowed.some((m) => m.id === current)) return allowed;
-  return [...allowed, { id: current, name: task.assigneeName ?? "Unknown member" }];
+  return [
+    ...allowed,
+    { id: current, name: task.assigneeName ?? "Unknown member" },
+  ];
 };
 
-const Row = ({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) => (
+const Row = ({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) => (
   <>
     {htmlFor ? (
       <label htmlFor={htmlFor} className={LABEL}>
@@ -71,7 +98,15 @@ const Row = ({ label, htmlFor, children }: { label: string; htmlFor?: string; ch
   </>
 );
 
-const DueDateField = ({ task, disabled, onSave }: { task: Task; disabled: boolean; onSave: TaskSave }) => {
+const DueDateField = ({
+  task,
+  disabled,
+  onSave,
+}: {
+  task: Task;
+  disabled: boolean;
+  onSave: TaskSave;
+}) => {
   const saved = task.dueDate ?? "";
   const [value, setValue] = useState(saved);
   useEffect(() => setValue(saved), [saved]);
@@ -121,7 +156,9 @@ const DescriptionSection = ({
   return (
     <section aria-label="Description" className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">Description</h3>
+        <h3 className="text-label-caps uppercase tracking-wider text-on-surface-variant">
+          Description
+        </h3>
         {canEdit && !editing && (
           <button type="button" onClick={startEdit} className={LINK_BUTTON}>
             Edit
@@ -140,21 +177,29 @@ const DescriptionSection = ({
             className={INPUT}
           />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setEditing(false)} disabled={saving} className={LINK_BUTTON}>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className={LINK_BUTTON}
+            >
               Cancel
             </button>
             <button
               type="button"
               onClick={submit}
               disabled={saving}
-              className="rounded-lg bg-primary-container px-3 py-1.5 text-body-md text-on-primary hover:bg-primary disabled:opacity-50"
+              className="rounded-full bg-primary-container px-3 py-1.5 text-body-md text-on-primary hover:bg-primary disabled:opacity-50"
             >
               Save
             </button>
           </div>
         </div>
       ) : (
-        <p dir="auto" className={`whitespace-pre-wrap break-words ${task.description ? VALUE : LABEL}`}>
+        <p
+          dir="auto"
+          className={`whitespace-pre-wrap break-words ${task.description ? VALUE : LABEL}`}
+        >
           {task.description || "No description yet."}
         </p>
       )}
@@ -178,7 +223,8 @@ const TaskFields = ({ task, proofChain, access, saving, onSave }: Props) => {
   };
 
   const changePriority = (value: string) => {
-    if (isTaskPriority(value) && value !== task.priority) void onSave({ priority: value });
+    if (isTaskPriority(value) && value !== task.priority)
+      void onSave({ priority: value });
   };
 
   const confirmComplete = async (evidence: string) => {
@@ -208,7 +254,10 @@ const TaskFields = ({ task, proofChain, access, saving, onSave }: Props) => {
             </select>
           )}
         </Row>
-        <Row label="Assignee" htmlFor={fieldsLocked ? undefined : "task-assignee"}>
+        <Row
+          label="Assignee"
+          htmlFor={fieldsLocked ? undefined : "task-assignee"}
+        >
           {fieldsLocked || !access ? (
             <span className={VALUE}>{task.assigneeName ?? "Unassigned"}</span>
           ) : (
@@ -216,7 +265,9 @@ const TaskFields = ({ task, proofChain, access, saving, onSave }: Props) => {
               id="task-assignee"
               value={task.assigneeId ?? ""}
               disabled={saving}
-              onChange={(e) => void onSave({ assigneeId: e.target.value || null })}
+              onChange={(e) =>
+                void onSave({ assigneeId: e.target.value || null })
+              }
               className={INPUT}
             >
               <option value="">Unassigned</option>
@@ -228,7 +279,10 @@ const TaskFields = ({ task, proofChain, access, saving, onSave }: Props) => {
             </select>
           )}
         </Row>
-        <Row label="Priority" htmlFor={fieldsLocked ? undefined : "task-priority"}>
+        <Row
+          label="Priority"
+          htmlFor={fieldsLocked ? undefined : "task-priority"}
+        >
           {fieldsLocked ? (
             <PriorityBadge priority={task.priority} />
           ) : (
@@ -249,13 +303,17 @@ const TaskFields = ({ task, proofChain, access, saving, onSave }: Props) => {
         </Row>
         <Row label="Due date" htmlFor={fieldsLocked ? undefined : "task-due"}>
           {fieldsLocked ? (
-            <span className={`${VALUE} font-mono`}>{task.dueDate ?? "None"}</span>
+            <span className={`${VALUE} font-mono`}>
+              {task.dueDate ?? "None"}
+            </span>
           ) : (
             <DueDateField task={task} disabled={saving} onSave={onSave} />
           )}
         </Row>
         <Row label="Created">
-          <span className={VALUE}>{new Date(task.createdAt).toLocaleDateString()}</span>
+          <span className={VALUE}>
+            {new Date(task.createdAt).toLocaleDateString()}
+          </span>
         </Row>
         <Row label="Meeting source">
           {proofChain?.meetingId ? (
@@ -272,7 +330,12 @@ const TaskFields = ({ task, proofChain, access, saving, onSave }: Props) => {
         </Row>
       </div>
 
-      <DescriptionSection task={task} canEdit={!fieldsLocked} saving={saving} onSave={onSave} />
+      <DescriptionSection
+        task={task}
+        canEdit={!fieldsLocked}
+        saving={saving}
+        onSave={onSave}
+      />
 
       {completing && (
         <CompleteTaskDialog

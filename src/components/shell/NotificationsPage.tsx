@@ -183,7 +183,7 @@ const NotificationsPage = ({ initialFilter }: { initialFilter?: string }) => {
           type="button"
           onClick={() => void markAll()}
           disabled={unread === 0}
-          className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-body-md font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:text-on-surface-variant"
+          className="flex items-center gap-2 rounded-card bg-surface-container-lowest shadow-card px-3 py-2 text-body-md font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:text-on-surface-variant"
         >
           <CheckCheck className="h-4 w-4" />
           Mark all as read
@@ -216,7 +216,7 @@ const NotificationsPage = ({ initialFilter }: { initialFilter?: string }) => {
       {((isLoading && timedOut) || failed) && <LoadError onRetry={retry} />}
 
       {!isLoading && !failed && items.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-6 py-12 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-card bg-surface-container-lowest shadow-card px-6 py-12 text-center">
           <Bell className="h-6 w-6 text-on-surface-variant" />
           <p className="text-body-md text-on-surface-variant">
             Nothing here yet. Notifications addressed to you will show up here.
@@ -225,7 +225,7 @@ const NotificationsPage = ({ initialFilter }: { initialFilter?: string }) => {
       )}
 
       {!isLoading && !failed && items.length > 0 && (
-        <ul className="overflow-hidden rounded-lg border border-outline-variant bg-surface-container-lowest">
+        <ul className="overflow-hidden rounded-card bg-surface-container-lowest shadow-card">
           {items.map((item) => (
             <li
               key={item.id}
@@ -281,7 +281,7 @@ const NotificationsPage = ({ initialFilter }: { initialFilter?: string }) => {
           type="button"
           onClick={() => void loadMore()}
           disabled={loadingMore}
-          className="self-center rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2 text-body-md font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:text-on-surface-variant"
+          className="self-center rounded-card bg-surface-container-lowest shadow-card px-4 py-2 text-body-md font-medium text-on-surface transition-colors hover:bg-surface-container-low disabled:text-on-surface-variant"
         >
           {loadingMore ? "Loading..." : "Load more"}
         </button>

@@ -70,11 +70,11 @@ const ForgotPasswordForm = () => {
   };
 
   const inputClass =
-    "w-full bg-surface-container-lowest border border-surface-variant rounded-lg px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-container text-sm transition-shadow";
+    "w-full bg-surface-container-lowest border border-outline-variant rounded-full px-4 py-2.5 text-on-surface placeholder:text-outline-variant focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-container text-sm transition-shadow";
   const labelClass =
     "block text-xs text-on-surface mb-1.5 uppercase tracking-wider";
   const submitClass =
-    "flex w-full justify-center rounded-lg bg-primary-container px-3 py-2.5 text-sm font-semibold text-on-primary shadow-sm hover:bg-primary transition-colors disabled:opacity-50";
+    "flex w-full justify-center rounded-full bg-primary-container px-3 py-2.5 text-sm font-semibold text-on-primary shadow-sm hover:bg-primary transition-colors disabled:opacity-50";
 
   return (
     <AuthLayout variant="sign-in">
@@ -87,7 +87,7 @@ const ForgotPasswordForm = () => {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface mb-2">
+        <h1 className="text-3xl font-light tracking-tight text-on-surface mb-2">
           Reset password
         </h1>
         <p className="text-on-surface-variant text-base">
