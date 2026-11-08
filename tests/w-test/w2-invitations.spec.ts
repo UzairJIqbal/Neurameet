@@ -89,7 +89,7 @@ test("W2 invitations", async ({ browser }) => {
     await clerk.signIn({ page, emailAddress: B.email });
     await page.goto(back);
     await expect
-      .soft(page.getByRole("button", { name: "Join", exact: true }))
+      .soft(page.getByRole("button", { name: "Accept", exact: true }))
       .toBeVisible({ timeout: 30000 });
     await context.close();
   });
@@ -99,7 +99,7 @@ test("W2 invitations", async ({ browser }) => {
     await expect
       .soft(c.page.getByRole("heading", { name: /E2E W-test W2/ }))
       .toBeVisible({ timeout: 30000 });
-    await c.page.getByRole("button", { name: "Join", exact: true }).click();
+    await c.page.getByRole("button", { name: "Accept", exact: true }).click();
     await expect
       .soft(c.page.getByText("This invite is for a different email"))
       .toBeVisible({ timeout: 20000 });
@@ -107,7 +107,7 @@ test("W2 invitations", async ({ browser }) => {
 
   await test.step("4 B joins as Developer, the same link then says already in", async () => {
     await b.page.goto(bPath);
-    await b.page.getByRole("button", { name: "Join", exact: true }).click();
+    await b.page.getByRole("button", { name: "Accept", exact: true }).click();
     await b.page.waitForURL(new RegExp(`/projects/${projectId}`), {
       timeout: 30000,
     });
@@ -150,7 +150,7 @@ test("W2 invitations", async ({ browser }) => {
       .toBeVisible({ timeout: 20000 });
     await d.page.goto(relativeLink(dev.link as string));
     await expect
-      .soft(d.page.getByRole("button", { name: "Join", exact: true }))
+      .soft(d.page.getByRole("button", { name: "Accept", exact: true }))
       .toBeVisible({ timeout: 20000 });
   });
 
@@ -161,7 +161,7 @@ test("W2 invitations", async ({ browser }) => {
     });
     expect.soft(link.status).toBeLessThan(300);
     await c.page.goto(relativeLink(link.link as string));
-    await c.page.getByRole("button", { name: "Ask to join" }).click();
+    await c.page.getByRole("button", { name: "Accept", exact: true }).click();
     await expect
       .soft(c.page.getByText(/Waiting for approval/))
       .toBeVisible({ timeout: 20000 });
@@ -197,7 +197,7 @@ test("W2 invitations", async ({ browser }) => {
       role: "viewer",
     });
     await e.page.goto(relativeLink(link.link as string));
-    await e.page.getByRole("button", { name: "Ask to join" }).click();
+    await e.page.getByRole("button", { name: "Accept", exact: true }).click();
     await expect
       .soft(e.page.getByText(/Waiting for approval/))
       .toBeVisible({ timeout: 20000 });
@@ -256,7 +256,8 @@ test("W2 invitations", async ({ browser }) => {
     const roles = e.page
       .getByRole("dialog", { name: "Add members" })
       .getByRole("radio");
-    const admin = roles.filter({ hasText: /^Admin/ });
+    const admin = e.page.getByRole("radio", { name: /^Admin:/ });
+    await expect(roles.first()).toBeAttached({ timeout: 20000 });
     console.log(
       `step 9: role cards ${await roles.count()}, Admin card disabled: ${await admin.isDisabled()}`,
     );

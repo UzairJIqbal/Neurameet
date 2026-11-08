@@ -682,7 +682,7 @@ Spec: [0004-workspace-shell](../specs/0004-conversations-to-code/0004-workspace-
   - [x] GitHub tab, Decisions and Activity filters, AI Assistant tab (AC-70i, AC-70l to AC-70n)
   - [x] My Tasks, My Dashboard, My Meetings (AC-77, AC-77b, AC-77c)
   - [x] Ctrl K palette with decisions, search route, `q` on `/search`, Raise hand, auth layouts (AC-78 to AC-78b, AC-70x, AC-70y)
-- [ ] Verify it: `/check verify workspace shell`
+- [x] Verify it: `/check verify workspace shell` (live pass 2026-11-08, GitHub reads still external)
 - [ ] Test it: `/test workspace shell`
 - [ ] Review it (fresh model): `/check review workspace shell`
 - [ ] Document it: `/document workspace shell`

@@ -91,6 +91,12 @@
       "skillPath": "skills/imprint/SKILL.md",
       "computedHash": "1690b7e280208914a8c950d414d47a7ccdc0278aacf4e04b127830db696c4f01"
     },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "sourceType": "github",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "computedHash": "7eb144f734450fee649dc1d209114775ddda07cbf45be84fe969d3d4f3971dce"
+    },
     "recover": {
       "source": "JavaScript-Mastery-Pro/jsm-agent-skill",
       "sourceType": "github",

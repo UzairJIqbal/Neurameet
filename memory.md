@@ -32,12 +32,11 @@ W8 code is built in 21 slices (all uncommitted), spec `docs/specs/0004-conversat
 
 ## Current state
 
-Checks before the last doc edits: vitest 149 files and 1611 tests pass, `npx tsc --noEmit` clean, `npm run build` passes, eslint 0 errors and 7 warnings (unused vars and one exhaustive-deps, plus unused disable directives). Nothing committed or pushed. Spec W8 not yet Accepted, Verify and Test boxes not ticked. The architect cross check did not run. Earlier open items: Tasdeeq live run needs signing key env values, LL5 live run, W-pre commit.
+Live verification passed 2026-11-08 (three Playwright specs against `next start`). Verify it ticked. GitHub reads remain external.
 
 ## Next session starts with
 
 1. Ask before committing W8 (and the earlier in flight work), then commit to main (no branches or PRs).
-2. Run `/check verify workspace shell` with a live browser pass against the ACs.
 3. Add `.env.example` lines `RESEND_WORKSPACE_FROM=` and `CRON_SECRET=` (earlier edit was denied) and set both in Vercel at Deploy.
 4. Then Step W9 (security suite and bilingual end to end run).
 
