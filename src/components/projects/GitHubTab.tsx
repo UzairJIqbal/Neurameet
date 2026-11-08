@@ -219,7 +219,8 @@ const GitHubTab = ({
         <p className="text-body-md text-on-surface-variant">
           Name a task key like {project.taskPrefix}-12 in a pull request and the
           task follows it. Merging a PR with &quot;Closes {project.taskPrefix}
-          -12&quot; into the default branch completes the task.
+          -12&quot; into the default branch completes the task. Commits pushed
+          without a pull request are not tracked.
         </p>
         <div className="flex flex-wrap gap-3">
           <a href={data.authorizeUrl} className={primaryButton}>

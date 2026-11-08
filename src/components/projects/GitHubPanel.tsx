@@ -184,7 +184,7 @@ const PullTable = ({ pulls }: { pulls: GitHubLinkedPull[] }) => (
 );
 
 const NO_PULLS =
-  "No pull requests are linked yet. Name a task key in a pull request to link it.";
+  "No pull requests are linked yet. Pushing commits alone does not sync. Open a pull request that names a task key to link it.";
 
 const PullsNote = ({ data }: { data: GitHubSummaryResponse }) => (
   <p className="text-xs text-on-surface-variant">
