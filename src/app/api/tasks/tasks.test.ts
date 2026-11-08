@@ -40,7 +40,7 @@ import { POST as reviewProposal } from "../proposals/[id]/review/route";
 import { POST as moveMeeting } from "../meetings/[id]/project/route";
 
 const P = "p1";
-const T = "t1";
+const T = "11111111-1111-4111-8111-111111111111";
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 const req = (body?: unknown, url = "http://localhost/api/x", method = "POST") =>
   new Request(url, {
@@ -783,5 +783,13 @@ describe("POST /api/meetings/[id]/project", () => {
     expect(
       calls.some((c) => c.table === "meetings" && c.method === "update"),
     ).toBe(false);
+  });
+});
+
+describe("task id shape", () => {
+  it("answers 404, not 500, for an id that is not a UUID", async () => {
+    mockAuth.mockResolvedValue({ userId: "u1" });
+    const res = await getTask(req(undefined, undefined, "GET"), params("t1"));
+    expect(res.status).toBe(404);
   });
 });

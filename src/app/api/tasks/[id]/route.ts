@@ -33,6 +33,9 @@ import type { TaskDetailResponse, TaskResponse } from "@/lib/task-types";
 type Params = { params: Promise<{ id: string }> };
 type Supabase = ReturnType<typeof supabaseServer>;
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const NOT_FOUND = { error: "Task not found" };
 const FORBIDDEN = (error: string) =>
   NextResponse.json({ error }, { status: 403 });
@@ -50,6 +53,8 @@ async function loadHead(
   supabase: Supabase,
   id: string,
 ): Promise<TaskHead | null> {
+  // A malformed id is just a task that does not exist, not a database error.
+  if (!UUID_RE.test(id)) return null;
   const { data, error } = await supabase
     .from("tasks")
     .select("id, project_id, status, assignee_id, version, position")

@@ -720,8 +720,8 @@ Project Decisions and Promises tab on `ledger_items` (project scoped; Owner/Admi
 ### Step W8 — Workspace shell, personal views, notifications, Ctrl K 🟡 (in progress, `prompts/step-W8-workspace-shell.md`)
 New sidebar from the PDF layout, My Dashboard, My Tasks with Overdue (Asia/Karachi day rule), notifications table and bell, one daily digest via the once a day Vercel Hobby cron, Ctrl K palette (`cmdk` recommended), success and warning tokens added to the Stitch set, an empty state in every project tab. Recordings fold into meeting detail, Prep into project overview, Search into Ctrl K. Exit: every tab renders a useful empty state in a fresh project.
 
-### Step W9 — Verify + security suite ⬜
-Security tests (non member, forged webhook, invite replay, role escalation), planted PR scenarios, a real bilingual project meeting through the full chain, demo script. Exit: all green, then Step 11.
+### Step W9 — Verify + security suite ✅ (code and tests done 2026-11-08; live runs moved to Deploy)
+Security tests (non member, forged webhook, invite replay, role escalation), planted PR scenarios, a real bilingual project meeting through the full chain, demo script. Exit: all green, then Step 11. Built: route matrix (249 tests), webhook and invite attacks (13), injection defences (7), search gate fix. The live injection probe and the bilingual end to end run happen on the Vercel deployment in Step 11. See `docs/specs/0004-conversations-to-code/verify.md`.
 
 ### Stretch after W9 — Live captions experiment (deferred) ⬜
 Browser Web Speech captions for each speaker's own mic over Stream custom events (5 KB cap), labelled experimental (Chrome and Edge only, audio processed by Google). The post call transcript stays the record. Not Stream captions (paid add-on, no Urdu).

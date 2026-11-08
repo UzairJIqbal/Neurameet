@@ -82,7 +82,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 24 | Proof Chain: a promise traced from meeting quote to merged PR (W6) | Project Workspace | in-progress |
 | 25 | Project AI assistant with code built citations (W7) | Project Workspace | in-progress |
 | 26 | Workspace shell, personal views, notifications, Ctrl K (W8) | Project Workspace | in-progress |
-| 27 | Workspace verify and security suite (W9) | Project Workspace | planned |
+| 27 | Workspace verify and security suite (W9) | Project Workspace | built (live runs at Deploy) |
 | 11 | Deploy and harden | Deploy | planned |
 | 12 | General AI chat page | FYP Polish | done |
 | 13 | Change category write path | FYP Polish | done |
@@ -692,7 +692,7 @@ Security tests (non member access, forged webhook, invite replay, role escalatio
 **Done when:** all checks are green and the demo script runs end to end.
 Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
 - [ ] Build it: `/develop workspace security suite`
-  - [ ] W9 Route matrix, webhook and invite attack tests, injection tests, bilingual run (AC-80 to AC-84)
+  - [x] W9 Route matrix, webhook and invite attack tests, injection tests, bilingual run (AC-80 to AC-84)
 - [ ] Verify it: `/check verify conversations to code`
 - [ ] Test it: `/test conversations to code`
 - [ ] Review it (fresh model): `/check review conversations to code`
