@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React, { useCallback, useEffect } from "react";
 import { useCardLoad } from "@/components/projects/useCardLoad";
 import { listMembers } from "@/lib/project-client";
@@ -38,7 +39,7 @@ const ParticipantsPicker = ({ projectId, value, onChange }: Props) => {
           </button>
         </div>
       ) : !members ? (
-        <p className="text-body-md text-on-surface-variant">Loading...</p>
+        <SkeletonCard />
       ) : (
         <ul className="flex max-h-40 flex-col gap-2 overflow-y-auto">
           {members.map((member) => (

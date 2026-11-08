@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Quote } from "lucide-react";
@@ -184,7 +185,7 @@ const ProposalsPanel = ({
   const reload = useCallback(() => setRetryNonce((k) => k + 1), []);
 
   if (timedOut) return <LoadError compact message="We couldn't load the proposals." onRetry={reload} />;
-  if (!loaded && isLoading) return <p className="text-body-md text-on-surface-variant">Loading...</p>;
+  if (!loaded && isLoading) return <SkeletonCard />;
   if (!loaded) return <LoadError compact message="We couldn't load the proposals." onRetry={reload} />;
 
   const visible = meetingId ? proposals.filter((p) => p.meetingId === meetingId) : proposals;

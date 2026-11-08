@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React, { useCallback, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
@@ -260,7 +261,7 @@ const GitHubPanel = ({ project, reloadKey, onChanged }: Props) => {
       {!data && summary.failed && (
         <LoadError compact message="We couldn't load the GitHub summary." onRetry={summary.retry} />
       )}
-      {!data && !summary.failed && <p className="text-body-md text-on-surface-variant">Loading...</p>}
+      {!data && !summary.failed && <SkeletonCard />}
 
       {data && (
         <>

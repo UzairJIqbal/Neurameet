@@ -674,6 +674,7 @@ Fonts: **Hanken Grotesk** (UI, `--font-hanken-grotesk`) + **JetBrains Mono** (mo
 | `NotificationBell` | `components/shell/NotificationBell.tsx` | Header bell with unread count badge, links to `/notifications` |
 | `HelpDialog` | `components/shell/HelpDialog.tsx` | Header Help dialog, overlay pattern |
 | `ShellContext` | `components/shell/ShellContext.tsx` | `ShellDetailProvider` and `useShellDetail(detail)`: a page sets the last breadcrumb segment (project or meeting name) shown in the header |
+| `Skeleton`, `SkeletonCard` | `components/ui/skeleton.tsx` | Loading placeholder. `Skeleton` is `animate-pulse rounded-md bg-surface-container` (no pulse under reduced motion). `SkeletonCard` is a card shell (`rounded-lg border border-surface-variant bg-surface-container-lowest p-4`, `role="status"`) with a title line and body lines. Replaces every bare "Loading..." paragraph; still pair with `useLoadingTimeout` and `LoadError`. |
 
 ## Registry Update Rule
 

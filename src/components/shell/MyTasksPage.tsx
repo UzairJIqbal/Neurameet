@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React, { useMemo, useState } from "react";
 import { CircleCheck, Search } from "lucide-react";
 import { LoadError } from "@/components/ui/load-error";
@@ -106,7 +107,7 @@ const MyTasksPage = () => {
       {failed && !data ? (
         <LoadError compact message="We could not load your tasks." onRetry={retry} />
       ) : isLoading && !data ? (
-        <p className="text-body-md text-on-surface-variant">Loading...</p>
+        <SkeletonCard />
       ) : tasks.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-surface-variant bg-surface-container-lowest px-4 py-10 text-center">
           <CircleCheck className="h-8 w-8 text-on-surface-variant" aria-hidden />

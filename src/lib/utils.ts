@@ -1,7 +1,31 @@
 import { Call } from "@stream-io/video-react-sdk";
 import { clsx, type ClassValue } from "clsx";
 import toast from "react-hot-toast";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// The locked type scale (tailwind.config.ts fontSize) are font sizes, not
+// colors: without this, twMerge drops `text-body-md` when `text-outline` follows.
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [
+        {
+          text: [
+            "display-lg",
+            "display-lg-mobile",
+            "headline-md",
+            "headline-sm",
+            "body-lg",
+            "body-md",
+            "label-caps",
+            "label-mono",
+          ],
+        },
+      ],
+    },
+  },
+});
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React, { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { LoadError } from "@/components/ui/load-error";
@@ -155,7 +156,7 @@ const InvitesPanel = ({ projectId, reloadNonce = 0, onMembersChanged }: Props) =
     );
   }
 
-  if (!loaded) return <p className="text-body-md text-on-surface-variant">Loading...</p>;
+  if (!loaded) return <SkeletonCard />;
 
   return (
     <div className="flex flex-col gap-6">

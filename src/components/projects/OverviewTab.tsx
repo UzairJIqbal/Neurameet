@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -154,7 +155,7 @@ function CardBody<T>({
   children: (data: T) => React.ReactNode;
 }) {
   if (load.failed) return <LoadError compact message={`We couldn't load ${label}.`} onRetry={load.retry} />;
-  if (load.data === null) return <p className={MUTED}>{load.isLoading ? "Loading..." : ""}</p>;
+  if (load.data === null) return load.isLoading ? <SkeletonCard /> : null;
   return <>{children(load.data)}</>;
 }
 

@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React, { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -222,7 +223,7 @@ const TransferCard = ({ project, onProjectChanged }: Props) => {
       {load.failed ? (
         <LoadError compact message="We couldn't load the members." onRetry={load.retry} />
       ) : !load.data ? (
-        <p className={MUTED}>Loading...</p>
+        <SkeletonCard />
       ) : admins.length === 0 ? (
         <p className={MUTED}>Make someone an Admin first.</p>
       ) : (

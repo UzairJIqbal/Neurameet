@@ -1,5 +1,6 @@
 "use client";
 
+import { SkeletonCard } from "@/components/ui/skeleton";
 import React from "react";
 import Link from "next/link";
 import { ArrowRight, Github } from "lucide-react";
@@ -22,7 +23,7 @@ import {
 export const CARD =
   "rounded-lg border border-surface-variant bg-surface-container-lowest p-4";
 const VIEW_ALL =
-  "flex items-center gap-1 text-body-md text-primary-container hover:underline";
+  "flex shrink-0 items-center gap-1 whitespace-nowrap text-body-md text-primary-container hover:underline";
 
 export const CardHeading = ({
   title,
@@ -34,7 +35,7 @@ export const CardHeading = ({
   linkLabel?: string;
 }) => (
   <div className="mb-3 flex items-center justify-between gap-2">
-    <h3 className="text-headline-sm font-semibold text-on-surface">{title}</h3>
+    <h3 className="min-w-0 text-headline-sm font-semibold text-on-surface">{title}</h3>
     {href && (
       <Link href={href} className={VIEW_ALL}>
         {linkLabel ?? "View all"} <ArrowRight className="h-4 w-4" aria-hidden />
@@ -59,7 +60,7 @@ export const CardState = ({
   failed ? (
     <LoadError compact message={message} onRetry={retry} />
   ) : isLoading ? (
-    <p className="text-body-md text-on-surface-variant">Loading...</p>
+    <SkeletonCard />
   ) : (
     <>{children}</>
   );
