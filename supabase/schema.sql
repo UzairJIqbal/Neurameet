@@ -156,6 +156,18 @@ as $$
   from meeting_chunks mc
   join meetings m on m.id = mc.meeting_id
   where m.user_id = p_user_id
+    -- W9: a project meeting is searchable only while you are still an active
+    -- developer or higher; a removed or demoted creator keeps no transcript access.
+    and (
+      m.project_id is null
+      or exists (
+        select 1 from project_members pm
+        where pm.project_id = m.project_id
+          and pm.user_id = p_user_id
+          and pm.removed_at is null
+          and pm.role in ('owner', 'admin', 'developer')
+      )
+    )
     and 1 - (mc.embedding <=> query_embedding) >= similarity_threshold
   order by mc.embedding <=> query_embedding
   limit match_count;
