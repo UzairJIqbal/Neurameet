@@ -252,6 +252,7 @@ const MeetingRoom = ({
     useMicrophoneState,
     useCameraState,
     useLocalParticipant,
+    useIsCallRecordingInProgress,
   } = useCallStateHooks();
   const callingState = useCallCallingState();
   const callCustom = useCallCustomData() as MeetingCustomData | undefined;
@@ -365,6 +366,15 @@ const MeetingRoom = ({
   // .../recordings/individual/stop` console error. Used to gate the stop on
   // call end and on the record toggle.
   const serverRecordingRef = useRef(false);
+  // F10: calls are created with individual recording auto-on, so recording is
+  // already running when someone joins and no `call.recording_started` event
+  // reaches them. Mirror Stream's own state so the REC badge, the consent notice
+  // and the Stop control reflect what is actually captured.
+  const serverRecording = useIsCallRecordingInProgress();
+  useEffect(() => {
+    serverRecordingRef.current = serverRecording;
+    setIsRecording(serverRecording);
+  }, [serverRecording]);
   useEffect(() => {
     if (isRecording) didRecordRef.current = true;
     if (!didRecordRef.current) return;

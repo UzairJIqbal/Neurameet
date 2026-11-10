@@ -97,6 +97,13 @@ Define `match_meeting_chunks` as a Postgres function using `<=>` cosine distance
 
 ---
 
+## Groq Whisper (transcript generation, F10)
+
+- Model: `whisper-large-v3` (constant `WHISPER_MODEL` in `src/agent/transcript-generation.ts`; lower WER than `-turbo`, same free tier).
+- Free-tier limits: 20 requests/min, 7,200 audio seconds/hour, 28,800/day, 25 MB per file. Hence silence stripping (`extractSpeechAudio`) before upload, sequential chunks per track, 2 tracks in parallel, and `retry-after` aware backoff (4 attempts).
+- Use `response_format: verbose_json`; drop segments via `isLikelyHallucination` (`no_speech_prob`, `avg_logprob`, `compression_ratio`, echoed prompt). Send the domain `prompt` on the first chunk of a track only.
+- Route budget: `POST /api/transcript/download` has `maxDuration = 300` (Hobby ceiling) and a 250 s generation budget.
+
 ## Vercel AI SDK + Gemini + Groq
 
 **Provider setup (`agent/models.ts`):**

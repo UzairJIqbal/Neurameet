@@ -71,7 +71,7 @@ const PersonalRoomPage = () => {
             quality: "720p",
             capture_interval_in_seconds: 2,
           },
-          individual_recording: { mode: "available" },
+          individual_recording: { mode: "auto-on" },
         },
       },
     });
@@ -83,7 +83,7 @@ const PersonalRoomPage = () => {
             quality: "720p",
             capture_interval_in_seconds: 2,
           },
-          individual_recording: { mode: "available" },
+          individual_recording: { mode: "auto-on" },
         },
       })
       .catch((err) =>

@@ -43,7 +43,9 @@ create table if not exists transcripts (
   language text,
   processing_state text not null default 'not_started'
     check (processing_state in ('not_started','pending','ready','failed','no_recording','too_short')),
-  created_at timestamptz not null default now()
+  raw_whisper_text text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 -- meeting_insights: AI-generated summary, category, key points, decisions
@@ -249,6 +251,26 @@ begin
     where table_name = 'transcripts' and column_name = 'language'
   ) then
     alter table transcripts add column language text;
+  end if;
+end $$;
+
+-- Migration (F10): add updated_at + raw_whisper_text to transcripts (idempotent).
+-- updated_at lets the download route tell a live `pending` generation from a
+-- dead one (real in-flight lock). raw_whisper_text keeps the merged Whisper text
+-- from before the AI cleanup pass so a bad cleanup can be compared or undone.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'transcripts' and column_name = 'updated_at'
+  ) then
+    alter table transcripts add column updated_at timestamptz not null default now();
+  end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'transcripts' and column_name = 'raw_whisper_text'
+  ) then
+    alter table transcripts add column raw_whisper_text text;
   end if;
 end $$;
 

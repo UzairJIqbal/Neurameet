@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Authorization tests: the caller must own or have attended the meeting, and
 // the body's streamCallId must match the stored one, before any generation.
-const { store, mockAuth, mockGenerate } = vi.hoisted(() => ({
+const { store, mockAuth, mockGenerate, mockClaim } = vi.hoisted(() => ({
   store: {
     meeting: null as Record<string, unknown> | null,
     attendance: [] as Array<Record<string, unknown>>,
@@ -12,6 +12,7 @@ const { store, mockAuth, mockGenerate } = vi.hoisted(() => ({
   },
   mockAuth: vi.fn(),
   mockGenerate: vi.fn(),
+  mockClaim: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -21,6 +22,8 @@ vi.mock("@/agent/transcript-generation", () => ({
 }));
 vi.mock("@/lib/transcript-state", () => ({
   setTranscriptState: vi.fn(async () => undefined),
+  claimTranscriptGeneration: mockClaim,
+  isMissingColumn: () => false,
 }));
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: () => ({
@@ -72,6 +75,8 @@ describe("POST /api/transcript/download authorization", () => {
   beforeEach(() => {
     mockAuth.mockResolvedValue({ userId: "user_a" });
     mockGenerate.mockReset();
+    mockClaim.mockReset();
+    mockClaim.mockResolvedValue(true);
     mockGenerate.mockResolvedValue({
       status: "ok",
       transcript: "A: hi",
@@ -105,6 +110,44 @@ describe("POST /api/transcript/download authorization", () => {
     const res = await post({ meetingId: "m1", streamCallId: "call-1" });
     expect(res.status).toBe(200);
     expect(mockGenerate).toHaveBeenCalledOnce();
+  });
+
+  it("answers pending and starts no second run while one is in flight (F10)", async () => {
+    mockAuth.mockResolvedValue({ userId: "owner" });
+    mockClaim.mockResolvedValue(false);
+    const res = await post({ meetingId: "m1", streamCallId: "call-1" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).status).toBe("pending");
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("says no_recording is final once the call ended long ago (F10)", async () => {
+    mockAuth.mockResolvedValue({ userId: "owner" });
+    store.meeting = {
+      id: "m1",
+      user_id: "owner",
+      stream_call_id: "call-1",
+      ended_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    };
+    mockGenerate.mockResolvedValue({ status: "no_recording", message: "wait" });
+    const body = await (await post({ meetingId: "m1", streamCallId: "call-1" })).json();
+    expect(body.status).toBe("no_recording");
+    expect(body.final).toBe(true);
+    expect(body.message).toMatch(/not recorded/i);
+  });
+
+  it("keeps no_recording retryable right after the call ends (F10)", async () => {
+    mockAuth.mockResolvedValue({ userId: "owner" });
+    store.meeting = {
+      id: "m1",
+      user_id: "owner",
+      stream_call_id: "call-1",
+      ended_at: new Date().toISOString(),
+    };
+    mockGenerate.mockResolvedValue({ status: "no_recording", message: "wait" });
+    const body = await (await post({ meetingId: "m1", streamCallId: "call-1" })).json();
+    expect(body.final).toBe(false);
+    expect(body.message).toBe("wait");
   });
 
   it("allows the owner", async () => {

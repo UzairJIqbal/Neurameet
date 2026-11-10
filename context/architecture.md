@@ -192,6 +192,9 @@ failure degrades to "less personalized" instead of crashing the request.
 | meeting_id     | uuid        | References meetings, unique              |
 | source        | text        | upload / recording                        |
 | raw_text       | text        | Required — never save empty               |
+| raw_whisper_text | text      | F10: merged Whisper text before AI cleanup (nullable; additive migration) |
+| processing_state | text      | not_started / pending / ready / failed / no_recording / too_short |
+| updated_at     | timestamptz | F10: set on every state change; drives the in-flight lock (a `pending` row older than 6 min is stale and may be restarted) |
 | created_at     | timestamptz |                                          |
 
 ### `meeting_insights`

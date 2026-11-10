@@ -69,6 +69,7 @@ vi.mock("@stream-io/video-react-sdk", () => ({
     useMicrophoneState: h.useMicrophoneState,
     useCameraState: h.useCameraState,
     useLocalParticipant: h.useLocalParticipant,
+    useIsCallRecordingInProgress: () => false,
   }),
   CallingState: h.CallingState,
   PaginatedGridLayout: () => null,

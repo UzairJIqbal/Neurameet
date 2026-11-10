@@ -35,18 +35,32 @@ export async function setTranscriptState(
   const row: Record<string, unknown> = {
     meeting_id: meetingId,
     processing_state: state,
+    updated_at: new Date().toISOString(),
   };
   if (opts?.rawText !== undefined) row.raw_text = opts.rawText;
   if (opts?.source !== undefined) row.source = opts.source;
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from("transcripts")
     .upsert(row, { onConflict: "meeting_id" });
+
+  // Database not migrated to F10 yet (no updated_at column): write without it.
+  if (error && isMissingColumn(error)) {
+    delete row.updated_at;
+    ({ error } = await supabase
+      .from("transcripts")
+      .upsert(row, { onConflict: "meeting_id" }));
+  }
 
   if (error) {
     console.error("[transcript-state] upsert failed:", error);
     throw error;
   }
+}
+
+/** Postgres 42703 / PostgREST PGRST204: a column in the payload does not exist. */
+export function isMissingColumn(error: { code?: string }): boolean {
+  return error.code === "42703" || error.code === "PGRST204";
 }
 
 /**
@@ -81,4 +95,56 @@ export async function getTranscriptState(
     rawText: row?.raw_text ?? "",
     hasInsights: !!insights,
   };
+}
+
+// A `pending` row older than this is a generation that died (function killed,
+// network cut) and may be restarted. Longer than the route's maxDuration (300 s).
+export const PENDING_STALE_MS = 6 * 60 * 1000;
+
+export function isPendingStale(
+  updatedAt: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  if (!updatedAt) return true;
+  const t = Date.parse(updatedAt);
+  return !Number.isFinite(t) || now - t > PENDING_STALE_MS;
+}
+
+/**
+ * Atomically take the right to generate. Returns false when another generation
+ * is already running (a fresh `pending` row). The conditional update only
+ * matches a row that is not pending or whose pending mark is stale, so two
+ * concurrent clicks cannot both win.
+ */
+export async function claimTranscriptGeneration(
+  supabase: SupabaseClient,
+  meetingId: string,
+): Promise<boolean> {
+  const nowIso = new Date().toISOString();
+  const cutoff = new Date(Date.now() - PENDING_STALE_MS).toISOString();
+
+  const { data: updated, error: updateErr } = await supabase
+    .from("transcripts")
+    .update({
+      processing_state: "pending",
+      source: "recording",
+      updated_at: nowIso,
+    })
+    .eq("meeting_id", meetingId)
+    .or(`processing_state.neq.pending,updated_at.lt.${cutoff}`)
+    .select("id");
+  if (updateErr) throw updateErr;
+  if (updated && updated.length > 0) return true;
+
+  // No row matched: either none exists yet, or a fresh pending one does.
+  const { error: insertErr } = await supabase.from("transcripts").insert({
+    meeting_id: meetingId,
+    source: "recording",
+    processing_state: "pending",
+    updated_at: nowIso,
+  });
+  if (!insertErr) return true;
+  // Unique violation: the row exists and is fresh pending, so we lost the race.
+  if (insertErr.code === "23505") return false;
+  throw insertErr;
 }

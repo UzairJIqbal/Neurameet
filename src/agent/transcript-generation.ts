@@ -10,6 +10,24 @@ import { StreamClient } from "@stream-io/node-sdk";
 import { supabaseServer } from "@/lib/supabase-server";
 import { generateStructuredWithFallback } from "@/agent/models";
 import { z } from "zod";
+import {
+  WhisperHttpError,
+  backoffDelayMs,
+  batchTranscriptLines,
+  describeWhisperFailure,
+  extractSpeechAudio,
+  isLikelyHallucination,
+  mapCompressedTime,
+  mapWithConcurrency,
+  parseRetryAfter,
+  probeDurationSeconds,
+  shouldRetryWhisper,
+  speakerLabelsPreserved,
+  type Piece,
+  type WhisperSegment,
+} from "@/agent/transcript-speech";
+
+export type { WhisperSegment };
 
 // Server-only transcript generation from Stream per-participant recordings.
 // Individual recordings arrive as `.mkv` (audio+video); Groq Whisper does not
@@ -26,7 +44,17 @@ if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const GROQ_TRANSCRIBE_URL =
   "https://api.groq.com/openai/v1/audio/transcriptions";
-const WHISPER_MODEL = "whisper-large-v3-turbo";
+// large-v3 (10.3% WER) is more accurate than turbo (12%) for Urdu and mixed
+// speech and shares the same free-tier limits. Flip back here if needed.
+const WHISPER_MODEL = "whisper-large-v3";
+const WHISPER_MAX_ATTEMPTS = 4;
+// Tracks transcribed at once. Groq free tier is 20 requests/min.
+const TRACK_CONCURRENCY = 2;
+// Stop starting new work after this long so the route can still answer before
+// its maxDuration kills it (route maxDuration is 300 s).
+const GENERATION_BUDGET_MS = 250_000;
+// Cleanup batches: keeps every model output well under its token limit.
+const CLEANUP_BATCH_CHARS = 6_000;
 // Groq Whisper `prompt` (max 224 tokens) biases the spelling of domain proper
 // nouns Whisper otherwise mishears (e.g. "Neurameet" → "Neuromade",
 // "Urdu" → "Urtah"). Sent on every chunk (each chunk is a separate Whisper
@@ -134,7 +162,22 @@ export function fallbackToRawIfTooShort(
 // default primary limit on long meetings.
 const CLEANUP_PRIMARY_TIMEOUT_MS = 90_000;
 
+/**
+ * Clean in line-batches so a long meeting never hits the model's output limit.
+ * Each batch keeps its raw lines when the cleanup fails, shrinks too far, or
+ * renames/invents a speaker label.
+ */
 export async function cleanupTranscript(raw: string): Promise<string> {
+  const batches = batchTranscriptLines(raw, CLEANUP_BATCH_CHARS);
+  const out: string[] = [];
+  for (const batch of batches) {
+    const cleaned = await cleanupBatch(batch);
+    out.push(speakerLabelsPreserved(batch, cleaned) ? cleaned : batch);
+  }
+  return out.join("\n");
+}
+
+async function cleanupBatch(raw: string): Promise<string> {
   try {
     const { object } = await generateStructuredWithFallback({
       schema: cleanupSchema,
@@ -194,7 +237,13 @@ export async function cleanupTranscript(raw: string): Promise<string> {
 }
 
 export type GenerateResult =
-  | { status: "ok"; transcript: string; language?: string }
+  | {
+      status: "ok";
+      transcript: string;
+      // Merged Whisper text before the AI cleanup pass (kept for comparison).
+      rawTranscript?: string;
+      language?: string;
+    }
   | { status: "too_short" }
   | { status: "no_recording"; message: string }
   | { status: "failed"; message: string };
@@ -352,7 +401,6 @@ async function resolveSpeakerName(
   return `Speaker ${(streamUserId ?? "").slice(0, 8)}`;
 }
 
-export type WhisperSegment = { start: number; end: number; text: string };
 type WhisperResponse = {
   text: string;
   language?: string;
@@ -375,22 +423,16 @@ async function transcribeChunk(
   );
   form.append("model", WHISPER_MODEL);
   form.append("response_format", "verbose_json");
-  // F9: do NOT force a language. When no hint is supplied, omit the field so
-  // Whisper auto-detects the spoken language and writes accurate source-language
-  // text (Urdu in Arabic script, English in English). Forcing "en" made Whisper
-  // machine-translate the audio into unreliable English (the garbage Urdu seen in
-  // the live bilingual test). The F8 cleanup pass then translates any non-English
-  // line into English. An explicit hint still wins (kept for callers that know
-  // the language up front).
+  // F9: do NOT force a language (auto-detect keeps Urdu as Urdu; the cleanup
+  // pass translates). An explicit hint still wins.
   if (language && language.trim()) {
     form.append("language", language.trim());
   }
-  // NOTE: Groq's Whisper API does NOT accept OpenAI's `timestamp_granularities`
-  // field (returns 400 "unknown param"). verbose_json already returns segments
-  // with per-segment start/end, which the merge step consumes. Do not re-add it.
-  // Bias spelling of domain proper nouns (e.g. "Neurameet", "Urdu") that Whisper
-  // otherwise mishears. Safe, supported param (max 224 tokens, well under here).
-  form.append("prompt", WHISPER_DOMAIN_HINT);
+  // NOTE: Groq's Whisper API does NOT accept `timestamp_granularities`
+  // (400 "unknown param"). verbose_json already returns per-segment times.
+  // The spelling hint goes on the FIRST chunk only: on later chunks (and on
+  // silence) Whisper tends to echo the prompt back as if it were speech.
+  if (index === 0) form.append("prompt", WHISPER_DOMAIN_HINT);
 
   const res = await fetch(GROQ_TRANSCRIBE_URL, {
     method: "POST",
@@ -400,12 +442,16 @@ async function transcribeChunk(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(
+    throw new WhisperHttpError(
       `Groq Whisper failed (${res.status}): ${errText.slice(0, 200)}`,
+      res.status,
+      parseRetryAfter(res.headers.get("retry-after")),
     );
   }
   return (await res.json()) as WhisperResponse;
 }
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 async function transcribeWithRetry(
   chunk: Uint8Array,
@@ -413,54 +459,33 @@ async function transcribeWithRetry(
   language?: string,
 ): Promise<WhisperResponse> {
   let lastErr: unknown;
-  // Groq is the sole provider: retry once, then fail gracefully (no fallback).
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Groq is the sole provider: back off (honouring retry-after on 429), then
+  // fail gracefully (no fallback).
+  for (let attempt = 0; attempt < WHISPER_MAX_ATTEMPTS; attempt++) {
     try {
       return await transcribeChunk(chunk, index, language);
     } catch (err) {
       lastErr = err;
+      if (!shouldRetryWhisper(err) || attempt === WHISPER_MAX_ATTEMPTS - 1) break;
+      await sleep(backoffDelayMs(attempt, err));
     }
   }
   throw lastErr;
 }
 
-/**
- * Probe media duration (seconds) using only the ffmpeg binary (no ffprobe
- * needed): `ffmpeg -i file` prints "Duration: HH:MM:SS.xx" to stderr even though
- * it exits with an error (no output specified). Returns 0 if it cannot parse.
- */
-function probeDurationSeconds(filePath: string): Promise<number> {
-  const bin = ffmpegStatic ?? "ffmpeg";
-  return new Promise((resolve) => {
-    let stderr = "";
-    const proc = spawn(bin, ["-i", filePath]);
-    proc.stderr.on("data", (d) => (stderr += d.toString()));
-    proc.on("close", () => {
-      const m = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
-      if (!m) {
-        resolve(0);
-        return;
-      }
-      const h = Number(m[1]);
-      const min = Number(m[2]);
-      const s = Number(m[3]);
-      resolve(h * 3600 + min * 60 + s);
-    });
-    proc.on("error", () => resolve(0));
-  });
-}
+type PreparedAudio = { chunks: Uint8Array[]; pieces: Piece[] };
 
 /**
- * Convert a downloaded recording buffer (mkv) into 16kHz mono FLAC segments
- * using the native ffmpeg binary. Each chunk (except the first) overlaps the
- * previous by OVERLAP_SECONDS so a word split across a 10-min boundary is kept
- * whole (Bug 3). Returns the raw bytes of each segment, in order. Works entirely
- * on disk in a temp dir, then cleans up.
+ * Convert a downloaded recording (mkv) to 16kHz mono FLAC, cut the silence out
+ * (saves the Groq hourly audio quota and removes what Whisper hallucinates on),
+ * then split into SEGMENT_SECONDS chunks that overlap by OVERLAP_SECONDS. The
+ * returned `pieces` map times on the shortened audio back to the real track
+ * time. Returns no chunks when the track holds no speech.
  */
-async function convertToFlacSegments(
+async function prepareAudio(
   inputBuf: Uint8Array,
   segmentSeconds: number,
-): Promise<Uint8Array[]> {
+): Promise<PreparedAudio> {
   const workDir = join(tmpdir(), `nm-transcript-${randomUUID()}`);
   await mkdir(workDir, { recursive: true });
   const inPath = join(workDir, "in.mkv");
@@ -469,7 +494,6 @@ async function convertToFlacSegments(
   try {
     await writeFile(inPath, inputBuf);
 
-    // Single 16kHz mono FLAC we then split per chunk (with overlap).
     await new Promise<void>((resolve, reject) => {
       ffmpeg(inPath)
         .outputOptions(["-vn", "-ar", "16000", "-ac", "1"])
@@ -479,22 +503,22 @@ async function convertToFlacSegments(
         .run();
     });
 
-    const duration = await probeDurationSeconds(inPath);
-    // Fallback: if we can't read a duration, transcribe the whole file as one
-    // chunk (no overlap). Rare; keeps the pipeline working.
+    const speech = await extractSpeechAudio(fullPath, workDir);
+    if (!speech) return { chunks: [], pieces: [] };
+
+    const duration = await probeDurationSeconds(speech.path);
     const numChunks =
       duration > 0 ? Math.max(1, Math.ceil(duration / segmentSeconds)) : 1;
 
-    const segments: Uint8Array[] = [];
+    const chunks: Uint8Array[] = [];
     for (let i = 0; i < numChunks; i++) {
       const start = i * segmentSeconds;
       const isLast = i === numChunks - 1;
       const outName = join(workDir, `out_${String(i).padStart(3, "0")}.flac`);
       await new Promise<void>((resolve, reject) => {
-        const cmd = ffmpeg(fullPath)
+        const cmd = ffmpeg(speech.path)
           .inputOptions(["-ss", String(start)])
           .outputOptions(["-ar", "16000", "-ac", "1"])
-          // Last chunk runs to EOF; others span one segment + the overlap tail.
           .output(outName);
         if (!isLast) cmd.outputOptions(["-t", String(segmentSeconds + OVERLAP_SECONDS)]);
         cmd
@@ -502,16 +526,19 @@ async function convertToFlacSegments(
           .on("error", (err) => reject(err))
           .run();
       });
-      if (!existsSync(outName)) continue; // silent/empty region → skip
-      segments.push(new Uint8Array(await readFile(outName)));
+      if (!existsSync(outName)) continue;
+      chunks.push(new Uint8Array(await readFile(outName)));
     }
-    return segments;
+    return { chunks, pieces: speech.pieces };
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
-type TrackOutcome = Segment[] | "silent" | "error";
+type TrackOutcome =
+  | { kind: "ok"; segments: Segment[] }
+  | { kind: "silent" }
+  | { kind: "error"; reason: string };
 
 async function processTrack(
   downloadUrl: string,
@@ -525,57 +552,59 @@ async function processTrack(
 ): Promise<TrackOutcome> {
   try {
     const res = await fetch(downloadUrl);
-    if (!res.ok) return "error";
+    if (!res.ok) {
+      return { kind: "error", reason: "A recording could not be downloaded." };
+    }
     const inputBuf = new Uint8Array(await res.arrayBuffer());
-    if (inputBuf.byteLength === 0) return "silent";
+    if (inputBuf.byteLength === 0) return { kind: "silent" };
 
     const displayName = streamUserId
       ? await resolveSpeakerName(meetingId, streamUserId, client, callType, callId)
       : speaker;
 
-    let flacChunks: Uint8Array[];
+    let prepared: PreparedAudio;
     try {
-      flacChunks = await convertToFlacSegments(inputBuf, SEGMENT_SECONDS);
+      prepared = await prepareAudio(inputBuf, SEGMENT_SECONDS);
     } catch (err) {
       console.error("[transcript-generation] ffmpeg conversion failed:", err);
-      return "error";
+      return { kind: "error", reason: "A recording could not be converted." };
+    }
+    if (prepared.chunks.length === 0) return { kind: "silent" };
+
+    // Chunks run one after another: parallel chunks are what trips Groq's
+    // per-minute limit.
+    const segments: Segment[] = [];
+    for (let i = 0; i < prepared.chunks.length; i++) {
+      const result = await transcribeWithRetry(prepared.chunks[i], i, language);
+      const offset = i * SEGMENT_SECONDS;
+      const rawSegments = result.segments;
+      const hasSegments = !!rawSegments && rawSegments.length > 0;
+      const segs: WhisperSegment[] = hasSegments
+        ? rawSegments
+        : [{ start: 0, end: 0, text: result.text }];
+      const isLast = i === prepared.chunks.length - 1;
+      const filtered = filterBoundarySegments(
+        segs,
+        i,
+        OVERLAP_SECONDS,
+        hasSegments,
+        isLast ? undefined : SEGMENT_SECONDS,
+      ).filter((s) => !isLikelyHallucination(s, WHISPER_DOMAIN_HINT));
+      for (const s of filtered) {
+        segments.push({
+          speaker: displayName,
+          // Whisper time is on the silence-stripped audio; map it back.
+          start: mapCompressedTime(offset + s.start, prepared.pieces),
+          text: s.text.trim(),
+        });
+      }
     }
 
-    if (flacChunks.length === 0) return "silent";
-
-    const perChunk = await Promise.all(
-      flacChunks.map(async (chunk, i) => {
-        const result = await transcribeWithRetry(chunk, i, language);
-        const offset = i * SEGMENT_SECONDS;
-        const rawSegments = result.segments;
-        const hasSegments = !!rawSegments && rawSegments.length > 0;
-        const segs: WhisperSegment[] = hasSegments
-          ? rawSegments
-          : [{ start: 0, end: 0, text: result.text }];
-        // Bug 3 dedup: split the overlap between neighbouring chunks (see
-        // filterBoundarySegments) so the seam neither drops nor doubles speech.
-        const isLast = i === flacChunks.length - 1;
-        const filtered = filterBoundarySegments(
-          segs,
-          i,
-          OVERLAP_SECONDS,
-          hasSegments,
-          isLast ? undefined : SEGMENT_SECONDS,
-        );
-        return filtered.map((s) => ({
-          speaker: displayName,
-          start: offset + s.start,
-          text: s.text.trim(),
-        }));
-      }),
-    );
-
-    const segments = perChunk.flat().filter((s) => s.text.length > 0);
     // Silent / empty track: no speech extracted. Skip without failing the run.
-    return segments.length > 0 ? segments : "silent";
+    return segments.length > 0 ? { kind: "ok", segments } : { kind: "silent" };
   } catch (err) {
     console.error("[transcript-generation] track failed:", err);
-    return "error";
+    return { kind: "error", reason: describeWhisperFailure(err) };
   }
 }
 
@@ -652,77 +681,71 @@ export async function generateTranscriptForMeeting({
   }
 
   try {
+    const deadline = Date.now() + GENERATION_BUDGET_MS;
+
+    const outcomes = await mapWithConcurrency(
+      individuals,
+      TRACK_CONCURRENCY,
+      async (rec): Promise<{ rec: Recording; outcome: TrackOutcome }> => {
+        if (Date.now() > deadline) {
+          return {
+            rec,
+            outcome: {
+              kind: "error",
+              reason: "The meeting is long, so it ran out of time. Please try again.",
+            },
+          };
+        }
+        const streamUserId = parseStreamUserId(rec.filename);
+        const downloadUrl = (rec.url || rec.file_url || rec.video_url) as string;
+        const outcome = await processTrack(
+          downloadUrl,
+          "Speaker",
+          meetingId,
+          streamUserId,
+          client,
+          streamCallType,
+          streamCallId,
+          language,
+        );
+        return { rec, outcome };
+      },
+    );
+
     const allSegments: Segment[] = [];
-    let anyError = false;
-
-    for (const rec of individuals) {
-      const streamUserId = parseStreamUserId(rec.filename);
-      const speaker = streamUserId
-        ? await resolveSpeakerName(
-            meetingId,
-            streamUserId,
-            client,
-            streamCallType,
-            streamCallId,
-          )
-        : "Speaker";
-      const downloadUrl = (rec.url || rec.file_url || rec.video_url) as string;
-
-      const outcome = await processTrack(
-        downloadUrl,
-        speaker,
-        meetingId,
-        streamUserId,
-        client,
-        streamCallType,
-        streamCallId,
-        language,
-      );
-
-      if (outcome === "error") {
-        anyError = true;
-        continue;
-      }
-      if (outcome === "silent") {
-        continue; // skip silent/empty participant, keep going
-      }
-      if (outcome.length > 0) {
+    const errors: string[] = [];
+    for (const { rec, outcome } of outcomes) {
+      if (outcome.kind === "error") {
+        errors.push(outcome.reason);
+      } else if (outcome.kind === "ok") {
         // F-merge: shift this track's segments by its own recording start so a
-        // participant who joined later (their Whisper times also start at 0) is
-        // placed at their true speaking time, not first in the recording array.
+        // participant who joined later is placed at their true speaking time.
         allSegments.push(
           ...offsetSegments(
-            outcome,
+            outcome.segments,
             epochSecondsFromRecordingStart(rec.start_time),
           ),
         );
       }
     }
 
-    if (allSegments.length === 0) {
-      // All tracks silent/empty, or some failed. Distinguish the two.
-      if (anyError) {
-        return {
-          status: "failed",
-          message: "Transcript generation failed, try manual upload",
-        };
-      }
-      // No speech anywhere → too short / silent meeting.
-      return { status: "too_short" };
+    // Never hand back a silently partial transcript: one failed track means a
+    // participant is missing, so report it and let the user retry.
+    if (errors.length > 0) {
+      return { status: "failed", message: errors[0] };
     }
+    // No speech anywhere → too short / silent meeting.
+    if (allSegments.length === 0) return { status: "too_short" };
 
     // F-merge: segments already carry their absolute (epoch-offset) start, so a
     // single chronological sort yields true speaking order across participants.
-    const transcript = mergeSegmentsToTranscript(allSegments);
+    const rawTranscript = mergeSegmentsToTranscript(allSegments);
 
-    // F8 + F9: light AI accuracy clean (word-level + same-speaker line merge)
-    // AND translation of any non-English line into English (F9), so the cached
-    // raw_text and the downloaded .txt are always English. Graceful: any failure
-    // or a suspiciously short result returns the raw transcript so the download
-    // is never blocked.
-    const cleaned = await cleanupTranscript(transcript);
+    // F8 + F9: AI accuracy clean and translation into English, in batches.
+    // Graceful: any failure returns the raw lines so the download never blocks.
+    const transcript = await cleanupTranscript(rawTranscript);
 
-    return { status: "ok", transcript: cleaned, language: "en" };
+    return { status: "ok", transcript, rawTranscript, language: "en" };
   } catch (err) {
     console.error("[transcript-generation] fatal:", err);
     return {

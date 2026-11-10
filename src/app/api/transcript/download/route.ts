@@ -4,7 +4,11 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { callTypeOfRow } from "@/lib/stream-call-type-server";
 import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { generateTranscriptForMeeting } from "@/agent/transcript-generation";
-import { setTranscriptState } from "@/lib/transcript-state";
+import {
+  claimTranscriptGeneration,
+  isMissingColumn,
+  setTranscriptState,
+} from "@/lib/transcript-state";
 import {
   accessErrorResponse,
   checkMeetingAccess,
@@ -14,6 +18,14 @@ import {
 
 // Native ffmpeg (ffmpeg-static) requires the Node runtime (never edge).
 export const runtime = "nodejs";
+// Download, ffmpeg and Whisper for every participant run inside this request.
+// 300 s is the Vercel Hobby ceiling with fluid compute; the generator stops
+// starting new work at 250 s so it can still answer.
+export const maxDuration = 300;
+
+// Once a call ended this long ago and Stream still lists no individual
+// recording, there never will be one (recording was off), so say so for good.
+const NO_RECORDING_FINAL_AFTER_MS = 20 * 60 * 1000;
 
 /**
  * Participant transcript download. Any signed in participant of the meeting can
@@ -58,7 +70,9 @@ export async function POST(request: Request) {
     // attendee. Otherwise any signed-in user could transcribe any meeting.
     const { data: meeting } = await supabase
       .from("meetings")
-      .select("id, user_id, project_id, stream_call_id, stream_call_type")
+      .select(
+        "id, user_id, project_id, stream_call_id, stream_call_type, ended_at",
+      )
       .eq("id", meetingId)
       .maybeSingle();
     if (!meeting || meeting.stream_call_id !== streamCallId) {
@@ -123,14 +137,27 @@ export async function POST(request: Request) {
     const locked = await assertMinutesUnlocked(supabase, meetingId);
     if (locked) return locked;
 
-    // No ready cache: mark in-flight so a concurrent click (or a later poll)
-    // sees `pending` instead of starting a second transcription.
+    // No ready cache: take the generation lock. A fresh `pending` row means
+    // another request is already transcribing, so answer `pending` and let the
+    // client keep polling instead of starting a second (quota-burning) run.
     try {
-      await setTranscriptState(supabase, meetingId, "pending", {
-        source: "recording",
-      });
-    } catch {
-      // state write is best-effort; generation itself still proceeds.
+      const claimed = await claimTranscriptGeneration(supabase, meetingId);
+      if (!claimed) {
+        return NextResponse.json({
+          status: "pending",
+          message: "Your transcript is being generated.",
+        });
+      }
+    } catch (claimErr) {
+      // Lock is best-effort (e.g. database not migrated yet); still proceed.
+      console.error("Transcript claim failed, continuing:", claimErr);
+      try {
+        await setTranscriptState(supabase, meetingId, "pending", {
+          source: "recording",
+        });
+      } catch {
+        /* best-effort */
+      }
     }
 
     // No cache: generate the merged transcript for any signed in participant.
@@ -147,18 +174,26 @@ export async function POST(request: Request) {
       const rawText = result.transcript.trim();
       // Upsert (not insert): a row may already exist from the `pending` write
       // above or a concurrent click, and `meeting_id` is UNIQUE.
-      const { error: transcriptError } = await supabase
+      const readyRow: Record<string, unknown> = {
+        meeting_id: meetingId,
+        source: "recording",
+        raw_text: rawText,
+        language: result.language,
+        processing_state: "ready",
+        updated_at: new Date().toISOString(),
+        raw_whisper_text: result.rawTranscript?.trim() ?? null,
+      };
+      let { error: transcriptError } = await supabase
         .from("transcripts")
-        .upsert(
-          {
-            meeting_id: meetingId,
-            source: "recording",
-            raw_text: rawText,
-            language: result.language,
-            processing_state: "ready",
-          },
-          { onConflict: "meeting_id" },
-        );
+        .upsert(readyRow, { onConflict: "meeting_id" });
+      // Database not migrated to F10 yet: save without the new columns.
+      if (transcriptError && isMissingColumn(transcriptError)) {
+        delete readyRow.updated_at;
+        delete readyRow.raw_whisper_text;
+        ({ error: transcriptError } = await supabase
+          .from("transcripts")
+          .upsert(readyRow, { onConflict: "meeting_id" }));
+      }
 
       if (transcriptError) {
         console.error("Failed to cache transcript:", transcriptError);
@@ -208,9 +243,16 @@ export async function POST(request: Request) {
       } catch {
         /* best-effort */
       }
+      const endedAt = meeting.ended_at ? Date.parse(meeting.ended_at) : NaN;
+      const final =
+        Number.isFinite(endedAt) &&
+        Date.now() - endedAt > NO_RECORDING_FINAL_AFTER_MS;
       return NextResponse.json({
         status: "no_recording",
-        message: result.message,
+        final,
+        message: final
+          ? "This meeting was not recorded, so there is nothing to transcribe. Upload a transcript instead."
+          : result.message,
       });
     }
     if (result.status === "too_short") {

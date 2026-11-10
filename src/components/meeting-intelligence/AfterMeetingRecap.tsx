@@ -85,6 +85,11 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   const { redirectToSignIn } = useClerk();
   const [gen, setGen] = useState<GenState>("idle");
   const [noRecordingTimedOut, setNoRecordingTimedOut] = useState(false);
+  // Why we are waiting: Stream still finalizing recordings, or a generation
+  // already running on the server. Drives the copy below the button.
+  const [waitReason, setWaitReason] = useState<"stream" | "server">("stream");
+  const [failReason, setFailReason] = useState("");
+  const [noRecordingNote, setNoRecordingNote] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
   // A transcription can outlast the 15s poll interval; this keeps a tick from
@@ -105,7 +110,8 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   // When Stream hasn't finalized recordings yet, poll the download endpoint and
   // auto-retry once the transcript is ready. Capped at NO_RECORDING_POLL_CAP ticks
   // (~5 min) so we never poll forever.
-  const startWaiting = () => {
+  const startWaiting = (reason: "stream" | "server") => {
+    setWaitReason(reason);
     setGen("pending");
     setNoRecordingTimedOut(false);
     attemptsRef.current = 0;
@@ -146,12 +152,13 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
     }
     if (!isAutoRetry) {
       setGen("generating");
+      setFailReason("");
     }
     // Guard against a slow/rate-limited AI provider hanging the request forever
     // (same class of hang fixed in UploadTranscriptModal). Signal + timeout so a
     // stuck /api/transcript/download surfaces a failure instead of spinning.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    const timeoutId = setTimeout(() => controller.abort(), 295000);
     inFlightRef.current = true;
     try {
       const res = await fetch("/api/transcript/download", {
@@ -187,10 +194,21 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
         stopPoll();
         setGen("too_short");
         toast("Meeting too short to transcribe");
+      } else if (status === "pending") {
+        // Another request is already generating this transcript. Wait for it:
+        // the poll fetches the finished text from the cache.
+        if (!isAutoRetry) startWaiting("server");
+      } else if (status === "no_recording" && data?.final) {
+        // The call ended long ago and Stream holds no recording: it was never
+        // recorded, so stop waiting and say so.
+        stopPoll();
+        setNoRecordingNote(data?.message?.trim() ?? "");
+        setNoRecordingTimedOut(true);
+        setGen("no_recording");
       } else if (status === "no_recording") {
         // Stream hasn't finalized the recordings yet — wait and auto-retry.
         if (!isAutoRetry) {
-          startWaiting();
+          startWaiting("stream");
           toast(
             data?.message?.trim() ||
               "Recordings are still processing. We'll grab your transcript shortly.",
@@ -200,23 +218,25 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
         stopPoll();
         setGen("failed");
         // Surface the real server message instead of a hardcoded generic line,
-        // so the cause (no recording captured, still processing, STT error) is
-        // visible to the user rather than hidden behind "try manual upload".
-        toast.error(
+        // so the cause (quota, conversion, STT error) is visible to the user.
+        const reason =
           data?.message?.trim() ||
-            "Transcript generation failed, try manual upload",
-        );
+          "Transcript generation failed, try manual upload";
+        setFailReason(reason);
+        toast.error(reason);
       }
     } catch (err) {
       if (!isAutoRetry) {
         stopPoll();
         setGen("failed");
         if (controller.signal.aborted) {
-          toast.error(
-            "Transcript generation timed out. Please try again shortly.",
-          );
+          // The server may still be finishing: waiting is safer than failing,
+          // because the poll picks up the cached result.
+          startWaiting("server");
         } else {
-          toast.error("Transcript generation failed, try manual upload");
+          const reason = "Transcript generation failed, try manual upload";
+          setFailReason(reason);
+          toast.error(reason);
         }
       }
     } finally {
@@ -242,7 +262,9 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
           ? "Transcript exists"
           : gen === "no_recording" && !noRecordingTimedOut
             ? "Recordings processing"
-            : "Generate Transcript";
+            : gen === "failed"
+              ? "Try again"
+              : "Generate Transcript";
 
   const participantJoinTimes = recap.participants
     .map((p) => (p.joinedAt ? new Date(p.joinedAt).getTime() : null))
@@ -503,19 +525,27 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
                 Go back to Dashboard
               </Link>
             </div>
+            {gen === "generating" && (
+              <p className="text-body-sm text-on-surface-variant">
+                Transcribing the recording. A long meeting can take a few
+                minutes, so keep this page open.
+              </p>
+            )}
             {gen === "pending" && !noRecordingTimedOut && (
               <p className="text-body-sm text-on-surface-variant">
-                Recordings are still being processed by Stream. We&apos;ll fetch
-                your transcript automatically when it&apos;s ready — no need to
-                wait here.
+                {waitReason === "server"
+                  ? "Your transcript is still being generated. We'll download it automatically when it's ready, so keep this page open."
+                  : "Recordings are still being processed by Stream. We'll fetch your transcript automatically when it's ready, so keep this page open."}
               </p>
             )}
             {gen === "no_recording" && noRecordingTimedOut && (
               <p className="text-body-sm text-on-surface-variant">
-                No recording was captured for this meeting. You can still upload
-                a transcript from the Dashboard to get AI summaries and
-                insights.
+                {noRecordingNote ||
+                  "No recording was captured for this meeting. You can still upload a transcript from the Dashboard to get AI summaries and insights."}
               </p>
+            )}
+            {gen === "failed" && failReason && (
+              <p className="text-body-sm text-error">{failReason}</p>
             )}
             {!isSignedIn && (
               <p className="text-body-sm text-on-surface-variant">

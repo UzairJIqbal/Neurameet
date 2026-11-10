@@ -372,7 +372,7 @@ describe("isMostlyNonEnglish (F9: untranslated-output detector)", () => {
 // and retry once; if pass 2 returns English it wins, otherwise it degrades to raw.
 describe("cleanupTranscript (F9: non-English retry path)", () => {
   const RAW =
-    "अज़ का मेरा नव्जायर जवेद है यह मीटिंग है\nBob: this is english";
+    "Uzair: अज़ का मेरा नव्जायर जवेद है यह मीटिंग है\nBob: this is english";
 
   beforeEach(() => {
     vi.mocked(generateStructuredWithFallback).mockReset();
@@ -383,7 +383,7 @@ describe("cleanupTranscript (F9: non-English retry path)", () => {
       .mockResolvedValueOnce({
         object: {
           cleanedTranscript:
-            "अज़ का मेरा नव्जायर जवेद है यह मीटिंग है\nBob: this is english",
+            "Uzair: अज़ का मेरा नव्जायर जवेद है यह मीटिंग है\nBob: this is english",
         },
       })
       .mockResolvedValueOnce({
