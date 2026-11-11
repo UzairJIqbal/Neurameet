@@ -74,7 +74,7 @@ const TAB_ORDER: TabKey[] = [
 const TAB_LABELS: Record<TabKey, string> = {
   overview: "Overview",
   meetings: "Meetings",
-  tasks: "Tasks",
+  tasks: "Team & Tasks",
   github: "GitHub",
   activity: "Development Activity",
   assistant: "AI Assistant",
