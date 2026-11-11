@@ -140,9 +140,9 @@ afterEach(cleanup);
 
 describe("project tabs", () => {
   it("gives each role the tabs AC-70 lists", () => {
-    expect(tabsForRole("owner")).toHaveLength(9);
-    expect(tabsForRole("admin")).toHaveLength(9);
-    expect(tabsForRole("developer")).not.toContain("settings");
+    expect(tabsForRole("owner")).toHaveLength(6);
+    expect(tabsForRole("admin")).toHaveLength(6);
+    expect(tabsForRole("developer")).toHaveLength(6);
     expect(tabsForRole("developer")).toContain("github");
     const viewer = tabsForRole("viewer");
     expect(viewer).not.toContain("github");
@@ -168,7 +168,6 @@ describe("ProjectHeader", () => {
         project={{ ...project, role }}
         onAddMember={vi.fn()}
         onSchedule={vi.fn()}
-        onOpenSettings={vi.fn()}
         onChanged={vi.fn()}
       />,
     );

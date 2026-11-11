@@ -30,7 +30,7 @@ type GenState =
 // ~5 minutes (20 × 15s) of waiting for Stream to finalize recordings. After
 // this we stop polling and show a final, clear message instead of spinning
 // forever.
-const NO_RECORDING_POLL_CAP = 20;
+const NO_RECORDING_POLL_CAP = 60;
 
 function formatDuration(
   startedAt: string | null,
@@ -180,7 +180,7 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
       } catch {
         /* keep polling until the cap */
       }
-    }, 15000);
+    }, 5000);
   };
 
   const executeDownload = async (isAutoRetry = false) => {

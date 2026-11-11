@@ -27,9 +27,9 @@ import {
   BOARD_REFETCH_MS,
   TASK_PRIORITIES,
   TASK_PRIORITY_LABELS,
-  TASK_STATUSES,
   TASK_STATUS_LABELS,
   columnCards,
+  type BoardCard,
   dropPosition,
   isTaskStatus,
   type TaskStatus,
@@ -65,6 +65,21 @@ const errorText = (err: unknown, fallback: string) =>
 // The Kanban board (AC-41). Every move is optimistic and sends ifVersion; a
 // 409 puts the card back and refetches. The server checks the same role rules
 // the board uses to refuse a drop early.
+// The board has three columns. In Progress and Blocked still exist behind the
+// scenes (GitHub moves a draft PR to In Progress), so those cards sit in To Do.
+const BOARD_STATUSES: TaskStatus[] = ["todo", "in_review", "completed"];
+const FOLDED_INTO_TODO: string[] = ["in_progress", "blocked"];
+
+const boardColumnCards = <T extends BoardCard>(
+  tasks: T[],
+  status: TaskStatus,
+): T[] =>
+  status === "todo"
+    ? tasks
+        .filter((t) => t.status === "todo" || FOLDED_INTO_TODO.includes(t.status))
+        .sort((a, b) => a.position - b.position)
+    : columnCards(tasks, status);
+
 const TasksBoard = ({
   project,
   reloadKey = 0,
@@ -318,7 +333,7 @@ const TasksBoard = ({
   const canDrag = role !== "viewer" && !filterOn;
   const isEmpty = tasks.length === 0 && !filterOn;
   const isTruncated = Object.keys(truncated).length > 0;
-  const columns = TASK_STATUSES.filter(
+  const columns = BOARD_STATUSES.filter(
     (status) => !statusFilter || status === statusFilter,
   );
 
@@ -373,7 +388,7 @@ const TasksBoard = ({
           className={inputClass}
         >
           <option value="">All statuses</option>
-          {TASK_STATUSES.map((value) => (
+          {BOARD_STATUSES.map((value) => (
             <option key={value} value={value}>
               {TASK_STATUS_LABELS[value]}
             </option>
@@ -458,10 +473,10 @@ const TasksBoard = ({
       {view === "board" && (
         <DragDropContext onDragEnd={handleDragEnd}>
           <div
-            className={`grid grid-cols-1 gap-4 ${statusFilter ? "" : "md:grid-cols-2 xl:grid-cols-5"}`}
+            className={`grid grid-cols-1 gap-4 ${statusFilter ? "" : "md:grid-cols-3"}`}
           >
             {columns.map((status) => {
-              const cards = columnCards(tasks, status);
+              const cards = boardColumnCards(tasks, status);
               const total = truncated[status];
               return (
                 <section

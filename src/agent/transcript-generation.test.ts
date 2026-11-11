@@ -192,10 +192,16 @@ describe("cleanupTranscript (F8 graceful degradation)", () => {
     vi.mocked(generateStructuredWithFallback).mockResolvedValue({
       object: { cleanedTranscript: "Alice: hello everyone welcome to the meeting\nBob: thanks alice\nAlice: lets start the agenda" },
     });
-    const result = await cleanupTranscript(RAW);
+    const result = await cleanupTranscript(RAW + "\nBob: شکریہ");
     expect(result).toContain("everyone");
     expect(result).toContain("agenda");
     expect(result).not.toBe(RAW);
+  });
+
+  it("skips the AI pass for a short Latin transcript", async () => {
+    vi.mocked(generateStructuredWithFallback).mockClear();
+    expect(await cleanupTranscript(RAW)).toBe(RAW);
+    expect(generateStructuredWithFallback).not.toHaveBeenCalled();
   });
 
   it("falls back to raw when the cleaned result is truncated (< ratio)", async () => {

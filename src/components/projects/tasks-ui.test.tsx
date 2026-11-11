@@ -248,7 +248,7 @@ describe("TasksBoard", () => {
   it("shows a + on every column but Completed, and none to a Viewer", async () => {
     const { unmount } = render(<TasksBoard project={project} />);
     await screen.findByText("Fix login");
-    for (const name of ["To Do", "In Progress", "In Review", "Blocked"]) {
+    for (const name of ["To Do", "In Review"]) {
       expect(
         screen.getByRole("button", { name: `Add a task to ${name}` }),
       ).toBeTruthy();
@@ -311,7 +311,7 @@ describe("TasksBoard", () => {
     await screen.findByText("Fix login");
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Add a task to Blocked" }),
+      screen.getByRole("button", { name: "Add a task to In Review" }),
     );
     fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "New one" },
@@ -402,16 +402,16 @@ describe("TasksBoard", () => {
       truncated: {},
     });
     client.updateTask.mockResolvedValue({
-      task: task({ status: "in_progress" }),
+      task: task({ status: "in_review" }),
     });
     render(<TasksBoard project={project} />);
     await screen.findByText("Fix login");
 
-    act(() => dnd.onDragEnd!(drop("in_progress")));
+    act(() => dnd.onDragEnd!(drop("in_review")));
 
     await waitFor(() =>
       expect(
-        within(column("In Progress")).getByLabelText("4 comments"),
+        within(column("In Review")).getByLabelText("4 comments"),
       ).toBeTruthy(),
     );
   });

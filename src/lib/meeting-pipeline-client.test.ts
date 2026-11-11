@@ -32,7 +32,7 @@ describe("runMeetingPipeline", () => {
     expect(await runMeetingPipeline("m1")).toEqual({ status: "skipped" });
   });
 
-  it("runs process, embed, then match", async () => {
+  it("runs embed alongside process, then match", async () => {
     fetchMock
       .mockResolvedValueOnce(json(true, { insights: null }))
       .mockResolvedValue(json(true, {}));
@@ -43,16 +43,20 @@ describe("runMeetingPipeline", () => {
     });
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
       "/api/meetings/m1",
-      "/api/ai/process",
       "/api/ai/embed",
+      "/api/ai/process",
     ]);
     expect(match).toHaveBeenCalledWith("m1");
   });
 
   it("stops at a process failure with the server message", async () => {
-    fetchMock
-      .mockResolvedValueOnce(json(true, { insights: null }))
-      .mockResolvedValueOnce(json(false, { error: "Quota hit" }));
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/meetings/m1"
+        ? json(true, { insights: null })
+        : url === "/api/ai/process"
+          ? json(false, { error: "Quota hit" })
+          : json(true, {}),
+    );
     expect(await runMeetingPipeline("m1")).toEqual({
       status: "failed",
       message: "Quota hit",
@@ -61,10 +65,13 @@ describe("runMeetingPipeline", () => {
   });
 
   it("skips matching when embedding fails", async () => {
-    fetchMock
-      .mockResolvedValueOnce(json(true, { insights: null }))
-      .mockResolvedValueOnce(json(true, {}))
-      .mockResolvedValueOnce(json(false, {}));
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/meetings/m1"
+        ? json(true, { insights: null })
+        : url === "/api/ai/embed"
+          ? json(false, {})
+          : json(true, {}),
+    );
     expect(await runMeetingPipeline("m1")).toEqual({
       status: "processed",
       embedded: false,

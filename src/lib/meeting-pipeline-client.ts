@@ -56,19 +56,25 @@ export async function runMeetingPipeline(
 ): Promise<PipelineResult> {
   if (!(await needsProcessing(meetingId))) return { status: "skipped" };
   const { emailNotifications } = readUserPrefs();
+  // Embedding reads the transcript only, so it runs alongside the summary call.
+  const embedPromise = postJson("/api/ai/embed", { meetingId });
   const processed = await postJson("/api/ai/process", {
     meetingId,
     emailNotifications,
   });
   // 403: this caller cannot manage the meeting, so the summary is not theirs to make.
-  if (processed.status === 403) return { status: "skipped" };
+  if (processed.status === 403) {
+    await embedPromise;
+    return { status: "skipped" };
+  }
   if (!processed.ok) {
+    await embedPromise;
     return {
       status: "failed",
       message: processed.error ?? "Summary generation failed, try again",
     };
   }
-  const embedded = (await postJson("/api/ai/embed", { meetingId })).ok;
+  const embedded = (await embedPromise).ok;
   const matched = embedded ? await requestLedgerMatch(meetingId) : false;
   return { status: "processed", embedded, matched };
 }

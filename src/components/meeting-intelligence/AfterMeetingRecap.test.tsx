@@ -375,9 +375,9 @@ describe("AfterMeetingRecap — no contradictory transcript messages (F-series r
     // Allow the initial fetch to resolve.
     await vi.runAllTimersAsync();
 
-    // Simulate 20 poll ticks (NO_RECORDING_POLL_CAP) at 15s intervals.
-    for (let i = 0; i < 20; i++) {
-      await vi.advanceTimersByTimeAsync(15000);
+    // Simulate 60 poll ticks (NO_RECORDING_POLL_CAP) at 5s intervals.
+    for (let i = 0; i < 60; i++) {
+      await vi.advanceTimersByTimeAsync(5000);
     }
 
     // After cap: the "processing" message must be gone.

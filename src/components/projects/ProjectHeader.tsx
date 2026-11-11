@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { relativeTime } from "@/lib/chatHistory";
-import { listMembers, removeMember, syncGitHub } from "@/lib/project-client";
+import { deleteProject, listMembers, removeMember, syncGitHub } from "@/lib/project-client";
 import { syncSummary } from "@/lib/github-types";
 import { canManageInvites, type ProjectFull } from "@/lib/project-types";
 import {
@@ -28,7 +28,6 @@ type Props = {
   project: ProjectFull;
   onAddMember: () => void;
   onSchedule: () => void;
-  onOpenSettings: () => void;
   /** After a Sync, so the header and the open tab show fresh numbers. */
   onChanged: () => void;
 };
@@ -139,19 +138,83 @@ const LeaveDialog = ({
   );
 };
 
+const DeleteDialog = ({
+  project,
+  onCancel,
+}: {
+  project: ProjectFull;
+  onCancel: () => void;
+}) => {
+  const router = useRouter();
+  const [confirmName, setConfirmName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await deleteProject(project.id, confirmName);
+      toast.success("Project deleted");
+      router.push("/projects");
+    } catch (err) {
+      toast.error(errorText(err, "Failed to delete project"));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/50 px-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-project-title"
+        className="flex w-full max-w-md flex-col gap-4 rounded-card bg-surface-container-lowest p-6 shadow-lg"
+      >
+        <h2 id="delete-project-title" className="text-headline-sm text-on-surface">
+          Delete this project?
+        </h2>
+        <p className="text-body-md text-on-surface-variant">
+          This deletes the project and all {project.meetingCount} of its meetings, with their
+          transcripts, insights, and ledger. Type{" "}
+          <span className="font-medium text-on-surface">{project.name}</span> to confirm.
+        </p>
+        <input
+          type="text"
+          aria-label="Type the project name to confirm"
+          value={confirmName}
+          onChange={(e) => setConfirmName(e.target.value)}
+          className="rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none"
+        />
+        <div className="flex justify-end gap-3">
+          <button type="button" onClick={onCancel} disabled={busy} className={outlineButton}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={remove}
+            disabled={busy || confirmName !== project.name}
+            className="rounded-lg bg-error px-4 py-2 text-body-md text-on-primary hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? "Deleting..." : "Delete project"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // The header on every tab (AC-70g). Each control shows only where your role
 // allows it; the server checks the same rule again on each call.
 const ProjectHeader = ({
   project,
   onAddMember,
   onSchedule,
-  onOpenSettings,
   onChanged,
 }: Props) => {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [busyLeave, setBusyLeave] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const { role, github } = project;
   const canManage = canManageInvites(role);
@@ -247,16 +310,19 @@ const ProjectHeader = ({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {canManage && (
-              <DropdownMenuItem onSelect={onOpenSettings}>
-                Project settings
-              </DropdownMenuItem>
-            )}
             <DropdownMenuItem onSelect={copyLink}>Copy link</DropdownMenuItem>
             {canManage && github.connected && (
               <DropdownMenuItem disabled={syncing} onSelect={runSync}>
                 {syncing ? "Syncing..." : "Sync GitHub"}
               </DropdownMenuItem>
+            )}
+            {role === "owner" && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setDeleting(true)}>
+                  Delete project
+                </DropdownMenuItem>
+              </>
             )}
             {role !== "owner" && (
               <>
@@ -269,6 +335,8 @@ const ProjectHeader = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {deleting && <DeleteDialog project={project} onCancel={() => setDeleting(false)} />}
 
       {leaving && (
         <LeaveDialog

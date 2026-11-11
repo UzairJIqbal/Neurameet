@@ -56,6 +56,11 @@ const GENERATION_BUDGET_MS = 250_000;
 // Cleanup batches: keeps every model output well under its token limit.
 const CLEANUP_BATCH_CHARS = 6_000;
 const CLEANUP_CONCURRENCY = 3;
+// Short, already-Latin transcripts gain little from the LLM cleanup pass, so
+// they skip it (saves a model round trip). Urdu/Arabic script still goes through
+// cleanup because that pass also translates to English.
+const CLEANUP_SKIP_MAX_CHARS = 1500;
+const NON_LATIN_SCRIPT = /[\u0600-\u06FF\u0900-\u097F]/;
 // Groq Whisper `prompt` (max 224 tokens) biases the spelling of domain proper
 // nouns Whisper otherwise mishears (e.g. "Neurameet" → "Neuromade",
 // "Urdu" → "Urtah"). Sent on every chunk (each chunk is a separate Whisper
@@ -169,6 +174,9 @@ const CLEANUP_PRIMARY_TIMEOUT_MS = 90_000;
  * renames/invents a speaker label.
  */
 export async function cleanupTranscript(raw: string): Promise<string> {
+  if (raw.length < CLEANUP_SKIP_MAX_CHARS && !NON_LATIN_SCRIPT.test(raw)) {
+    return raw;
+  }
   const batches = batchTranscriptLines(raw, CLEANUP_BATCH_CHARS);
   const out: string[] = new Array(batches.length);
   let next = 0;
