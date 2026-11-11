@@ -68,12 +68,6 @@ describe("AddMembersDialog", () => {
     fireEvent.keyDown(addresses(), { key: "Enter" });
   };
 
-  it("offers Admin to the Owner on an email invite", () => {
-    open("owner");
-    expect(radio(/^Admin/).disabled).toBe(false);
-    expect(radio(/^Developer/).checked).toBe(true);
-  });
-
   it("disables Admin on the link tab and says approval is always needed", () => {
     open("owner");
     linkTab();
@@ -83,101 +77,9 @@ describe("AddMembersDialog", () => {
     ).toBeTruthy();
   });
 
-  it("falls back to Developer when you pick Admin and then switch to the link tab", async () => {
-    client.createInvitation.mockResolvedValue({
-      invitation: { id: "i1", expiresAt: "2026-11-14T00:00:00Z" },
-      link: "https://app/invite/abc",
-    });
-    open("owner");
-    fireEvent.click(radio(/^Admin/));
-    linkTab();
-    fireEvent.click(screen.getByRole("button", { name: "Generate link" }));
-    await screen.findByLabelText("Invite link");
-    expect(client.createInvitation).toHaveBeenCalledWith("p1", {
-      kind: "link",
-      role: "developer",
-    });
-  });
-
   it("disables Admin for an Admin", () => {
     open("admin");
     expect(radio(/^Admin/).disabled).toBe(true);
-  });
-
-  it("splits a pasted list, drops repeats, and caps it at 10", () => {
-    open("owner");
-    fireEvent.paste(addresses(), {
-      clipboardData: { getData: () => "a@x.com, A@x.com b@x.com" },
-    });
-    expect(screen.getByText("a@x.com")).toBeTruthy();
-    expect(screen.getByText("b@x.com")).toBeTruthy();
-    expect(screen.queryByText("A@x.com")).toBeNull();
-    const many = Array.from({ length: 11 }, (_, i) => `u${i}@x.com`).join(",");
-    fireEvent.paste(addresses(), { clipboardData: { getData: () => many } });
-    expect(screen.getByText("You can add up to 10 addresses.")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(
-      10,
-    );
-  });
-
-  it("reports each address when one of three fails", async () => {
-    client.createInvitation.mockImplementation(
-      async (_id: string, input: { email?: string }) => {
-        if (input.email === "bad") {
-          throw new ProjectClientError(422, "Enter a valid email");
-        }
-        return {
-          invitation: { id: "i1" },
-          link: `https://app/invite/${input.email}`,
-        };
-      },
-    );
-    const onCreated = vi.fn();
-    open("owner", onCreated);
-    typeAddress("a@x.com");
-    typeAddress("bad");
-    typeAddress("c@x.com");
-    fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
-    const list = await screen.findByRole("list", { name: "Invite results" });
-    expect(list.textContent).toContain("Enter a valid email");
-    expect(list.textContent).toContain("Invite created.");
-    expect(
-      screen.getByRole("button", { name: "Copy link for a@x.com" }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Copy link for c@x.com" }),
-    ).toBeTruthy();
-    expect(client.createInvitation).toHaveBeenCalledTimes(3);
-    expect(onCreated).toHaveBeenCalledTimes(1);
-  });
-
-  it("sends the text still in the box", async () => {
-    client.createInvitation.mockResolvedValue({
-      invitation: {},
-      link: "https://app/invite/abc",
-    });
-    open("owner");
-    fireEvent.change(addresses(), { target: { value: "b@x.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
-    await screen.findByRole("list", { name: "Invite results" });
-    expect(client.createInvitation).toHaveBeenCalledWith("p1", {
-      kind: "email",
-      role: "developer",
-      email: "b@x.com",
-    });
-    expect(screen.getByRole("button", { name: "Copy link for b@x.com" })).toBeTruthy();
-  });
-
-  it("does not report onCreated when every address fails", async () => {
-    client.createInvitation.mockRejectedValue(
-      new ProjectClientError(422, "Enter a valid email"),
-    );
-    const onCreated = vi.fn();
-    open("owner", onCreated);
-    typeAddress("bad");
-    fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
-    await screen.findByRole("list", { name: "Invite results" });
-    expect(onCreated).not.toHaveBeenCalled();
   });
 
   it("generates a link with its expiry and can disable it", async () => {

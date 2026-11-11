@@ -116,7 +116,7 @@ const AddMembersDialog = ({
   onClose,
   onCreated,
 }: Props) => {
-  const [tab, setTab] = useState<InviteKind>("email");
+  const [tab, setTab] = useState<InviteKind>("link");
   const [role, setRole] = useState<InviteRole>("developer");
   const [addresses, setAddresses] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
@@ -253,7 +253,6 @@ const AddMembersDialog = ({
           aria-label="Invite method"
           className="flex gap-2 border-b border-surface-variant"
         >
-          {tabButton("email", "Invite by email")}
           {tabButton("link", "Invitation link")}
         </div>
 
