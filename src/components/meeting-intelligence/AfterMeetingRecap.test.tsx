@@ -21,6 +21,11 @@ vi.mock("@clerk/nextjs", () => ({
   useClerk: () => ({ redirectToSignIn: vi.fn() }),
 }));
 
+const runPipeline = vi.fn();
+vi.mock("@/lib/meeting-pipeline-client", () => ({
+  runMeetingPipeline: (id: string) => runPipeline(id),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
@@ -38,12 +43,49 @@ const recap: MeetingRecap = {
   participants: [],
 };
 
+describe("AfterMeetingRecap summary after generate", () => {
+  afterEach(cleanup);
+
+  const stubDownload = (body: object) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => body })),
+    );
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:mock"),
+      revokeObjectURL: vi.fn(),
+    });
+  };
+  const generate = () =>
+    fireEvent.click(
+      screen.getByRole("button", { name: /generate transcript/i }),
+    );
+
+  beforeEach(() => runPipeline.mockReset().mockResolvedValue({ status: "skipped" }));
+
+  it("runs the AI pipeline after a freshly generated transcript", async () => {
+    stubDownload({ status: "ok", transcript: "A: hi", cached: false });
+    render(<AfterMeetingRecap recap={recap} />);
+    generate();
+    await waitFor(() => expect(runPipeline).toHaveBeenCalledWith("meeting_test"));
+  });
+
+  it("does not rerun the pipeline for a cached transcript", async () => {
+    stubDownload({ status: "ok", transcript: "A: hi", cached: true });
+    render(<AfterMeetingRecap recap={recap} />);
+    generate();
+    await screen.findByText("Transcript ready");
+    expect(runPipeline).not.toHaveBeenCalled();
+  });
+});
+
 describe("AfterMeetingRecap transcript language selector", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   afterEach(cleanup);
 
   beforeEach(() => {
+    runPipeline.mockReset().mockResolvedValue({ status: "skipped" });
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (typeof url === "string" && url.includes("/api/transcript/status")) {
         return { ok: true, json: async () => ({ hasInsights: false }) };

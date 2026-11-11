@@ -15,7 +15,6 @@ import {
   newInviteToken,
   parseInviteEmail,
 } from "@/lib/invitations";
-import { emailInvite } from "@/lib/invite-email";
 import { notifyProjectInvitation } from "@/lib/notification-events";
 import {
   type CreateInvitationResponse,
@@ -110,18 +109,6 @@ export async function POST(request: Request, { params }: Params) {
 
     const row = data as InvitationRow;
     const link = inviteLink(token);
-    const emailSent =
-      kind === "email" && email
-        ? await emailInvite(supabase, {
-            projectId: id,
-            invitationId: row.id,
-            actorId: userId,
-            to: email,
-            role,
-            link,
-          })
-        : false;
-
     if (kind === "email" && email) {
       after(() =>
         notifyProjectInvitation(supabase, {
@@ -142,7 +129,6 @@ export async function POST(request: Request, { params }: Params) {
         expiresAt: row.expires_at,
       },
       link,
-      emailSent,
     };
     return NextResponse.json(response, { status: 201 });
   } catch (err) {

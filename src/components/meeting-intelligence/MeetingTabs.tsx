@@ -147,6 +147,12 @@ const MeetingTabs = ({
           <SummaryTab
             insights={insights}
             onRetry={isOwner ? onRetry : undefined}
+            transcriptMissing={!isViewer && !transcriptText?.trim()}
+            recapHref={
+              meeting.streamCallId
+                ? `/after-meeting/${meeting.streamCallId}`
+                : undefined
+            }
           />
         )}
         {!isViewer && active === "Transcript" && <TranscriptTab text={transcriptText} />}

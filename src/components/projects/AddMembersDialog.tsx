@@ -25,8 +25,7 @@ type Props = {
 };
 
 type EmailResult =
-  | { email: string; status: "sent" }
-  | { email: string; status: "not_emailed"; link: string }
+  | { email: string; status: "created"; link: string }
   | { email: string; status: "failed"; message: string };
 
 const MAX_ADDRESSES = 10;
@@ -159,9 +158,7 @@ const AddMembersDialog = ({
         role: effectiveRole,
         email,
       });
-      return res.emailSent
-        ? { email, status: "sent" }
-        : { email, status: "not_emailed", link: res.link };
+      return { email, status: "created", link: res.link };
     } catch (err) {
       return {
         email,
@@ -271,17 +268,12 @@ const AddMembersDialog = ({
                   <span className="break-all text-body-md font-medium text-on-surface">
                     {r.email}
                   </span>
-                  {r.status === "sent" && (
-                    <span className="text-body-md text-on-surface-variant">
-                      Invite sent.
-                    </span>
-                  )}
                   {r.status === "failed" && (
                     <span className="text-body-md text-error">{r.message}</span>
                   )}
-                  {r.status === "not_emailed" && (
+                  {r.status === "created" && (
                     <span className="flex flex-wrap items-center gap-2 text-body-md text-on-surface-variant">
-                      Email not sent, copy the link.
+                      Invite created. Copy the link and send it yourself.
                       <button
                         type="button"
                         aria-label={`Copy link for ${r.email}`}

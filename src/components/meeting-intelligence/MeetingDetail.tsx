@@ -96,7 +96,12 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         body: JSON.stringify({ meetingId, emailNotifications: false }),
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error("summary retry failed");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "summary retry failed");
+      }
       const refreshed = await fetch(`/api/meetings/${meetingId}`, {
         signal: controller.signal,
       });
@@ -104,11 +109,16 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         setData((await refreshed.json()) as MeetingDetailResponse);
       }
       toast.success("Summary regenerated");
-    } catch {
+    } catch (err) {
       if (controller.signal.aborted) {
         toast.error("Summary generation timed out. Please try again.");
       } else {
-        toast.error("Summary generation failed, try again");
+        const reason = err instanceof Error ? err.message : "";
+        toast.error(
+          reason && reason !== "summary retry failed"
+            ? reason
+            : "Summary generation failed, try again",
+        );
       }
       return;
     } finally {

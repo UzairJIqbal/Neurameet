@@ -8,9 +8,11 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { Loader2, Sparkles, Users, Clock, FileText } from "lucide-react";
 import { MeetingRecap } from "@/lib/meeting-recap";
 import toast from "react-hot-toast";
+import { runMeetingPipeline } from "@/lib/meeting-pipeline-client";
 
-// All states the recap "Generate Transcript" button can be in. This is a
-// participant-only, personal .txt download: it NEVER triggers AI. The only
+// All states the recap "Generate Transcript" button can be in. A participant
+// gets a personal .txt download; a caller who can manage the meeting also gets
+// the AI summary created afterwards (see runMeetingPipeline). The only
 // terminal success is "done" (file downloaded). "no_recording" / "too_short" /
 // "failed" are retryable; "pending" means we are waiting on Stream + a background
 // poll to finish, so the button is disabled and the user is told.
@@ -95,6 +97,23 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   // A transcription can outlast the 15s poll interval; this keeps a tick from
   // starting a second /api/transcript/download while one is still running.
   const inFlightRef = useRef(false);
+  const [summarising, setSummarising] = useState(false);
+
+  // Summary, chat indexing and promise matching follow a generated transcript,
+  // for callers who can manage the meeting. Never blocks the download.
+  const createSummary = async () => {
+    setSummarising(true);
+    try {
+      const result = await runMeetingPipeline(recap.id);
+      if (result.status === "processed") {
+        toast.success("Summary created. Open the meeting to read it.");
+      } else if (result.status === "failed") {
+        toast.error(`${result.message}. Open the meeting and press Retry.`);
+      }
+    } finally {
+      setSummarising(false);
+    }
+  };
 
   const stopPoll = () => {
     if (pollRef.current) {
@@ -186,6 +205,7 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
         stopPoll();
         setGen("done");
         toast.success("Transcript downloaded");
+        if (!data.cached) void createSummary();
       } else if (status === "exists") {
         stopPoll();
         setGen("exists");
@@ -542,6 +562,12 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
               <p className="text-body-sm text-on-surface-variant">
                 {noRecordingNote ||
                   "No recording was captured for this meeting. You can still upload a transcript from the Dashboard to get AI summaries and insights."}
+              </p>
+            )}
+            {summarising && (
+              <p className="text-body-sm text-on-surface-variant">
+                Creating the summary, action items and chat index. This can take
+                a minute.
               </p>
             )}
             {gen === "failed" && failReason && (

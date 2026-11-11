@@ -87,7 +87,6 @@ describe("AddMembersDialog", () => {
     client.createInvitation.mockResolvedValue({
       invitation: { id: "i1", expiresAt: "2026-11-14T00:00:00Z" },
       link: "https://app/invite/abc",
-      emailSent: false,
     });
     open("owner");
     fireEvent.click(radio(/^Admin/));
@@ -130,7 +129,6 @@ describe("AddMembersDialog", () => {
         return {
           invitation: { id: "i1" },
           link: `https://app/invite/${input.email}`,
-          emailSent: input.email === "a@x.com",
         };
       },
     );
@@ -141,15 +139,14 @@ describe("AddMembersDialog", () => {
     typeAddress("c@x.com");
     fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
     const list = await screen.findByRole("list", { name: "Invite results" });
-    expect(list.textContent).toContain("Invite sent.");
     expect(list.textContent).toContain("Enter a valid email");
-    expect(list.textContent).toContain("Email not sent, copy the link.");
+    expect(list.textContent).toContain("Invite created.");
+    expect(
+      screen.getByRole("button", { name: "Copy link for a@x.com" }),
+    ).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Copy link for c@x.com" }),
     ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "Copy link for a@x.com" }),
-    ).toBeNull();
     expect(client.createInvitation).toHaveBeenCalledTimes(3);
     expect(onCreated).toHaveBeenCalledTimes(1);
   });
@@ -158,7 +155,6 @@ describe("AddMembersDialog", () => {
     client.createInvitation.mockResolvedValue({
       invitation: {},
       link: "https://app/invite/abc",
-      emailSent: true,
     });
     open("owner");
     fireEvent.change(addresses(), { target: { value: "b@x.com" } });
@@ -169,7 +165,7 @@ describe("AddMembersDialog", () => {
       role: "developer",
       email: "b@x.com",
     });
-    expect(screen.queryByText("Email not sent, copy the link.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy link for b@x.com" })).toBeTruthy();
   });
 
   it("does not report onCreated when every address fails", async () => {
@@ -188,7 +184,6 @@ describe("AddMembersDialog", () => {
     client.createInvitation.mockResolvedValue({
       invitation: { id: "i1", expiresAt: "2026-11-14T00:00:00Z" },
       link: "https://app/invite/abc",
-      emailSent: false,
     });
     client.revokeInvitation.mockResolvedValue({});
     const onCreated = vi.fn();
@@ -243,18 +238,17 @@ describe("InvitesPanel", () => {
     expect(screen.getAllByText(/^Invited by Olivia/)).toHaveLength(2);
   });
 
-  it("shows the new link when Resend could not send the email", async () => {
+  it("shows the new link after a resend", async () => {
     load([invite()]);
     client.resendInvitation.mockResolvedValue({
       link: "https://app/invite/new",
-      emailed: false,
     });
     show();
     fireEvent.click(
       await screen.findByRole("button", { name: "Resend invite to b@x.com" }),
     );
     expect(
-      await screen.findByText(/Email not sent, copy the link/),
+      await screen.findByText(/Copy the link and send it yourself/),
     ).toBeTruthy();
     expect(client.resendInvitation).toHaveBeenCalledWith("p1", "i1");
   });

@@ -233,41 +233,30 @@ export function displayNameFor(user: {
   return local || "Unknown member";
 }
 
-// ---- AC-15: invite email under the workspace budget ----
+// ---- Workspace email budget (W8 event emails) ----
 
 export const WORKSPACE_EMAIL_DAILY_BUDGET = 60;
-export const INVITE_EMAILED_ACTION = "invite.emailed";
 
 const utcDayStart = (now: Date): string =>
   new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   ).toISOString();
 
-/** Emails sent since UTC midnight: invites plus W8 event emails. Null when unreadable. */
+/** Event emails sent since UTC midnight. Null when unreadable. */
 export async function workspaceEmailsSentToday(
   supabase: SupabaseClient,
   now: Date = new Date(),
 ): Promise<number | null> {
   const since = utcDayStart(now);
-  const [invites, events] = await Promise.all([
-    supabase
-      .from("audit_log")
-      .select("id", { count: "exact", head: true })
-      .eq("action", INVITE_EMAILED_ACTION)
-      .gte("created_at", since),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .gte("emailed_at", since),
-  ]);
-  if (invites.error || events.error) {
-    console.error(
-      "[invitations] email budget count failed:",
-      invites.error ?? events.error,
-    );
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .gte("emailed_at", since);
+  if (error) {
+    console.error("[invitations] email budget count failed:", error);
     return null;
   }
-  return (invites.count ?? 0) + (events.count ?? 0);
+  return count ?? 0;
 }
 
 export async function workspaceEmailBudgetLeft(
@@ -276,40 +265,6 @@ export async function workspaceEmailBudgetLeft(
 ): Promise<boolean> {
   const sent = await workspaceEmailsSentToday(supabase, now);
   return sent !== null && sent < WORKSPACE_EMAIL_DAILY_BUDGET;
-}
-
-export type InviteEmailJob = {
-  projectId: string;
-  invitationId: string;
-  actorId: string;
-  send: () => Promise<boolean>;
-};
-
-/** Sends when configured and under budget; a sent email writes invite.emailed. Never throws. */
-export async function sendInviteEmailWithinBudget(
-  supabase: SupabaseClient,
-  configured: boolean,
-  job: InviteEmailJob,
-): Promise<boolean> {
-  if (!configured) return false;
-  try {
-    if (!(await workspaceEmailBudgetLeft(supabase))) return false;
-    const sent = await job.send();
-    if (!sent) return false;
-    const { error } = await supabase.from("audit_log").insert({
-      project_id: job.projectId,
-      actor_id: job.actorId,
-      action: INVITE_EMAILED_ACTION,
-      target_type: "invitation",
-      target_id: job.invitationId,
-      detail: {},
-    });
-    if (error) console.error("[invitations] emailed row write failed:", error);
-    return true;
-  } catch (err) {
-    console.error("[invitations] invite email step failed:", err);
-    return false;
-  }
 }
 
 const UUID_RE =

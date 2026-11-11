@@ -241,13 +241,11 @@ export interface CreateInvitationResponse {
     expiresAt: string;
   };
   link: string;
-  emailSent: boolean;
 }
 
 export interface ResendInvitationResponse {
   /** Shows once. The old link stopped working. */
   link: string;
-  emailed: boolean;
 }
 
 export interface InvitePreview {

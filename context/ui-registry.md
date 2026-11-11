@@ -684,3 +684,5 @@ Fonts: **Inter** (UI, `--font-inter`) + **JetBrains Mono** (mono labels, `--font
 Every new component gets a row here immediately after creation, with the pattern it establishes so the next session reuses it instead of inventing a variant. Run `/imprint` after any new UI component or page.
 
 | `TabbedShowcase` | `src/components/landing/TabbedShowcase.tsx` | Landing pill tabs (Summary, Action Items, Promise Ledger, Verified Minutes) over a lilac mockup card in a `rounded-tray`, `motion` crossfade, off under reduced motion. |
+
+- **AfterMeetingRecap** (2026-11-11): after Generate Transcript, a "Creating the summary, action items and chat index" status line shows while the AI chain runs (managers only). **SummaryTab**: "No transcript yet" empty state with an "Open meeting recap" link. **AddMembersDialog / InvitesPanel**: invite wording is "Copy the link and send it yourself" (no email sending).

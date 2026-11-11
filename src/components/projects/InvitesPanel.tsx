@@ -115,9 +115,8 @@ const InvitesPanel = ({
     setBusyInvite(invite.id);
     setResent(null);
     try {
-      const { link, emailed } = await resendInvitation(projectId, invite.id);
-      if (emailed) toast.success(`Invite sent again to ${invite.email}`);
-      else setResent({ invitationId: invite.id, link });
+      const { link } = await resendInvitation(projectId, invite.id);
+      setResent({ invitationId: invite.id, link });
       reload();
     } catch (err) {
       toast.error(errorText(err, "Failed to resend invite"));
@@ -286,7 +285,7 @@ const InvitesPanel = ({
                 {resent?.invitationId === i.id && (
                   <div className="flex flex-wrap items-center gap-2 rounded-lg bg-warning-container p-3 text-body-md text-on-warning-container">
                     <span>
-                      Email not sent, copy the link. It shows only once.
+                      Copy the link and send it yourself. It shows only once.
                     </span>
                     <button
                       type="button"

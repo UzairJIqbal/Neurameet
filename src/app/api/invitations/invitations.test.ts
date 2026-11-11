@@ -138,7 +138,7 @@ describe("POST /api/projects/[id]/invitations", () => {
     );
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.emailSent).toBe(false);
+    expect(body.emailSent).toBeUndefined();
     expect(body.invitation).toEqual({
       id: INV,
       kind: "email",
@@ -217,61 +217,6 @@ describe("POST /api/projects/[id]/invitations", () => {
         )
       ).status,
     ).toBe(409);
-  });
-
-  it("sends the email when a workspace sender is set and the budget allows", async () => {
-    vi.stubEnv("RESEND_API_KEY", "key");
-    vi.stubEnv("RESEND_WORKSPACE_FROM", "invites@example.com");
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal("fetch", fetchMock);
-    role("owner");
-    created();
-    queue("audit_log", count(3));
-    queue("projects", ok({ name: "Core" }));
-    const res = await createInvite(
-      post({ kind: "email", email: "b@x.com", role: "developer" }),
-      idParams,
-    );
-    expect((await res.json()).emailSent).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const emailed = callsOf("audit_log", "insert")[0].args[0];
-    expect(emailed).toMatchObject({
-      action: "invite.emailed",
-      target_id: INV,
-      detail: {},
-    });
-  });
-
-  it("skips the email when the day's budget is spent", async () => {
-    vi.stubEnv("RESEND_API_KEY", "key");
-    vi.stubEnv("RESEND_WORKSPACE_FROM", "invites@example.com");
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    role("owner");
-    created();
-    queue("audit_log", count(60));
-    const res = await createInvite(
-      post({ kind: "email", email: "b@x.com", role: "developer" }),
-      idParams,
-    );
-    expect(res.status).toBe(201);
-    expect((await res.json()).emailSent).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("never emails without RESEND_WORKSPACE_FROM", async () => {
-    vi.stubEnv("RESEND_API_KEY", "key");
-    vi.stubEnv("RESEND_WORKSPACE_FROM", "");
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    role("owner");
-    created();
-    const res = await createInvite(
-      post({ kind: "email", email: "b@x.com", role: "developer" }),
-      idParams,
-    );
-    expect((await res.json()).emailSent).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

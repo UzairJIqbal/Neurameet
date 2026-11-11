@@ -2,17 +2,46 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { ListChecks, Lightbulb, Inbox } from "lucide-react";
 import { MeetingInsights } from "@/lib/meeting-types";
 
 const SummaryTab = ({
   insights,
   onRetry,
+  transcriptMissing = false,
+  recapHref,
 }: {
   insights: MeetingInsights | null;
   onRetry?: () => void;
+  transcriptMissing?: boolean;
+  recapHref?: string;
 }) => {
   const [retrying, setRetrying] = useState(false);
+
+  // No transcript means a retry can never succeed: point to where one is made.
+  if (!insights?.summary && transcriptMissing) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-surface-variant bg-surface-container-lowest px-6 py-16 text-center">
+        <Inbox className="h-10 w-10 text-on-surface-variant" />
+        <p className="text-body-lg text-on-surface-variant">
+          No transcript yet, so there is nothing to summarise.
+        </p>
+        <p className="max-w-md text-body-md text-on-surface-variant">
+          Generate the transcript from the meeting recap, then come back and
+          create the summary.
+        </p>
+        {recapHref && (
+          <Link
+            href={recapHref}
+            className="inline-flex w-fit items-center gap-2 rounded-full border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10"
+          >
+            Open meeting recap
+          </Link>
+        )}
+      </div>
+    );
+  }
 
   if (!insights?.summary) {
     return (

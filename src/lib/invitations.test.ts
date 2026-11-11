@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -159,6 +159,13 @@ describe("resolveInviteState (AC-19)", () => {
 });
 
 describe("loadInviteByToken", () => {
+  // The fixture invite expires 2026-11-10, so pin the clock to NOW.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
   it("looks up by hash, never by token", async () => {
     queue("project_invitations", ok(invite()));
     queue("projects", ok({ name: "Core" }));

@@ -14,7 +14,6 @@ import {
   isUuid,
   newInviteToken,
 } from "@/lib/invitations";
-import { emailInvite } from "@/lib/invite-email";
 import type {
   InviteKind,
   InviteRole,
@@ -118,15 +117,7 @@ export async function POST(_request: Request, { params }: Params) {
     if (auditError) console.error("[invitations] audit failed:", auditError);
 
     const link = inviteLink(token);
-    const emailed = await emailInvite(supabase, {
-      projectId: id,
-      invitationId: row.id,
-      actorId: userId,
-      to: row.email,
-      role: row.role,
-      link,
-    });
-    const response: ResendInvitationResponse = { link, emailed };
+    const response: ResendInvitationResponse = { link };
     return NextResponse.json(response);
   } catch (err) {
     const denied = accessErrorResponse(err);

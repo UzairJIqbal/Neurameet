@@ -228,6 +228,30 @@ describe("Meeting Details tabs (spec 0004 AC-70v, AC-70w)", () => {
     expect(screen.queryByRole("button", { name: "Transcript" })).toBeNull();
   });
 
+  it("AI Summary tab with no transcript points to the recap instead of Retry", () => {
+    stubFetch();
+    render(
+      <MeetingTabs
+        {...baseProps}
+        meeting={{ streamCallId: "call1" } as unknown as MeetingDetailData}
+        transcriptText={null}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI Summary" }));
+    expect(screen.getByText(/No transcript yet/)).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Open meeting recap" }).getAttribute("href"),
+    ).toBe("/after-meeting/call1");
+    expect(screen.queryByRole("button", { name: "Retry summary generation" })).toBeNull();
+  });
+
+  it("AI Summary tab keeps Retry when a transcript exists but the summary is missing", () => {
+    stubFetch();
+    render(<MeetingTabs {...baseProps} transcriptText="Ali: hello" />);
+    fireEvent.click(screen.getByRole("button", { name: "AI Summary" }));
+    expect(screen.getByRole("button", { name: "Retry summary generation" })).toBeTruthy();
+  });
+
   it("shows the transcript text on its tab", async () => {
     stubFetch();
     render(<MeetingTabs {...baseProps} transcriptText="Ali: hello" />);

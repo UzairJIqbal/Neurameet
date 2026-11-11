@@ -838,7 +838,7 @@ GitHub moves (rules in [0004-github.md](0004-github.md)): a linked draft PR move
 | /api/tasks/[id]/comments/[commentId] | DELETE | | ok | author, or owner or admin | 403, 404 |
 | /api/tasks/[id]/commits | GET | | PR linked commits read on click, never stored | developer+ | 403 viewer, 502 |
 | /api/proposals/[id]/review (extended) | POST | adds priority? | as before | owner, admin | 422 |
-| /api/projects/[id]/invitations/[invitationId]/resend | POST | | link (once), emailed | owner, admin | 404, 410, 422 link kind |
+| /api/projects/[id]/invitations/[invitationId]/resend | POST | | link (once) | owner, admin | 404, 410, 422 link kind |
 | /api/invitations/preview (extended) | GET | token | adds inviter, details, counts, createdAt, invitedAt, repoName?, team?, invitationId? | signed in | 410, 429 |
 | /api/invitations/mine | GET | | active email invites for your verified email | signed in | |
 | /api/invitations/mine/[id] | POST | decision | status, projectId | signed in, matching email | 404, 410, 422 |
