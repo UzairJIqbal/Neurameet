@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   // ENOENT. Keep both packages external so require() resolves the real binary
   // from node_modules at runtime (local dev and Vercel alike).
   serverExternalPackages: ["ffmpeg-static", "fluent-ffmpeg"],
+  // The tracer only follows require() calls, so it copies ffmpeg-static's
+  // index.js but not the `ffmpeg` binary next to it. Without the binary the
+  // deployed function cannot spawn ffmpeg and every recording fails to convert.
+  outputFileTracingIncludes: {
+    "/api/transcript/download": ["./node_modules/ffmpeg-static/ffmpeg"],
+  },
   eslint: {
     // Pre-existing ESLint flat-config hang in this project (env-only, not app
     // code). Per project decision, skip lint during build; rely on `tsc --noEmit`
