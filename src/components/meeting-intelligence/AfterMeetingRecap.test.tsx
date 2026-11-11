@@ -34,7 +34,7 @@ const recap: MeetingRecap = {
   id: "meeting_test",
   title: "Test Meeting",
   description: "",
-  status: "ended",
+  status: "active",
   startedAt: null,
   endedAt: null,
   streamCallId: "call_test",
@@ -70,12 +70,48 @@ describe("AfterMeetingRecap summary after generate", () => {
     await waitFor(() => expect(runPipeline).toHaveBeenCalledWith("meeting_test"));
   });
 
-  it("does not rerun the pipeline for a cached transcript", async () => {
+  it("still asks the pipeline for a cached transcript (it skips when a summary exists)", async () => {
     stubDownload({ status: "ok", transcript: "A: hi", cached: true });
     render(<AfterMeetingRecap recap={recap} />);
     generate();
-    await screen.findByText("Transcript ready");
+    await waitFor(() => expect(runPipeline).toHaveBeenCalledWith("meeting_test"));
+  });
+});
+
+describe("AfterMeetingRecap starts by itself after the call ended", () => {
+  afterEach(cleanup);
+  beforeEach(() => runPipeline.mockReset().mockResolvedValue({ status: "skipped" }));
+  const ended: MeetingRecap = { ...recap, status: "ended" };
+
+  it("generates and runs the pipeline with no click, without saving a file", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "ok", transcript: "A: hi", cached: false }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const createUrl = vi.fn(() => "blob:mock");
+    vi.stubGlobal("URL", { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
+    render(<AfterMeetingRecap recap={ended} />);
+    await waitFor(() => expect(runPipeline).toHaveBeenCalledWith("meeting_test"));
+    expect(createUrl).not.toHaveBeenCalled();
+  });
+
+  it("stays idle when the caller may not generate (403)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 403, json: async () => ({ error: "Not authorized" }) })),
+    );
+    render(<AfterMeetingRecap recap={ended} />);
+    await screen.findByRole("button", { name: /generate transcript/i });
     expect(runPipeline).not.toHaveBeenCalled();
+  });
+
+  it("does not start while the meeting is still active", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AfterMeetingRecap recap={recap} />);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

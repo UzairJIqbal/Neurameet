@@ -98,6 +98,10 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   // starting a second /api/transcript/download while one is still running.
   const inFlightRef = useRef(false);
   const [summarising, setSummarising] = useState(false);
+  // An automatic run (page opened after the call) never saves a file or toasts
+  // errors the viewer did not ask for; a button click turns this off.
+  const silentRef = useRef(false);
+  const autoStartedRef = useRef(false);
 
   // Summary, chat indexing and promise matching follow a generated transcript,
   // for callers who can manage the meeting. Never blocks the download.
@@ -125,6 +129,17 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   useEffect(() => {
     return () => stopPoll();
   }, []);
+
+  // A finished call needs no click: start the transcript, summary and project
+  // review items on arrival. Callers who cannot generate get a 403 and stay idle.
+  useEffect(() => {
+    if (!isSignedIn || autoStartedRef.current) return;
+    if (recap.status !== "ended") return;
+    autoStartedRef.current = true;
+    silentRef.current = true;
+    void executeDownload(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, recap.status]);
 
   // When Stream hasn't finalized recordings yet, poll the download endpoint and
   // auto-retry once the transcript is ready. Capped at NO_RECORDING_POLL_CAP ticks
@@ -189,10 +204,22 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
         }),
         signal: controller.signal,
       });
+      if (res.status === 403 && silentRef.current) {
+        stopPoll();
+        setGen("idle");
+        return;
+      }
       const data = await res.json();
       const status = data?.status;
       if (status === "ok") {
         const text = data.transcript ?? "";
+        if (silentRef.current) {
+          stopPoll();
+          setGen("done");
+          toast.success("Transcript ready");
+          void createSummary();
+          return;
+        }
         const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -205,7 +232,7 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
         stopPoll();
         setGen("done");
         toast.success("Transcript downloaded");
-        if (!data.cached) void createSummary();
+        void createSummary();
       } else if (status === "exists") {
         stopPoll();
         setGen("exists");
@@ -265,7 +292,10 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
     }
   };
 
-  const handleGenerate = () => executeDownload(false);
+  const handleGenerate = () => {
+    silentRef.current = false;
+    return executeDownload(false);
+  };
 
   const genDisabled =
     gen === "generating" ||

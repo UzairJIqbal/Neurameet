@@ -473,6 +473,12 @@ async function transcribeWithRetry(
   throw lastErr;
 }
 
+/** ffmpeg refuses a recording that has no audio stream (mic never on). */
+export function isNoAudioStreamError(err: unknown): boolean {
+  const text = err instanceof Error ? err.message : String(err);
+  return /does not contain any stream|matches no streams|no audio/i.test(text);
+}
+
 type PreparedAudio = { chunks: Uint8Array[]; pieces: Piece[] };
 
 /**
@@ -499,7 +505,9 @@ async function prepareAudio(
         .outputOptions(["-vn", "-ar", "16000", "-ac", "1"])
         .output(fullPath)
         .on("end", () => resolve())
-        .on("error", (err) => reject(err))
+        .on("error", (err, _stdout, stderr) =>
+          reject(new Error(`${err.message} ${stderr ?? ""}`.trim())),
+        )
         .run();
     });
 
@@ -566,6 +574,8 @@ async function processTrack(
     try {
       prepared = await prepareAudio(inputBuf, SEGMENT_SECONDS);
     } catch (err) {
+      // A track with no audio stream means the person never spoke: silent, not broken.
+      if (isNoAudioStreamError(err)) return { kind: "silent" };
       console.error("[transcript-generation] ffmpeg conversion failed:", err);
       return { kind: "error", reason: "A recording could not be converted." };
     }

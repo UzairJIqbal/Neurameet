@@ -1,45 +1,47 @@
-# Memory — NeuraMeet: GitHub connect fixed on production, tester check pending
+# Memory — Invite email removal, post-transcript AI pipeline (on top of F10)
 
-Last updated: 2026-11-08
+Last updated: 2026-11-11
 
-## What was built (whole project state)
+## What was built
 
-Everything through Phase W is built and pushed to main (Core, Advanced, Meeting Experience, Transcript Generation, Promise Ledger, Live Ledger, Tasdeeq T1 to T5, Phase W W-pre to W9) and deployed at https://neurameet.vercel.app. UI polish pass is done (token only, see `docs/ui-audit/`). No repo files were changed this session; all fixes were GitHub and Vercel settings.
+Commit `772332b` (pushed to main, both production builds Ready on Vercel: `neurameet-4182nwnoq` from the push, `neurameet-3kiv8msdv` from `vercel --prod`):
 
-Also done this session: the FYP briefing PDFs for the user's friend, in `~/Desktop/neurameet-fyp-pack/` (`NeuraMeet-FYP-Briefing-Part1.pdf`, `Part2.pdf`), and an explanation of adding the friend as a GitHub collaborator.
+- Invite email removed: deleted `src/lib/invite-email.ts`, `sendProjectInviteEmail`, the invite email budget and `invite.emailed` audit code. Create and resend invitation responses now carry only `{ link }`. `AddMembersDialog` and `InvitesPanel` say "Copy the link and send it yourself". Spec 0004 AC-15 updated. Kept: in-app invite notification, and the W8 notification and digest emails (still gated on `RESEND_WORKSPACE_FROM`).
+- Blank tabs after Generate Transcript: new `src/lib/meeting-pipeline-client.ts` (`runMeetingPipeline`: checks manage access and missing summary via `GET /api/meetings/[id]`, then `/api/ai/process`, `/api/ai/embed`, `requestLedgerMatch`). `AfterMeetingRecap.tsx` runs it after a fresh (not cached) generated transcript and shows a "Creating the summary" line. Never blocks the .txt download.
+- No-transcript summary tab: `SummaryTab` shows "No transcript yet" with an "Open meeting recap" link instead of a useless Retry; `MeetingDetail.retrySummary` surfaces the server error text.
+- `src/lib/invitations.test.ts`: pinned the clock (fixture invite had expired).
+- Plans: `prompts/fix-no-transcript-summary-state.md`, `prompts/fix-blank-insights-after-generate-transcript.md`.
+
+Earlier F10 work (commit `f88d29a`): silence stripping, `whisper-large-v3`, in-flight lock, auto-on individual recording, honest recap states. See progress tracker.
 
 ## Decisions made
 
-- Projects, roles and invites live in our own Supabase tables, not Clerk Organizations. Locked Stitch tokens stay.
-- Zero cost rule everywhere (Gemini, Groq, pgvector, Stream free, Clerk free, Supabase, Vercel Hobby, Resend free, GitHub App).
-- Production uses ONE GitHub App: "NeuraMeet local x072s" (slug `neurameet-local-x072s`, app id 5665093, now public). Its client id, client secret, app id, private key and webhook secret must all belong to this same app. The other app "NeuraMeet Dev UzairJIqbal" (slug `neurameet-dev-uzairjiqbal`, app id 5629534) is also public but unused in production.
-- Commit and push straight to main, no branches or PRs (ask first). Commit trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+- Invites are copy-link only; no invite email, no Resend invite sending.
+- The AI chain after Generate Transcript runs client-side from the recap page (no server `after()` change). Server-side auto-run was left as a separate decision.
+- The "Invite by email" tab in the invite dialog was kept: it creates an invite bound to that email address, copy the link. Not renamed.
+- Supabase project NeuraMeet (`lsjiwxohfpzdvenbxpeu`) is the app DB. Commit trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Push straight to main.
+- F10: option A auto-on recording, `whisper-large-v3`, Groq free limits 20 req/min and 7,200 audio s/hour.
 
 ## Problems solved
 
-- Tester saw a GitHub 404 on `github.com/login/oauth/authorize?client_id=...`. Cause: the client id in the link belongs to the x072s app, which was private, and GitHub shows a 404 to non owners of a private app. The slug env vars pointed at the other app, so making that one public changed nothing. Fix: made x072s public, set Vercel `NEXT_PUBLIC_GITHUB_APP_SLUG` and `GITHUB_APP_SLUG` to `neurameet-local-x072s`, redeployed. Anonymous check: `curl https://api.github.com/apps/<slug>` returns 200 when public, 404 when private.
-- Webhook returned 401 "Bad signature" on pings. Cause: `GITHUB_WEBHOOK_SECRET` was missing from `.env.local` and the Vercel and GitHub values did not match. Fix: generated a new random secret, set the same value in the app's webhook settings and in Vercel production, redeployed. A signed test ping returned 202.
-- After the secret fix the app still sent no `pull_request` events until "Pull request" was ticked under Permissions and events and the new permissions were accepted. Then `pull_request.synchronize` delivered green.
-- Redelivering an old failed delivery replays the old signature, so it keeps failing. Test with a fresh event instead.
-- Vercel sensitive env vars cannot be read back (`vercel env pull` shows "[SENSITIVE]"). NEXT_PUBLIC vars and any env change need a redeploy. The auto mode classifier blocked my own `vercel env rm/add` and `vercel --prod`, so the user ran them.
-- Never paste secrets in chat or memory; the webhook secret was passed through the clipboard and a scratchpad file that was deleted.
+- Root cause of blank Summary/Overview: `/api/transcript/download` only stores the transcript and never runs AI.
+- "Email not sent" in the invite dialog was `RESEND_WORKSPACE_FROM` unset in production, now moot.
+- `vercel --prod --yes` prints little here; confirm with `vercel ls --prod` (shows status).
+- macOS BSD `sed -i` needs `''`; `npm run lint` shows about 880 baseline prettier errors.
 
 ## Current state
 
-GitHub connect on production works: "Reconnect GitHub" gave a success popup, the repo `UzairJIqbal/neurameet-w8-test` is linked to the project `NM_Test_3`, and the webhook shows green 202 deliveries. The user is waiting for the tester to retry "Connect GitHub" (no logout needed). The x072s webhook URL is `https://neurameet.vercel.app/api/github/webhook` and correct. Three old red `ping` deliveries remain in the app's history and can be ignored.
-
-Test leftovers in `UzairJIqbal/neurameet-w8-test`: PR #2 "Test webhook" and branch `test-webhook` (I pushed two commits). A local clone sits in the session scratchpad `w8t/`. The user asked to clean up only after the tester checks.
-
-Typecheck clean and 1883 vitest tests passed at the last full run. `npx next lint` has one old prettier error in `src/lib/transcript-state.ts`. Untracked: `reports/tasdeeq-seed-*.json`.
+tsc clean, full vitest 1912 passing, build passes, deployed. NOT verified live: that the tabs now fill after Generate Transcript, and the F10 two-account bilingual call. Why meeting `77caf6f9` had no transcript is unknown (probably never recorded or generated).
 
 ## Next session starts with
 
-1. Ask how the tester's "Connect GitHub" went. If it still fails, get the exact URL or screenshot.
-2. When the user says go, close PR #2 and delete the `test-webhook` branch in `neurameet-w8-test` (`gh pr close 2 --delete-branch`).
-3. Then the owed live checks on the deployment: W2 to W6 manual tests, LL5, Tasdeeq live run, W9 live injection probe, AC-83 bilingual run, and the unverified `requested_reviewer.id` webhook payload. Optional: set `RESEND_FROM` and `RESEND_WORKSPACE_FROM` in Vercel.
+1. Ask the user how the live test went: Generate Transcript as owner, then Overview, AI Summary, Action Items, Category and AI Chat should all be filled. Also the non-owner path (download only, no summary).
+2. If tracks are missing, check Stream recording settings first (the stream-react skill calls auto recording a paid feature, but the F0 gate showed it works on this account).
+3. Owed live checks: F10 bilingual call, W2 to W6 manual tests, LL5, Tasdeeq live run, W9 injection probe, AC-83 bilingual run, the `requested_reviewer.id` webhook payload, GitHub PR test (PR titled `KEY-1 ...`, Sync now, expect Read 1 and Linked 1).
 
 ## Open questions
 
-- The Google Drive and SurveyMonkey connectors need authorizing in claude.ai connector settings (unavailable until then).
-- D3.4 recording access control stays parked (Stream plan limitation).
-- Not audited: `projects/search`, `github/sync`, `github/summary`, the `ai/chat` project path, invitation list, resend and mine routes.
+- Rename or remove the "Invite by email" tab now that nothing is emailed?
+- Move the post-transcript AI chain server-side so it runs even if the recap page is closed?
+- Visual and accessibility check of the DotTime redesign is still owed. D3.4 recording access control stays parked.
+- Left out of commits: `neurameet-source.zip`, `reports/tasdeeq-seed-*.json`; `scripts/stream-f0-check-recording-modes.mjs` is a throwaway diagnostic.

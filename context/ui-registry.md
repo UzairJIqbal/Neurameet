@@ -686,3 +686,4 @@ Every new component gets a row here immediately after creation, with the pattern
 | `TabbedShowcase` | `src/components/landing/TabbedShowcase.tsx` | Landing pill tabs (Summary, Action Items, Promise Ledger, Verified Minutes) over a lilac mockup card in a `rounded-tray`, `motion` crossfade, off under reduced motion. |
 
 - **AfterMeetingRecap** (2026-11-11): after Generate Transcript, a "Creating the summary, action items and chat index" status line shows while the AI chain runs (managers only). **SummaryTab**: "No transcript yet" empty state with an "Open meeting recap" link. **AddMembersDialog / InvitesPanel**: invite wording is "Copy the link and send it yourself" (no email sending).
+- **AfterMeetingRecap** (2026-11-11): starts transcript, summary and review items by itself once the meeting is `ended` and the viewer is signed in (silent: no .txt download, no error toast for a 403). The Generate Transcript button still downloads the file.

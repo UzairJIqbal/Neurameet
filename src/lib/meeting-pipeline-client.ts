@@ -13,7 +13,7 @@ export type PipelineResult =
 async function postJson(
   url: string,
   body: object,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; status?: number }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), STEP_TIMEOUT_MS);
   try {
@@ -27,7 +27,7 @@ async function postJson(
     const data = (await res.json().catch(() => null)) as {
       error?: string;
     } | null;
-    return { ok: false, error: data?.error };
+    return { ok: false, error: data?.error, status: res.status };
   } catch (err) {
     console.error(`Request to ${url} failed:`, err);
     return { ok: false };
@@ -60,6 +60,8 @@ export async function runMeetingPipeline(
     meetingId,
     emailNotifications,
   });
+  // 403: this caller cannot manage the meeting, so the summary is not theirs to make.
+  if (processed.status === 403) return { status: "skipped" };
   if (!processed.ok) {
     return {
       status: "failed",

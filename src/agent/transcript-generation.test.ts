@@ -22,6 +22,7 @@ import {
   parseStreamUserId,
   WHISPER_DOMAIN_HINT,
   type WhisperSegment,
+  isNoAudioStreamError,
 } from "./transcript-generation";
 import { generateStructuredWithFallback } from "@/agent/models";
 
@@ -506,5 +507,19 @@ describe("mergeSegmentsToTranscript (F-merge: chronological interleave)", () => 
     // concatenation order -> Bob's first line incorrectly precedes Alice's A2.
     const wrong = mergeSegmentsToTranscript([...ownerSegs, ...p2Segs]);
     expect(wrong).toBe("Alice: A1\nBob: B1\nAlice: A2\nBob: B2");
+  });
+});
+
+describe("isNoAudioStreamError", () => {
+  it("recognises ffmpeg's no audio stream failure", () => {
+    expect(
+      isNoAudioStreamError(
+        new Error("ffmpeg exited with code 1: Output file does not contain any stream"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not hide a real conversion failure", () => {
+    expect(isNoAudioStreamError(new Error("Invalid data found when processing input"))).toBe(false);
   });
 });
