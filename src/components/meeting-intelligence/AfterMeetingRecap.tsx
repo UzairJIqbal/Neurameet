@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ModalProvider } from "@/components/ui/animated-modal";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { Loader2, Sparkles, Users, Clock, FileText } from "lucide-react";
@@ -85,6 +86,7 @@ function formatTalk(seconds: number): string {
 const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   const { isSignedIn, user } = useUser();
   const { redirectToSignIn } = useClerk();
+  const router = useRouter();
   const [gen, setGen] = useState<GenState>("idle");
   const [noRecordingTimedOut, setNoRecordingTimedOut] = useState(false);
   // Why we are waiting: Stream still finalizing recordings, or a generation
@@ -129,6 +131,19 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   useEffect(() => {
     return () => stopPoll();
   }, []);
+
+  // The owner lands here a moment before the "ended" stamp is saved, so the page
+  // can render as "active". Re-read it a few times instead of asking for a refresh.
+  useEffect(() => {
+    if (!isSignedIn || recap.status === "ended") return;
+    let tries = 0;
+    const id = setInterval(() => {
+      tries += 1;
+      router.refresh();
+      if (tries >= 10) clearInterval(id);
+    }, 3000);
+    return () => clearInterval(id);
+  }, [isSignedIn, recap.status, router]);
 
   // A finished call needs no click: start the transcript, summary and project
   // review items on arrival. Callers who cannot generate get a 403 and stay idle.

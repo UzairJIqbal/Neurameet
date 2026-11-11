@@ -13,6 +13,7 @@ import {
   compressedDuration,
   describeWhisperFailure,
   extractSpeechAudio,
+  hasRepetitionLoop,
   isLikelyHallucination,
   mapCompressedTime,
   mapWithConcurrency,
@@ -241,4 +242,18 @@ describe("extractSpeechAudio (real ffmpeg)", () => {
       await rm(dir, { recursive: true, force: true });
     }
   }, 30_000);
+});
+
+describe("repetition loops and partial prompt echoes", () => {
+  const hint = "This is a meeting about Neurameet, an AI meeting platform, discussed in English and Urdu.";
+  it("flags a long word repeated three times in a segment", () => {
+    expect(hasRepetitionLoop("tasleemat ke liye tasleemat ke liye tasleemat")).toBe(true);
+    expect(hasRepetitionLoop("we ship the build today and review the build tomorrow")).toBe(false);
+    expect(hasRepetitionLoop("ok ok ok ok ok ok")).toBe(false);
+  });
+  it("drops a partial echo of the hint but keeps real speech", () => {
+    expect(isLikelyHallucination({ start: 0, end: 2, text: "Spell the Neurameet and Urdu." }, hint)).toBe(false);
+    expect(isLikelyHallucination({ start: 0, end: 2, text: "meeting about Neurameet and Urdu." }, hint)).toBe(true);
+    expect(isLikelyHallucination({ start: 0, end: 2, text: "We will finish the login page by Friday." }, hint)).toBe(false);
+  });
 });

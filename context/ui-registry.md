@@ -687,3 +687,4 @@ Every new component gets a row here immediately after creation, with the pattern
 
 - **AfterMeetingRecap** (2026-11-11): after Generate Transcript, a "Creating the summary, action items and chat index" status line shows while the AI chain runs (managers only). **SummaryTab**: "No transcript yet" empty state with an "Open meeting recap" link. **AddMembersDialog / InvitesPanel**: invite wording is "Copy the link and send it yourself" (no email sending).
 - **AfterMeetingRecap** (2026-11-11): starts transcript, summary and review items by itself once the meeting is `ended` and the viewer is signed in (silent: no .txt download, no error toast for a 403). The Generate Transcript button still downloads the file.
+- **MeetingTabs** (2026-11-11): Overview of a project meeting shows a "N tasks waiting for review" banner with a Review tasks button that opens the Action Items tab. **AfterMeetingRecap**: refreshes the page every 3 s (max 10) until the status is `ended`.

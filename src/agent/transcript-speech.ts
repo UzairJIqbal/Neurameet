@@ -127,6 +127,31 @@ export function mapCompressedTime(t: number, pieces: Piece[]): number {
 const normalize = (s: string): string =>
   s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 
+/** Three or more words, all taken from the hint: a partial echo of the prompt. */
+function echoesHint(text: string, hint: string): boolean {
+  const words = text.split(" ");
+  if (words.length < 3) return false;
+  const hintWords = new Set(hint.split(" "));
+  return words.every((w) => hintWords.has(w));
+}
+
+/**
+ * A long word said three or more times in one short segment is Whisper looping
+ * on unclear speech ("tasleemat ke liye tasleemat ke liye tasleemat").
+ */
+export function hasRepetitionLoop(text: string): boolean {
+  const words = text.split(" ").filter(Boolean);
+  if (words.length < 6) return false;
+  const counts = new Map<string, number>();
+  for (const w of words) {
+    if (w.length < 4) continue;
+    const n = (counts.get(w) ?? 0) + 1;
+    if (n >= 3) return true;
+    counts.set(w, n);
+  }
+  return false;
+}
+
 /**
  * Whisper invents text on silence or noise ("Thank you.", the prompt echoed
  * back). Drop a segment when the model itself says it was probably not speech,
@@ -140,6 +165,8 @@ export function isLikelyHallucination(
   if (text.length === 0) return true;
   const h = normalize(hint);
   if (h && text.length >= 12 && (text.includes(h) || h.includes(text))) return true;
+  if (h && echoesHint(text, h)) return true;
+  if (hasRepetitionLoop(text)) return true;
   if (
     (seg.no_speech_prob ?? 0) > 0.6 &&
     (seg.avg_logprob ?? 0) < -1

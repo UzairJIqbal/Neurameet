@@ -92,6 +92,10 @@ const MeetingTabs = ({
     ? actionItems.filter((item) => item.reviewState !== "proposed" && item.reviewState !== "rejected")
     : actionItems;
 
+  const pendingReview = projectId && !isViewer
+    ? actionItems.filter((item) => item.reviewState === "proposed").length
+    : 0;
+
   // Spec 0001 AC-11: the Ledger tab badge. No spinner, so a failure only hides it.
   useEffect(() => {
     if (!ledgerOpen) return;
@@ -133,6 +137,20 @@ const MeetingTabs = ({
       </div>
 
       <div>
+        {active === "Overview" && pendingReview > 0 && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-card bg-surface-container-lowest px-5 py-4 shadow-card">
+            <p className="text-body-md text-on-surface">
+              {pendingReview} task{pendingReview === 1 ? "" : "s"} from this meeting {pendingReview === 1 ? "is" : "are"} waiting for review.
+            </p>
+            <button
+              type="button"
+              onClick={() => setActive("Action Items")}
+              className="rounded-full border border-primary-container px-4 py-2 text-body-md font-semibold text-primary-container transition-colors hover:bg-primary-container/10"
+            >
+              Review tasks
+            </button>
+          </div>
+        )}
         {active === "Overview" && (
           <OverviewTab
             meeting={meeting}

@@ -55,6 +55,7 @@ const TRACK_CONCURRENCY = 2;
 const GENERATION_BUDGET_MS = 250_000;
 // Cleanup batches: keeps every model output well under its token limit.
 const CLEANUP_BATCH_CHARS = 6_000;
+const CLEANUP_CONCURRENCY = 3;
 // Groq Whisper `prompt` (max 224 tokens) biases the spelling of domain proper
 // nouns Whisper otherwise mishears (e.g. "Neurameet" → "Neuromade",
 // "Urdu" → "Urtah"). Sent on every chunk (each chunk is a separate Whisper
@@ -92,7 +93,7 @@ Rules:
 0. TRANSLATION (do this FIRST, before any cleaning): Look at the text of EVERY line. If a line's text is NOT written in English — including but not limited to Devanagari/Hindi script (e.g. "अज़ का मेरा"), Arabic-script Urdu (e.g. "ميرا نام"), or any non-Latin script — you MUST translate it into natural, fluent English. "Cleaning" a line does NOT mean keeping its original script; a line left in Devanagari or Arabic is a failure. The ONLY part you never translate is the speaker label (the text BEFORE the first colon). Preserve every "SpeakerName: text" line and the original chronological order. A line that is already English is kept as-is. Do not summarize while translating. Your final output MUST be entirely in English.
 1. Word-level correction: fix garbled, misheard, or dropped words caused by microphone or poor audio. Do not change the meaning.
 2. Line-level reconstruction: merge consecutive lines from the SAME speaker into a single "SpeakerName: text" line whenever they are part of ONE continuous speech turn. This includes a long monologue that Whisper split into several sentences or clauses, OR a microphone glitch that broke one thought across lines. Join the fragments with a single space. ONLY merge consecutive lines from the SAME speaker. NEVER merge across different speakers. Do NOT merge if the consecutive same-speaker lines are clearly separate, unrelated utterances spoken at different times.
-3. Remove a line ONLY if it is genuinely meaningless noise (for example a stray cough, dead-air caption, or a fragment with no reconstructable content). Do NOT fabricate words for broken lines — if a fragment has no reconstructable meaning, drop it; never invent speech that was not said.
+3. Remove a line ONLY if it is genuinely meaningless noise (for example a stray cough, dead-air caption, or a fragment with no reconstructable content). Do NOT fabricate words for broken lines — if a fragment has no reconstructable meaning (garbled, looping, repeated phrases, or text that makes no sense in a meeting), DROP the whole line rather than translating or guessing it; never invent speech that was not said, never add names, organisations or facts that are not in the line.
 4. NEVER summarize. NEVER remove real content. NEVER alter speaker names or labels. Keep the exact "SpeakerName: text" format, the original chronological order, and the speaker sequence.
 5. Output the COMPLETE cleaned transcript in English. Do not omit any speaker or any real line. Preserve every real word.
 
@@ -169,11 +170,21 @@ const CLEANUP_PRIMARY_TIMEOUT_MS = 90_000;
  */
 export async function cleanupTranscript(raw: string): Promise<string> {
   const batches = batchTranscriptLines(raw, CLEANUP_BATCH_CHARS);
-  const out: string[] = [];
-  for (const batch of batches) {
-    const cleaned = await cleanupBatch(batch);
-    out.push(speakerLabelsPreserved(batch, cleaned) ? cleaned : batch);
-  }
+  const out: string[] = new Array(batches.length);
+  let next = 0;
+  // Three workers: batches are independent, so a long meeting no longer waits
+  // for each model call in turn. Order is kept by index.
+  const worker = async (): Promise<void> => {
+    while (next < batches.length) {
+      const i = next++;
+      const batch = batches[i];
+      const cleaned = await cleanupBatch(batch);
+      out[i] = speakerLabelsPreserved(batch, cleaned) ? cleaned : batch;
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(CLEANUP_CONCURRENCY, batches.length) }, worker),
+  );
   return out.join("\n");
 }
 
@@ -423,6 +434,9 @@ async function transcribeChunk(
   );
   form.append("model", WHISPER_MODEL);
   form.append("response_format", "verbose_json");
+  // Greedy decoding: no random temperature fallback, which is what makes
+  // Whisper drift into fluent but unrelated sentences on unclear audio.
+  form.append("temperature", "0");
   // F9: do NOT force a language (auto-detect keeps Urdu as Urdu; the cleanup
   // pass translates). An explicit hint still wins.
   if (language && language.trim()) {
@@ -430,9 +444,9 @@ async function transcribeChunk(
   }
   // NOTE: Groq's Whisper API does NOT accept `timestamp_granularities`
   // (400 "unknown param"). verbose_json already returns per-segment times.
-  // The spelling hint goes on the FIRST chunk only: on later chunks (and on
-  // silence) Whisper tends to echo the prompt back as if it were speech.
-  if (index === 0) form.append("prompt", WHISPER_DOMAIN_HINT);
+  // No `prompt`: a spelling hint made Whisper read it back as speech
+  // ("Spell the Neurameet and Urdu.") on quiet or short audio. The hint stays
+  // exported only so the hallucination filter can still catch an echo.
 
   const res = await fetch(GROQ_TRANSCRIBE_URL, {
     method: "POST",

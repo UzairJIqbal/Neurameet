@@ -27,7 +27,7 @@ vi.mock("@/lib/meeting-pipeline-client", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 const recap: MeetingRecap = {
