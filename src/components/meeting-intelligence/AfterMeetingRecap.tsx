@@ -119,6 +119,9 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
     } finally {
       setSummarising(false);
     }
+    // A project meeting lands straight on the project's Tasks tab, where the
+    // new task proposals wait for review.
+    if (recap.projectId) router.push(`/projects/${recap.projectId}?tab=tasks`);
   };
 
   const stopPoll = () => {
@@ -584,10 +587,14 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
                 {genLabel}
               </button>
               <Link
-                href="/dashboard"
+                href={
+                  recap.projectId
+                    ? `/projects/${recap.projectId}?tab=tasks`
+                    : "/dashboard"
+                }
                 className="inline-flex w-fit items-center justify-center gap-2 rounded-card bg-surface-container-lowest shadow-card px-4 py-2 text-body-md font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
               >
-                Go back to Dashboard
+                {recap.projectId ? "Go to Project" : "Go back to Dashboard"}
               </Link>
             </div>
             {gen === "generating" && (

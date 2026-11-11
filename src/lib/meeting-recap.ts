@@ -18,6 +18,7 @@ export interface MeetingRecap {
   endedAt: string | null;
   createdAt: string;
   user_id: string;
+  projectId?: string | null;
   participants: RecapParticipant[];
 }
 
@@ -53,7 +54,7 @@ export async function getMeetingRecap(id: string): Promise<MeetingRecap | null> 
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
     .select(
-      "id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, stream_call_type",
+      "id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, stream_call_type, project_id",
     )
     .eq("stream_call_id", id)
     .single();
@@ -110,6 +111,7 @@ export async function getMeetingRecap(id: string): Promise<MeetingRecap | null> 
     endedAt: meeting.ended_at,
     createdAt: meeting.created_at,
     user_id: meeting.user_id,
+    projectId: (meeting.project_id as string | null) ?? null,
     // The recap page is public (anyone with the link), so attendee emails never
     // leave the server here; names and times are enough for the recap.
     participants: participants.map((p) => ({ ...p, email: null })),

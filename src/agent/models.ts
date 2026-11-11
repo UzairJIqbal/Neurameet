@@ -113,6 +113,8 @@ export async function generateStructuredWithFallback<OBJECT>({
       prompt,
       maxRetries: 0,
       abortSignal: AbortSignal.timeout(primaryTimeoutMs),
+      // Extraction does not need hidden reasoning; it only adds seconds.
+      providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
     });
   } catch (error) {
     console.warn("Gemini structured call failed, falling back to Groq:", error);

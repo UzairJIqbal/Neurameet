@@ -91,14 +91,17 @@ describe("generateStructuredWithFallback", () => {
     expect(modelsCalled()).toEqual(["gemini", "groq"]);
   });
 
-  it("gives Groq a token budget and low reasoning, Gemini neither", async () => {
+  it("gives Groq a token budget and low reasoning, Gemini no thinking", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     mockProviders(() => Promise.reject(new Error("quota")));
 
     await generateStructuredWithFallback({ schema, prompt: "p" });
 
     const [gemini, groq] = vi.mocked(generateObject).mock.calls;
-    expect(gemini[0]).not.toHaveProperty("providerOptions");
+    expect(gemini[0]).toMatchObject({
+      providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+    });
+    expect(gemini[0]).not.toHaveProperty("maxOutputTokens");
     expect(groq[0]).toMatchObject({
       maxOutputTokens: FALLBACK_MAX_OUTPUT_TOKENS,
       providerOptions: { groq: { reasoningEffort: "low" } },
