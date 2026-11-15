@@ -9,13 +9,22 @@ import toast from "react-hot-toast";
 import { ConsentNotice } from "@/components/ConsentNotice";
 import { LoadError } from "@/components/ui/load-error";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { useGuestRequests } from "@/hooks/useGuestRequests";
 import { lookupMeetingByCall } from "@/lib/meeting-lookup-client";
 import { CONSENT_NOTICE_VERSION, CONSENT_REQUIRED_MESSAGE } from "@/lib/consent";
 import type { MeetingDetailResponse } from "@/lib/meeting-types";
 
-type ProjectInfo = { projectId: string | null; projectName: string | null };
+type ProjectInfo = {
+  projectId: string | null;
+  projectName: string | null;
+  canManage: boolean;
+};
 
-const NO_PROJECT: ProjectInfo = { projectId: null, projectName: null };
+const NO_PROJECT: ProjectInfo = {
+  projectId: null,
+  projectName: null,
+  canManage: false,
+};
 
 // W3: is this call a project meeting? A missing row or a 404 from the detail
 // route (a personal meeting you have not attended, or a project you are not in)
@@ -36,6 +45,7 @@ async function loadProjectInfo(
   return {
     projectId: data.projectId ?? null,
     projectName: data.projectName ?? null,
+    canManage: data.canManage === true,
   };
 }
 
@@ -87,6 +97,8 @@ const MeetingSetup = ({
 
   const retryInfo = useCallback(() => setRetryNonce((n) => n + 1), []);
   const isProjectMeeting = Boolean(project?.projectId);
+  // G2: the owner sees guest join requests here too, before joining the call.
+  useGuestRequests(call, project?.canManage === true);
 
   const { useCameraState, useMicrophoneState } = useCallStateHooks();
   const { hasBrowserPermission: hasCameraPermission } = useCameraState();

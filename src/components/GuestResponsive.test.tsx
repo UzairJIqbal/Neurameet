@@ -27,10 +27,18 @@ const guestPagePath = join(
   "page.tsx",
 );
 const meetingRoomPath = join(__dirname, "MeetingRoom.tsx");
+// The owner Accept/Deny toast lives in the shared hook (MeetingSetup + MeetingRoom).
+const guestRequestsPath = join(
+  __dirname,
+  "..",
+  "hooks",
+  "useGuestRequests.tsx",
+);
 
 describe("G7 — Responsive token revert guards (source-level)", () => {
   const guestPage = readFileSync(guestPagePath, "utf-8");
   const meetingRoom = readFileSync(meetingRoomPath, "utf-8");
+  const guestRequests = readFileSync(guestRequestsPath, "utf-8");
 
   // G7.1 — NameModal responsive padding
   describe("G7.1 — NameModal responsive padding", () => {
@@ -65,15 +73,15 @@ describe("G7 — Responsive token revert guards (source-level)", () => {
   // G7.3 — Owner's Accept/Deny toast responsive
   describe("G7.3 — Accept/Deny toast responsive", () => {
     it("the toast container has min-w-[260px] sm:min-w-[280px]", () => {
-      expect(meetingRoom).toContain("min-w-[260px] sm:min-w-[280px]");
+      expect(guestRequests).toContain("min-w-[260px] sm:min-w-[280px]");
     });
 
     it("the toast container has max-w-[calc(100vw-2rem)]", () => {
-      expect(meetingRoom).toContain("max-w-[calc(100vw-2rem)]");
+      expect(guestRequests).toContain("max-w-[calc(100vw-2rem)]");
     });
 
     it("the button column has w-[70px] sm:w-[90px]", () => {
-      expect(meetingRoom).toContain("w-[70px] sm:w-[90px]");
+      expect(guestRequests).toContain("w-[70px] sm:w-[90px]");
     });
   });
 
@@ -99,7 +107,9 @@ describe("G7 — Responsive token revert guards (source-level)", () => {
   describe("G7.6 — GuestStreamClientProvider responsive", () => {
     it("the LoadError/LoaderOne wrappers use flex min-h-screen items-center justify-center", () => {
       // The GuestStreamClientProvider uses these exact classes.
-      expect(guestPage).toContain("flex min-h-screen items-center justify-center");
+      expect(guestPage).toContain(
+        "flex min-h-screen items-center justify-center",
+      );
     });
   });
 
