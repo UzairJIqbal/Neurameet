@@ -43,6 +43,15 @@ const {
 });
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/pipeline-steps", () => ({
+  claimPipelineStep: vi.fn(async () => true),
+  markPipelineStep: vi.fn(async () => {}),
+  stepStart: () => new Date().toISOString(),
+}));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: vi.fn(),
+}));
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mockAuth,
   currentUser: vi.fn(),
@@ -65,6 +74,7 @@ vi.mock("@/agent/minutes", async (importOriginal) => {
 });
 
 import { POST } from "./route";
+import { claimPipelineStep } from "@/lib/pipeline-steps";
 
 const RAW = "Sara: We go with Vercel.\nAli: main Friday tak survey bhej dunga";
 
@@ -394,5 +404,18 @@ describe("POST /api/ai/process (Promise Ledger extraction)", () => {
     expect((await call("u1")).status).toBe(409);
     expect(mockWriteLedger).not.toHaveBeenCalled();
     expect(inserts.meeting_insights).toBeUndefined();
+  });
+
+  it("returns 409 while another run holds the process step", async () => {
+    ownedMeeting();
+    vi.mocked(claimPipelineStep).mockResolvedValueOnce(false);
+
+    const res = await call("u1");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Summary is already being created",
+    });
+    expect(mockGenerate).not.toHaveBeenCalled();
   });
 });

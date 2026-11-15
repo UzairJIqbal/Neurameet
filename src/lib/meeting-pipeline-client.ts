@@ -1,13 +1,16 @@
 // Browser side AI chain for a meeting that just got a transcript without going
-// through the upload modal: process, then embed, then promise matching.
+// through the upload modal: process and embed. Promise matching runs on the
+// server once both are done (spec 0005).
 import { readUserPrefs } from "@/lib/user-prefs";
-import { requestLedgerMatch } from "@/lib/ledger-match-client";
 
 const STEP_TIMEOUT_MS = 120000;
+// The process route's answer while another run (webhook, cron) holds the step.
+const PROCESS_BUSY = "Summary is already being created";
 
 export type PipelineResult =
   | { status: "skipped" }
-  | { status: "processed"; embedded: boolean; matched: boolean }
+  | { status: "processed"; embedded: boolean }
+  | { status: "running" }
   | { status: "failed"; message: string };
 
 async function postJson(
@@ -67,6 +70,11 @@ export async function runMeetingPipeline(
     await embedPromise;
     return { status: "skipped" };
   }
+  // Another run is creating the summary; the page keeps watching the status.
+  if (processed.status === 409 && processed.error === PROCESS_BUSY) {
+    await embedPromise;
+    return { status: "running" };
+  }
   if (!processed.ok) {
     await embedPromise;
     return {
@@ -75,6 +83,5 @@ export async function runMeetingPipeline(
     };
   }
   const embedded = (await embedPromise).ok;
-  const matched = embedded ? await requestLedgerMatch(meetingId) : false;
-  return { status: "processed", embedded, matched };
+  return { status: "processed", embedded };
 }

@@ -1,8 +1,8 @@
 /* eslint-disable prettier/prettier */
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { embedAndStore } from "@/agent/embed";
+import { embedMeeting, maybeRunLedgerMatch } from "@/agent/meeting-pipeline";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 
 // True when the caller has an attendance row for the meeting. Guests may have
@@ -81,27 +81,23 @@ export async function POST(request: Request) {
       return denied;
     }
 
-    // Fetch the transcript for this meeting
-    const { data: transcript, error: transcriptError } = await supabase
-      .from("transcripts")
-      .select("raw_text")
-      .eq("meeting_id", meetingId)
-      .single();
-
-    if (transcriptError || !transcript || !transcript.raw_text.trim()) {
-      console.error("Transcript not found:", transcriptError);
+    const outcome = await embedMeeting(supabase, { meetingId, source: "page" });
+    if (outcome.status === "no_transcript") {
       return NextResponse.json(
         { error: "Transcript not found" },
         { status: 404 },
       );
     }
+    if (outcome.status === "busy") {
+      return NextResponse.json(
+        { error: "Chat indexing is already running" },
+        { status: 409 },
+      );
+    }
 
-    const { chunkCount } = await embedAndStore(
-      meetingId,
-      transcript.raw_text,
-    );
+    after(() => maybeRunLedgerMatch(supabase, meetingId, "page"));
 
-    return NextResponse.json({ success: true, chunkCount });
+    return NextResponse.json({ success: true, chunkCount: outcome.chunkCount });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Embedding failed";
     console.error("Embedding error:", err);

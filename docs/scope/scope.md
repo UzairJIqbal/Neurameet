@@ -83,6 +83,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 25 | Project AI assistant with code built citations (W7) | Project Workspace | in-progress |
 | 26 | Workspace shell, personal views, notifications, Ctrl K (W8) | Project Workspace | in-progress |
 | 27 | Workspace verify and security suite (W9) | Project Workspace | built (live runs at Deploy) |
+| 28 | Faster after meeting pipeline: fast Gemini failover, step timings, server ledger match, Stream webhook start, step list | Performance | in-progress |
 | 11 | Deploy and harden | Deploy | planned |
 | 12 | General AI chat page | FYP Polish | done |
 | 13 | Change category write path | FYP Polish | done |
@@ -697,6 +698,23 @@ Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md
 - [ ] Test it: `/test conversations to code`
 - [ ] Review it (fresh model): `/check review conversations to code`
 - [ ] Document it: `/document conversations to code`
+
+## Performance
+
+### 28. Faster after meeting pipeline · in-progress · GA
+The transcript, summary, and action items after a call take too long. Stay free: fail over from a busy Gemini Flash fast, save each step's timing, run the ledger match on the server, start the pipeline from Stream's `call.recording_ready` webhook with the page as fallback, and show a three step list on the after meeting page.
+**Done when:** a live bilingual call reaches the summary without the page driving it, every step's time is in `transcripts.pipeline`, and the page fallback still works with the webhook off.
+Spec: [0005. Faster after meeting pipeline](../specs/0005-faster-after-meeting-pipeline/index.md)
+- [x] Design it (spec)
+- [x] Build it: `/develop faster after meeting pipeline` (built 2026-11-15; Stream dashboard webhook and live bilingual call still owed)
+  - [x] Model chain: Flash, Flash Lite, Groq, 15 s Flash cap, 60 s busy skip (AC-1 to AC-4)
+  - [x] Step timings, process and ledger claims, server ledger match (AC-5, AC-9, AC-13)
+  - [x] Status steps and the three step list on the after meeting page (AC-10, AC-11)
+  - [x] Stream webhook, server pipeline with deadline, cron stuck meeting sweep (AC-6 to AC-8, AC-12)
+- [ ] Verify it: `/check verify faster after meeting pipeline`
+- [ ] Test it: `/test faster after meeting pipeline`
+- [ ] Review it (fresh model): `/check review faster after meeting pipeline`
+- [ ] Document it: `/document faster after meeting pipeline`
 
 ## Deploy
 

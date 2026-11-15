@@ -191,6 +191,7 @@ describe("cleanupTranscript (F8 graceful degradation)", () => {
   it("returns the cleaned transcript when the AI succeeds", async () => {
     vi.mocked(generateStructuredWithFallback).mockResolvedValue({
       object: { cleanedTranscript: "Alice: hello everyone welcome to the meeting\nBob: thanks alice\nAlice: lets start the agenda" },
+      model: "flash",
     });
     const result = await cleanupTranscript(RAW + "\nBob: شکریہ");
     expect(result).toContain("everyone");
@@ -207,6 +208,7 @@ describe("cleanupTranscript (F8 graceful degradation)", () => {
   it("falls back to raw when the cleaned result is truncated (< ratio)", async () => {
     vi.mocked(generateStructuredWithFallback).mockResolvedValue({
       object: { cleanedTranscript: "Alice: hi" }, // far below 60% -> discard
+      model: "flash",
     });
     const result = await cleanupTranscript(RAW);
     expect(result).toBe(RAW);
@@ -215,6 +217,7 @@ describe("cleanupTranscript (F8 graceful degradation)", () => {
   it("falls back to raw when the AI returns an empty cleanedTranscript", async () => {
     vi.mocked(generateStructuredWithFallback).mockResolvedValue({
       object: { cleanedTranscript: "   " },
+      model: "flash",
     });
     const result = await cleanupTranscript(RAW);
     expect(result).toBe(RAW);
@@ -322,6 +325,7 @@ describe("cleanupTranscript (F9: non-English raw becomes English)", () => {
         cleanedTranscript:
           "Uzair: My name is Uzair and this product was built by my friends\nBob: this is already english",
       },
+      model: "flash",
     });
     const result = await cleanupTranscript(RAW_URDU);
     expect(result).toContain("My name is Uzair");
@@ -392,12 +396,14 @@ describe("cleanupTranscript (F9: non-English retry path)", () => {
           cleanedTranscript:
             "Uzair: अज़ का मेरा नव्जायर जवेद है यह मीटिंग है\nBob: this is english",
         },
+        model: "flash",
       })
       .mockResolvedValueOnce({
         object: {
           cleanedTranscript:
             "Uzair: my name is Uzair and this is a meeting\nBob: this is english",
         },
+        model: "flash",
       });
     const result = await cleanupTranscript(RAW);
     expect(result).toContain("my name is Uzair");
@@ -408,8 +414,8 @@ describe("cleanupTranscript (F9: non-English retry path)", () => {
 
   it("falls back to raw when BOTH pass 1 and pass 2 stay non-English", async () => {
     vi.mocked(generateStructuredWithFallback)
-      .mockResolvedValueOnce({ object: { cleanedTranscript: "यह मीटिंग है" } })
-      .mockResolvedValueOnce({ object: { cleanedTranscript: "यह फिर भी हिन्दी है" } });
+      .mockResolvedValueOnce({ object: { cleanedTranscript: "यह मीटिंग है" }, model: "flash" })
+      .mockResolvedValueOnce({ object: { cleanedTranscript: "यह फिर भी हिन्दी है" }, model: "flash" });
     const result = await cleanupTranscript(RAW);
     expect(result).toBe(RAW); // raw is also untranslated, but logged (not silent)
     expect(generateStructuredWithFallback).toHaveBeenCalledTimes(2);

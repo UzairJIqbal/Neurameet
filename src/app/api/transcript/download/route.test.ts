@@ -20,7 +20,10 @@ vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/agent/transcript-generation", () => ({
   generateTranscriptForMeeting: mockGenerate,
 }));
-vi.mock("@/lib/transcript-state", () => ({
+vi.mock("@/lib/transcript-state", async (importOriginal) => ({
+  isNoRecordingFinal: (
+    await importOriginal<typeof import("@/lib/transcript-state")>()
+  ).isNoRecordingFinal,
   setTranscriptState: vi.fn(async () => undefined),
   claimTranscriptGeneration: mockClaim,
   isMissingColumn: () => false,
@@ -130,7 +133,9 @@ describe("POST /api/transcript/download authorization", () => {
       ended_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     };
     mockGenerate.mockResolvedValue({ status: "no_recording", message: "wait" });
-    const body = await (await post({ meetingId: "m1", streamCallId: "call-1" })).json();
+    const body = await (
+      await post({ meetingId: "m1", streamCallId: "call-1" })
+    ).json();
     expect(body.status).toBe("no_recording");
     expect(body.final).toBe(true);
     expect(body.message).toMatch(/not recorded/i);
@@ -145,7 +150,9 @@ describe("POST /api/transcript/download authorization", () => {
       ended_at: new Date().toISOString(),
     };
     mockGenerate.mockResolvedValue({ status: "no_recording", message: "wait" });
-    const body = await (await post({ meetingId: "m1", streamCallId: "call-1" })).json();
+    const body = await (
+      await post({ meetingId: "m1", streamCallId: "call-1" })
+    ).json();
     expect(body.final).toBe(false);
     expect(body.message).toBe("wait");
   });

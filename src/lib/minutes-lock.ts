@@ -20,11 +20,11 @@ export async function minutesReviewStatus(
   return status ?? null;
 }
 
-/** A 409 (or a 500 when the check itself fails) to return, or null when unlocked. */
-export async function assertMinutesUnlocked(
+/** The lock as plain data (409, or 500 when the check fails), or null when unlocked. */
+export async function minutesLockError(
   supabase: SupabaseClient,
   meetingId: string,
-): Promise<NextResponse | null> {
+): Promise<{ status: 409 | 500; error: string } | null> {
   try {
     const status = await minutesReviewStatus(supabase, meetingId);
     if (!status) return null;
@@ -32,12 +32,19 @@ export async function assertMinutesUnlocked(
       status === "open"
         ? "These minutes are under review. Cancel the review on the Minutes tab first."
         : "These minutes are sealed and can't change.";
-    return NextResponse.json({ error }, { status: 409 });
+    return { status: 409, error };
   } catch (err) {
     console.error("[tasdeeq] minutes lock check failed", { meetingId, err });
-    return NextResponse.json(
-      { error: "Could not check the minutes review" },
-      { status: 500 },
-    );
+    return { status: 500, error: "Could not check the minutes review" };
   }
+}
+
+/** A 409 (or a 500 when the check itself fails) to return, or null when unlocked. */
+export async function assertMinutesUnlocked(
+  supabase: SupabaseClient,
+  meetingId: string,
+): Promise<NextResponse | null> {
+  const locked = await minutesLockError(supabase, meetingId);
+  if (!locked) return null;
+  return NextResponse.json({ error: locked.error }, { status: locked.status });
 }

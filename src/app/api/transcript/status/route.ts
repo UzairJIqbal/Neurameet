@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { getTranscriptState } from "@/lib/transcript-state";
+import {
+  getTranscriptState,
+  isNoRecordingFinal,
+  isPendingStale,
+} from "@/lib/transcript-state";
+import { deriveRecapSteps } from "@/lib/pipeline-steps";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 
 const UUID_RE =
@@ -26,6 +31,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = supabaseServer();
+  let endedAt: string | null = null;
 
   // Project meeting: any member may read the status (spec 0004, read); a non
   // member gets 404. Personal meetings stay open to any signed-in caller, as
@@ -33,7 +39,7 @@ export async function GET(request: Request) {
   if (UUID_RE.test(meetingId)) {
     const { data: meeting, error: meetingErr } = await supabase
       .from("meetings")
-      .select("id, user_id, project_id")
+      .select("id, user_id, project_id, ended_at")
       .eq("id", meetingId)
       .maybeSingle();
     if (meetingErr) {
@@ -44,6 +50,7 @@ export async function GET(request: Request) {
       );
     }
     if (meeting) {
+      endedAt = (meeting.ended_at as string | null) ?? null;
       try {
         await checkMeetingAccess(supabase, userId, meeting, "read", {
           personalFallback: async () => true,
@@ -56,10 +63,8 @@ export async function GET(request: Request) {
     }
   }
 
-  const { state, rawText, hasInsights } = await getTranscriptState(
-    supabase,
-    meetingId,
-  );
+  const { state, rawText, hasInsights, updatedAt, pipeline } =
+    await getTranscriptState(supabase, meetingId);
 
   // `ready` from a transcript-text standpoint: there is text and we are not in
   // the middle of (re)generating it. Legacy rows may carry text with a stale
@@ -74,5 +79,14 @@ export async function GET(request: Request) {
     hasInsights,
     // Owner-facing readiness: text + AI insights both present.
     ready: rawTextAvailable && hasInsights,
+    // The after meeting step list (spec 0005). Enum values only.
+    steps: deriveRecapSteps({
+      state,
+      rawTextAvailable,
+      hasInsights,
+      pendingStale: isPendingStale(updatedAt),
+      noRecordingFinal: isNoRecordingFinal(endedAt),
+      pipeline,
+    }),
   });
 }

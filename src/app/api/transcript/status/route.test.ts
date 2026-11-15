@@ -8,6 +8,8 @@ const { mockAuth, mockState } = vi.hoisted(() => ({
     state: "ready",
     rawText: "Ali: hi",
     hasInsights: true,
+    updatedAt: new Date().toISOString(),
+    pipeline: null,
   })),
 }));
 
@@ -17,7 +19,10 @@ vi.mock(
   "@/lib/supabase-server",
   async () => (await import("@/test/supabase-queue-mock")).supabaseServerModule,
 );
-vi.mock("@/lib/transcript-state", () => ({ getTranscriptState: mockState }));
+vi.mock("@/lib/transcript-state", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/transcript-state")>()),
+  getTranscriptState: mockState,
+}));
 
 import { GET } from "./route";
 
@@ -37,6 +42,33 @@ describe("GET /api/transcript/status", () => {
     const res = await get();
     expect(res.status).toBe(200);
     expect((await res.json()).ready).toBe(true);
+  });
+
+  it("returns the step list, enum values only (spec 0005)", async () => {
+    queue("meetings", ok({ id: MEETING, user_id: "u1", project_id: null }));
+    const body = await (await get()).json();
+    expect(body.steps).toEqual({
+      recording: "done",
+      transcript: "done",
+      summary: "done",
+    });
+  });
+
+  it("shows the summary running from the process step", async () => {
+    mockState.mockResolvedValueOnce({
+      state: "ready",
+      rawText: "Ali: hi",
+      hasInsights: false,
+      updatedAt: new Date().toISOString(),
+      pipeline: {
+        steps: {
+          process: { status: "running", startedAt: new Date().toISOString() },
+        },
+      },
+    } as never);
+    const body = await (await get()).json();
+    expect(body.steps.summary).toBe("running");
+    expect(body.ready).toBe(false);
   });
 
   it("answers for an unknown meeting as before", async () => {

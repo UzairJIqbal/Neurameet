@@ -41,6 +41,15 @@ const { store, mockAuth, mockEmbedAndStore, mockSupabase } = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/pipeline-steps", () => ({
+  claimPipelineStep: vi.fn(async () => true),
+  markPipelineStep: vi.fn(async () => {}),
+  stepStart: () => new Date().toISOString(),
+}));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: vi.fn(),
+}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: mockAuth }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: mockSupabase }));
 vi.mock("@/agent/embed", () => ({ embedAndStore: mockEmbedAndStore }));

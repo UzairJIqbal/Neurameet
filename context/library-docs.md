@@ -43,6 +43,8 @@ const issued = Math.round(new Date().getDate() / 1000) - 60;
 const issued = Math.floor(Date.now() / 1000) - 60;
 ```
 
+**Webhooks (spec 0005):** `POST /api/stream/webhook` authenticates with `new StreamClient(key, secret).verifyWebhook(rawBody, x-signature)` only (HMAC SHA-256 over the exact raw bytes; decompress by `content-encoding` first; do not gate on `x-api-key`, per the Stream skill). `call.recording_ready` carries no recording type and arrives once per participant track, so list recordings with `listRecordings` and filter `recording_type === "individual"`, and dedupe with the transcript claim. Do the work in `after()`.
+
 Token generation stays server-only (`"use server"`), never expose `STREAM_SECRET_KEY` to the client. Existing `StreamClientProvider` and call hooks (`useGetCall`, `useGetCallbyId`) stay as-is.
 
 ---

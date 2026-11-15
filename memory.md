@@ -1,47 +1,53 @@
-# Memory — Invite email removal, post-transcript AI pipeline (on top of F10)
+# Memory — Recap speed, project redirect, Team & Tasks tab
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 ## What was built
 
-Commit `772332b` (pushed to main, both production builds Ready on Vercel: `neurameet-4182nwnoq` from the push, `neurameet-3kiv8msdv` from `vercel --prod`):
+All pushed to main (latest `004d1fc`). Last production deploy `neurameet-d880zzgd0` is Ready.
 
-- Invite email removed: deleted `src/lib/invite-email.ts`, `sendProjectInviteEmail`, the invite email budget and `invite.emailed` audit code. Create and resend invitation responses now carry only `{ link }`. `AddMembersDialog` and `InvitesPanel` say "Copy the link and send it yourself". Spec 0004 AC-15 updated. Kept: in-app invite notification, and the W8 notification and digest emails (still gated on `RESEND_WORKSPACE_FROM`).
-- Blank tabs after Generate Transcript: new `src/lib/meeting-pipeline-client.ts` (`runMeetingPipeline`: checks manage access and missing summary via `GET /api/meetings/[id]`, then `/api/ai/process`, `/api/ai/embed`, `requestLedgerMatch`). `AfterMeetingRecap.tsx` runs it after a fresh (not cached) generated transcript and shows a "Creating the summary" line. Never blocks the .txt download.
-- No-transcript summary tab: `SummaryTab` shows "No transcript yet" with an "Open meeting recap" link instead of a useless Retry; `MeetingDetail.retrySummary` surfaces the server error text.
-- `src/lib/invitations.test.ts`: pinned the clock (fixture invite had expired).
-- Plans: `prompts/fix-no-transcript-summary-state.md`, `prompts/fix-blank-insights-after-generate-transcript.md`.
-
-Earlier F10 work (commit `f88d29a`): silence stripping, `whisper-large-v3`, in-flight lock, auto-on individual recording, honest recap states. See progress tracker.
+- Recap speed:
+  - `src/agent/transcript-generation.ts`: `cleanupTranscript` returns the raw text when it is under 1500 chars and has no Urdu or Hindi script (`CLEANUP_SKIP_MAX_CHARS`, `NON_LATIN_SCRIPT`).
+  - `src/lib/meeting-pipeline-client.ts`: `/api/ai/embed` now starts at the same time as `/api/ai/process`, then ledger match runs.
+  - `src/agent/models.ts`: the Gemini structured call sets `thinkingConfig.thinkingBudget: 0`.
+  - `AfterMeetingRecap.tsx`: poll every 5000 ms, `NO_RECORDING_POLL_CAP = 60`.
+- Recap redirect: `getMeetingRecap` (`src/lib/meeting-recap.ts`) returns `projectId`. After the summary is created, a project meeting goes to `/projects/{id}?tab=tasks`. The bottom button reads "Go to Project" for project meetings, otherwise "Go back to Dashboard".
+- `AddMembersDialog.tsx`: the "Invite by email" tab is removed and the dialog opens on the link tab. The email sections are still in the file as dead code. Five email-only tests were deleted from `invites-ui.test.tsx`.
+- `ProjectDetailView.tsx`: the tab label is now "Team & Tasks". The tab id stays `tasks` (`?tab=tasks`).
+- Tests updated: `models.test.ts`, `transcript-generation.test.ts`, `meeting-pipeline-client.test.ts`, `AfterMeetingRecap.test.tsx`.
 
 ## Decisions made
 
-- Invites are copy-link only; no invite email, no Resend invite sending.
-- The AI chain after Generate Transcript runs client-side from the recap page (no server `after()` change). Server-side auto-run was left as a separate decision.
-- The "Invite by email" tab in the invite dialog was kept: it creates an invite bound to that email address, copy the link. Not renamed.
-- Supabase project NeuraMeet (`lsjiwxohfpzdvenbxpeu`) is the app DB. Commit trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Push straight to main.
-- F10: option A auto-on recording, `whisper-large-v3`, Groq free limits 20 req/min and 7,200 audio s/hour.
+- `/api/ai/process` stays one large structured call. It was not split because of the cross-references (`actionItemIndex`, `relatedDecisionIndex`) and the amount of write logic.
+- Invites are link only, with no invite email.
+- Only the project owner links GitHub repos.
 
 ## Problems solved
 
-- Root cause of blank Summary/Overview: `/api/transcript/download` only stores the transcript and never runs AI.
-- "Email not sent" in the invite dialog was `RESEND_WORKSPACE_FROM` unset in production, now moot.
-- `vercel --prod --yes` prints little here; confirm with `vercel ls --prod` (shows status).
-- macOS BSD `sed -i` needs `''`; `npm run lint` shows about 880 baseline prettier errors.
+- Parallelising embed broke 3 pipeline tests and 1 cleanup test. Fixed with URL-based fetch mocks and an Urdu string in the cleanup test input.
+- The Gemini timing script only works when run from the project root.
+- `vercel --prod` was blocked once by the auto classifier. It went through after the user explicitly ordered a deploy.
 
 ## Current state
 
-tsc clean, full vitest 1912 passing, build passes, deployed. NOT verified live: that the tabs now fill after Generate Transcript, and the F10 two-account bilingual call. Why meeting `77caf6f9` had no transcript is unknown (probably never recorded or generated).
+- The code, tests and deploy are done. Recap speed is not verified live. Gemini returned "high demand" and "Headers Timeout" during timing tests. When Gemini fails, the app falls back to Groq, which is slower.
+- It is unconfirmed whether Gemini accepts `thinkingBudget: 0`. A rejection also causes the Groq fallback.
+- `context/progress-tracker.md` and `context/ui-registry.md` have NOT been updated for the project UI changes, the speed work, the redirect, the email-tab removal or the tab rename.
+- GitHub task linking:
+  - Key regex is `\b([A-Z]{2,5})-(\d{1,6})\b`.
+  - `Closes KEY-1` completes the task on merge. One closing word covers one key.
+  - A draft PR sets the task to In Progress, which shows in To Do. Ready for review sets In Review. A merge into the default branch completes it. A revert reopens it.
+  - "Sync now" re-applies the same rules.
+  - Jair and Alisnain have joined via Google. They need collaborator access on the repo on GitHub. This has not been tested live.
 
 ## Next session starts with
 
-1. Ask the user how the live test went: Generate Transcript as owner, then Overview, AI Summary, Action Items, Category and AI Chat should all be filled. Also the non-owner path (download only, no summary).
-2. If tracks are missing, check Stream recording settings first (the stream-react skill calls auto recording a paid feature, but the F0 gate showed it works on this account).
-3. Owed live checks: F10 bilingual call, W2 to W6 manual tests, LL5, Tasdeeq live run, W9 injection probe, AC-83 bilingual run, the `requested_reviewer.id` webhook payload, GitHub PR test (PR titled `KEY-1 ...`, Sync now, expect Read 1 and Linked 1).
+1. Update `context/progress-tracker.md` and `context/ui-registry.md` for the changes above.
+2. Check the Vercel logs for the recap pipeline: does Gemini accept `thinkingBudget: 0`, and how long does `/api/ai/process` take?
+3. Run the live GitHub test: a PR titled `KEY-1 ...` from a member, then Sync now.
 
 ## Open questions
 
-- Rename or remove the "Invite by email" tab now that nothing is emailed?
-- Move the post-transcript AI chain server-side so it runs even if the recap page is closed?
-- Visual and accessibility check of the DotTime redesign is still owed. D3.4 recording access control stays parked.
-- Left out of commits: `neurameet-source.zip`, `reports/tasdeeq-seed-*.json`; `scripts/stream-f0-check-recording-modes.mjs` is a throwaway diagnostic.
+- Should ledger, minutes and dissent extraction move out of the one big `/api/ai/process` call to make it faster?
+- Remove the leftovers: `ProjectSettingsTab.tsx`, `DecisionsTab.tsx` and its test, the email-invite dead code in `AddMembersDialog.tsx`, and the unused `typeAddress` helper in `invites-ui.test.tsx` (lint warning)?
+- Other live checks still owed: F10 bilingual call, W2 to W6 manual tests, LL5, Tasdeeq live run.

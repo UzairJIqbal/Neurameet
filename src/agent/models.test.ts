@@ -1,16 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-vi.mock("@ai-sdk/google", () => ({ google: () => "gemini" }));
+vi.mock("@ai-sdk/google", () => ({ google: (id: string) => id }));
 vi.mock("@ai-sdk/groq", () => ({ groq: () => "groq" }));
 vi.mock("ai", () => ({ generateText: vi.fn(), generateObject: vi.fn() }));
 
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import {
+  DEFAULT_STRUCTURED_TIMEOUT_MS,
   FALLBACK_MAX_OUTPUT_TOKENS,
+  FLASH_BUSY_TTL_MS,
+  FLASH_STRUCTURED_TIMEOUT_MS,
   generateStructuredWithFallback,
-  PRIMARY_STRUCTURED_TIMEOUT_MS,
+  resetFlashBusyForTests,
+  resolveChatModel,
 } from "./models";
+
+const FLASH = "gemini-flash-latest";
+const LITE = "gemini-3.5-flash-lite";
 
 const schema = z.object({ ok: z.boolean() });
 type CallArgs = { model: string; abortSignal?: AbortSignal };
@@ -38,13 +45,18 @@ function useFakeAbortTimeout() {
   });
 }
 
-function mockProviders(gemini: (args: CallArgs) => Promise<unknown>) {
-  vi.mocked(generateObject).mockImplementation(((args: CallArgs) =>
-    args.model === "gemini"
-      ? gemini(args)
-      : Promise.resolve({
-          object: { ok: false },
-        })) as unknown as typeof generateObject);
+// Flash runs `flash`; Lite runs `lite` (fails by default, so the old two
+// step tests still reach Groq); Groq answers { ok: false }.
+function mockProviders(
+  flash: (args: CallArgs) => Promise<unknown>,
+  lite: (args: CallArgs) => Promise<unknown> = () =>
+    Promise.reject(new Error("lite busy")),
+) {
+  vi.mocked(generateObject).mockImplementation(((args: CallArgs) => {
+    if (args.model === FLASH) return flash(args);
+    if (args.model === LITE) return lite(args);
+    return Promise.resolve({ object: { ok: false } });
+  }) as unknown as typeof generateObject);
 }
 
 function modelsCalled(): string[] {
@@ -55,6 +67,7 @@ function modelsCalled(): string[] {
 
 describe("generateStructuredWithFallback", () => {
   afterEach(() => {
+    resetFlashBusyForTests();
     vi.useRealTimers();
     vi.restoreAllMocks();
     vi.mocked(generateObject).mockReset();
@@ -68,15 +81,15 @@ describe("generateStructuredWithFallback", () => {
       prompt: "p",
     });
 
-    expect(result.object).toEqual({ ok: true });
-    expect(modelsCalled()).toEqual(["gemini"]);
+    expect(result).toEqual({ object: { ok: true }, model: "flash" });
+    expect(modelsCalled()).toEqual([FLASH]);
     const [args] = vi.mocked(generateObject).mock.calls[0];
     expect((args as unknown as CallArgs).abortSignal).toBeInstanceOf(
       AbortSignal,
     );
   });
 
-  it("falls back to Groq when Gemini is aborted", async () => {
+  it("falls back to Groq when Flash and Lite fail", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     mockProviders(() =>
       Promise.reject(new DOMException("timed out", "TimeoutError")),
@@ -87,8 +100,8 @@ describe("generateStructuredWithFallback", () => {
       prompt: "p",
     });
 
-    expect(result.object).toEqual({ ok: false });
-    expect(modelsCalled()).toEqual(["gemini", "groq"]);
+    expect(result).toEqual({ object: { ok: false }, model: "groq" });
+    expect(modelsCalled()).toEqual([FLASH, LITE, "groq"]);
   });
 
   it("gives Groq a token budget and low reasoning, Gemini no thinking", async () => {
@@ -97,7 +110,8 @@ describe("generateStructuredWithFallback", () => {
 
     await generateStructuredWithFallback({ schema, prompt: "p" });
 
-    const [gemini, groq] = vi.mocked(generateObject).mock.calls;
+    const [gemini, lite, groq] = vi.mocked(generateObject).mock.calls;
+    expect(lite[0]).not.toHaveProperty("providerOptions");
     expect(gemini[0]).toMatchObject({
       providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
     });
@@ -116,7 +130,7 @@ describe("generateStructuredWithFallback", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     let groqCalls = 0;
     vi.mocked(generateObject).mockImplementation(((args: CallArgs) => {
-      if (args.model === "gemini") return Promise.reject(new Error("quota"));
+      if (args.model !== "groq") return Promise.reject(new Error("quota"));
       groqCalls += 1;
       return groqCalls === 1
         ? Promise.reject(new Error(message))
@@ -129,7 +143,7 @@ describe("generateStructuredWithFallback", () => {
     });
 
     expect(result.object).toEqual({ ok: true });
-    expect(modelsCalled()).toEqual(["gemini", "groq", "groq"]);
+    expect(modelsCalled()).toEqual([FLASH, LITE, "groq", "groq"]);
   });
 
   it("stops after the second Groq JSON failure", async () => {
@@ -141,7 +155,7 @@ describe("generateStructuredWithFallback", () => {
     await expect(
       generateStructuredWithFallback({ schema, prompt: "p" }),
     ).rejects.toThrow("validate JSON");
-    expect(modelsCalled()).toEqual(["gemini", "groq", "groq"]);
+    expect(modelsCalled()).toEqual([FLASH, LITE, "groq", "groq"]);
   });
 
   it("does not try Groq again on other errors", async () => {
@@ -151,38 +165,93 @@ describe("generateStructuredWithFallback", () => {
     await expect(
       generateStructuredWithFallback({ schema, prompt: "p" }),
     ).rejects.toThrow("rate limited");
-    expect(modelsCalled()).toEqual(["gemini", "groq"]);
+    expect(modelsCalled()).toEqual([FLASH, LITE, "groq"]);
   });
 
-  it("aborts a stalled Gemini call after the default limit", async () => {
+  it("aborts a stalled Flash call after 15 s, then Lite answers", async () => {
     useFakeAbortTimeout();
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockProviders(hangUntilAborted);
+    mockProviders(hangUntilAborted, () =>
+      Promise.resolve({ object: { ok: true } }),
+    );
 
     const pending = generateStructuredWithFallback({ schema, prompt: "p" });
-    await vi.advanceTimersByTimeAsync(PRIMARY_STRUCTURED_TIMEOUT_MS - 1);
-    expect(modelsCalled()).toEqual(["gemini"]);
+    await vi.advanceTimersByTimeAsync(FLASH_STRUCTURED_TIMEOUT_MS - 1);
+    expect(modelsCalled()).toEqual([FLASH]);
 
     await vi.advanceTimersByTimeAsync(1);
-    await expect(pending).resolves.toEqual({ object: { ok: false } });
-    expect(modelsCalled()).toEqual(["gemini", "groq"]);
+    await expect(pending).resolves.toEqual({
+      object: { ok: true },
+      model: "lite",
+    });
+    expect(modelsCalled()).toEqual([FLASH, LITE]);
+    const [, lite] = vi.mocked(generateObject).mock.calls;
+    expect(lite[0]).not.toHaveProperty("providerOptions");
+    expect((lite[0] as unknown as CallArgs).abortSignal).toBeInstanceOf(
+      AbortSignal,
+    );
   });
 
-  it("respects a longer primaryTimeoutMs", async () => {
+  it("caps Flash at 15 s even with a longer timeoutMs, and Lite uses it", async () => {
     useFakeAbortTimeout();
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockProviders(hangUntilAborted);
+    mockProviders(hangUntilAborted, hangUntilAborted);
 
     const pending = generateStructuredWithFallback({
       schema,
       prompt: "p",
-      primaryTimeoutMs: 90_000,
+      timeoutMs: 90_000,
     });
-    await vi.advanceTimersByTimeAsync(PRIMARY_STRUCTURED_TIMEOUT_MS);
-    expect(modelsCalled()).toEqual(["gemini"]);
+    await vi.advanceTimersByTimeAsync(FLASH_STRUCTURED_TIMEOUT_MS);
+    expect(modelsCalled()).toEqual([FLASH, LITE]);
 
-    await vi.advanceTimersByTimeAsync(60_000);
-    await expect(pending).resolves.toEqual({ object: { ok: false } });
-    expect(modelsCalled()).toEqual(["gemini", "groq"]);
+    await vi.advanceTimersByTimeAsync(90_000 - 1);
+    expect(modelsCalled()).toEqual([FLASH, LITE]);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toEqual({
+      object: { ok: false },
+      model: "groq",
+    });
+  });
+
+  it("aborts Lite after the default 30 s", async () => {
+    useFakeAbortTimeout();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockProviders(() => Promise.reject(new Error("busy")), hangUntilAborted);
+
+    const pending = generateStructuredWithFallback({ schema, prompt: "p" });
+    await vi.advanceTimersByTimeAsync(DEFAULT_STRUCTURED_TIMEOUT_MS - 1);
+    expect(modelsCalled()).toEqual([FLASH, LITE]);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toMatchObject({ model: "groq" });
+  });
+
+  it("skips Flash for 60 s after a Flash failure", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockProviders(
+      () => Promise.reject(new Error("busy")),
+      () => Promise.resolve({ object: { ok: true } }),
+    );
+
+    await generateStructuredWithFallback({ schema, prompt: "p" });
+    await generateStructuredWithFallback({ schema, prompt: "p" });
+    expect(modelsCalled()).toEqual([FLASH, LITE, LITE]);
+
+    vi.advanceTimersByTime(FLASH_BUSY_TTL_MS);
+    await generateStructuredWithFallback({ schema, prompt: "p" });
+    expect(modelsCalled()).toEqual([FLASH, LITE, LITE, FLASH, LITE]);
+  });
+});
+
+describe("resolveChatModel", () => {
+  it("probes Lite when the Flash probe fails", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(generateText).mockImplementation(((args: { model: string }) =>
+      args.model === FLASH
+        ? Promise.reject(new Error("busy"))
+        : Promise.resolve({ text: "" })) as unknown as typeof generateText);
+
+    await expect(resolveChatModel()).resolves.toBe(LITE);
   });
 });

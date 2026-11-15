@@ -1842,3 +1842,68 @@ alter table task_comments enable row level security;
 -- same as every existing table. Grant to service_role per slice, as 0002 and 0003 do.
 -- Views and functions are not covered by RLS, so each slice also revokes the defaults:
 revoke all on project_activity from anon, authenticated;
+
+-- Spec 0005: faster after meeting pipeline. Per step timings in transcripts.pipeline:
+-- { source: "webhook" | "page" | "cron", steps: { <step>: { status, startedAt, endedAt, ms, model?, reason? } } }
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'transcripts' and column_name = 'pipeline'
+  ) then
+    alter table transcripts add column pipeline jsonb;
+  end if;
+end $$;
+
+-- Writes one step (replacing it whole) and optionally the run source, atomically,
+-- so parallel process and embed writes never overwrite each other. Never creates
+-- the transcripts row.
+create or replace function pipeline_mark(p_meeting uuid, p_step text, p_value jsonb,
+  p_source text default null)
+returns void language plpgsql set search_path = public as $$
+begin
+  update transcripts
+    set pipeline = jsonb_set(
+      coalesce(pipeline, '{}'::jsonb)
+        || jsonb_build_object('steps', coalesce(pipeline->'steps', '{}'::jsonb))
+        || case when p_source is null then '{}'::jsonb
+                else jsonb_build_object('source', p_source) end,
+      array['steps', p_step], p_value, true)
+    where meeting_id = p_meeting;
+end $$;
+
+-- Claims one step: true when this caller may run it. A running step is held
+-- unless it started more than 5 minutes ago (stale). With p_allow_done false a
+-- done step is never claimed again (ledger match runs once per meeting).
+create or replace function claim_pipeline_step(p_meeting uuid, p_step text,
+  p_allow_done boolean default true)
+returns boolean language plpgsql set search_path = public as $$
+declare
+  v_now timestamptz := now();
+  v_count integer;
+begin
+  update transcripts
+    set pipeline = jsonb_set(
+      coalesce(pipeline, '{}'::jsonb)
+        || jsonb_build_object('steps', coalesce(pipeline->'steps', '{}'::jsonb)),
+      array['steps', p_step],
+      jsonb_build_object('status', 'running',
+        'startedAt', to_char(v_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+      true)
+    where meeting_id = p_meeting
+      and (
+        pipeline->'steps'->p_step is null
+        or pipeline->'steps'->p_step->>'status' in ('failed', 'skipped')
+        or (p_allow_done and pipeline->'steps'->p_step->>'status' = 'done')
+        or (pipeline->'steps'->p_step->>'status' = 'running'
+            and (pipeline->'steps'->p_step->>'startedAt')::timestamptz
+                < v_now - interval '5 minutes')
+      );
+  get diagnostics v_count = row_count;
+  return v_count > 0;
+end $$;
+
+revoke execute on function pipeline_mark(uuid, text, jsonb, text) from public, anon, authenticated;
+revoke execute on function claim_pipeline_step(uuid, text, boolean) from public, anon, authenticated;
+grant execute on function pipeline_mark(uuid, text, jsonb, text) to service_role;
+grant execute on function claim_pipeline_step(uuid, text, boolean) to service_role;

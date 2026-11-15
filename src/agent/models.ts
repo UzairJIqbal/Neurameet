@@ -4,6 +4,9 @@ import { generateText, generateObject } from "ai";
 import { z } from "zod";
 
 export const primaryModel = google("gemini-flash-latest");
+// Gemini Flash Lite: same free tier and key, used when Flash is busy. It
+// rejects `thinkingBudget` (400 invalid argument), so it gets no thinkingConfig.
+export const liteModel = google("gemini-3.5-flash-lite");
 // Groq fallback: openai/gpt-oss-20b (20B open-weight reasoning model, free tier).
 // This account's Groq key does NOT expose the older llama-3.x chat models
 // (llama-3.1-8b-instant was retired by Groq; llama-3.3-8b-versatile is absent
@@ -48,10 +51,28 @@ export async function resolveChatModel(): Promise<typeof primaryModel> {
 }
 
 async function probeChatModel(): Promise<typeof primaryModel> {
-  let resolved: typeof primaryModel = primaryModel;
+  let resolved: typeof primaryModel;
+  if (await probeModel("Gemini Flash", primaryModel)) {
+    resolved = primaryModel;
+  } else if (await probeModel("Gemini Flash Lite", liteModel)) {
+    resolved = liteModel;
+  } else {
+    console.warn("Gemini probes failed, using Groq for chat");
+    resolved = fallbackModel as unknown as typeof primaryModel;
+  }
+
+  cachedModel = resolved;
+  cachedModelExpiry = Date.now() + PROBE_CACHE_TTL_MS;
+  return resolved;
+}
+
+async function probeModel(
+  name: string,
+  model: typeof primaryModel,
+): Promise<boolean> {
   try {
     await Promise.race([
-      generateText({ model: primaryModel, prompt: "ping", maxOutputTokens: 1 }),
+      generateText({ model, prompt: "ping", maxOutputTokens: 1 }),
       new Promise<never>((_, reject) =>
         setTimeout(
           () => reject(new Error("provider probe timeout")),
@@ -59,14 +80,11 @@ async function probeChatModel(): Promise<typeof primaryModel> {
         ),
       ),
     ]);
+    return true;
   } catch (err) {
-    console.warn("Gemini probe failed, using Groq for chat:", err);
-    resolved = fallbackModel as unknown as typeof primaryModel;
+    console.warn(`${name} probe failed:`, err);
+    return false;
   }
-
-  cachedModel = resolved;
-  cachedModelExpiry = Date.now() + PROBE_CACHE_TTL_MS;
-  return resolved;
 }
 
 export async function withFallback<T>(
@@ -89,37 +107,67 @@ export async function withFallback<T>(
 // Optional fields would make the Groq fallback 400 with
 // "`required` ... must be supplied ... including every key in properties",
 // which only surfaces when Gemini is down and the call falls back to Groq.
-// Gemini can stall without answering until the 300 s HTTP headers timeout,
-// which outlasts the client's 120 s budget. Abort the primary early so the
-// Groq fallback still answers in time.
-export const PRIMARY_STRUCTURED_TIMEOUT_MS = 30_000;
+// Gemini can stall without answering until the 300 s HTTP headers timeout.
+// Flash is capped short for every caller so a busy Flash costs little; Flash
+// Lite then gets the caller's timeout (30 s by default, longer for cleanup).
+export const FLASH_STRUCTURED_TIMEOUT_MS = 15_000;
+export const DEFAULT_STRUCTURED_TIMEOUT_MS = 30_000;
+
+// After a Flash failure, start at Flash Lite for this long. Module state, so it
+// only helps inside one warm server instance; the short Flash cap bounds what a
+// cold instance loses.
+export const FLASH_BUSY_TTL_MS = 60_000;
+let flashBusyUntil = 0;
+
+export function resetFlashBusyForTests(): void {
+  flashBusyUntil = 0;
+}
+
+export type StructuredModelUsed = "flash" | "lite" | "groq";
 
 export async function generateStructuredWithFallback<OBJECT>({
   schema,
   prompt,
-  primaryTimeoutMs = PRIMARY_STRUCTURED_TIMEOUT_MS,
+  timeoutMs = DEFAULT_STRUCTURED_TIMEOUT_MS,
 }: {
   schema: z.ZodType<OBJECT>;
   prompt: string;
-  primaryTimeoutMs?: number;
-}): Promise<{ object: OBJECT }> {
+  timeoutMs?: number;
+}): Promise<{ object: OBJECT; model: StructuredModelUsed }> {
+  // No retries on Gemini: when it is busy we want the next model at once.
+  if (Date.now() >= flashBusyUntil) {
+    try {
+      const { object } = await generateObject({
+        model: primaryModel,
+        schema,
+        prompt,
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(
+          Math.min(FLASH_STRUCTURED_TIMEOUT_MS, timeoutMs),
+        ),
+        // Extraction does not need hidden reasoning; it only adds seconds.
+        providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+      });
+      return { object, model: "flash" };
+    } catch (error) {
+      flashBusyUntil = Date.now() + FLASH_BUSY_TTL_MS;
+      console.warn("Gemini Flash structured call failed, trying Flash Lite:", error);
+    }
+  }
   try {
-    // No retries on the primary: when Gemini is rate-limited we want to fail
-    // over to Groq immediately rather than burn the request budget on backoffs.
-    // Groq is itself the retry for this call.
-    return await generateObject({
-      model: primaryModel,
+    const { object } = await generateObject({
+      model: liteModel,
       schema,
       prompt,
       maxRetries: 0,
-      abortSignal: AbortSignal.timeout(primaryTimeoutMs),
-      // Extraction does not need hidden reasoning; it only adds seconds.
-      providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+      abortSignal: AbortSignal.timeout(timeoutMs),
     });
+    return { object, model: "lite" };
   } catch (error) {
-    console.warn("Gemini structured call failed, falling back to Groq:", error);
-    return await generateFallbackObject({ schema, prompt });
+    console.warn("Gemini Flash Lite structured call failed, falling back to Groq:", error);
   }
+  const { object } = await generateFallbackObject({ schema, prompt });
+  return { object, model: "groq" };
 }
 
 // gpt-oss-20b is a reasoning model and its reasoning counts against the

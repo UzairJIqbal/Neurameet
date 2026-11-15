@@ -238,6 +238,9 @@ GET  /api/cron/daily               → Vercel cron only (Bearer CRON_SECRET): de
 GET  /api/github/callback          → (extended) also the account connect path, told apart by a separately signed state; stores login and id, discards the token
 GET  /api/meetings/[id]            → (extended) adds description, scheduledEndAt, meetingType, organizerName, invitedUserIds, transcriptText (never for a Viewer)
 GET  /api/meetings                 → (extended) adds the same meeting fields; a project list adds summaryExcerpt and counts
+POST /api/stream/webhook           → public, Stream signature only (verifyWebhook HMAC over the raw body, per the Stream skill); call.recording_ready for a saved meeting starts the server pipeline in after(), 200 otherwise with no work
+GET  /api/transcript/status        → (extended) adds steps { recording, transcript, summary }, each "waiting" | "running" | "done" | "failed"
+POST /api/ai/process               → (extended) 409 "Summary is already being created" while the process claim is held
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 

@@ -10,6 +10,10 @@ import { Loader2, Sparkles, Users, Clock, FileText } from "lucide-react";
 import { MeetingRecap } from "@/lib/meeting-recap";
 import toast from "react-hot-toast";
 import { runMeetingPipeline } from "@/lib/meeting-pipeline-client";
+import type { RecapSteps } from "@/lib/pipeline-steps";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { LoadError } from "@/components/ui/load-error";
+import { PipelineSteps } from "./PipelineSteps";
 
 // All states the recap "Generate Transcript" button can be in. A participant
 // gets a personal .txt download; a caller who can manage the meeting also gets
@@ -31,6 +35,28 @@ type GenState =
 // this we stop polling and show a final, clear message instead of spinning
 // forever.
 const NO_RECORDING_POLL_CAP = 60;
+// The step list reads GET /api/transcript/status this often.
+const STEPS_POLL_MS = 4000;
+const STEPS_FETCH_TIMEOUT_MS = 10000;
+
+/** The step list from the status route, or null on any error or odd body. */
+async function fetchSteps(meetingId: string): Promise<RecapSteps | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), STEPS_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(
+      `/api/transcript/status?meetingId=${encodeURIComponent(meetingId)}`,
+      { signal: controller.signal },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { steps?: RecapSteps };
+    return data?.steps && typeof data.steps === "object" ? data.steps : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function formatDuration(
   startedAt: string | null,
@@ -104,6 +130,17 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
   // errors the viewer did not ask for; a button click turns this off.
   const silentRef = useRef(false);
   const autoStartedRef = useRef(false);
+  const [steps, setSteps] = useState<RecapSteps | null>(null);
+  const [stepsNonce, setStepsNonce] = useState(0);
+  const redirectedRef = useRef(false);
+
+  // A project meeting lands straight on the project's Team & Tasks tab, where
+  // the new task proposals wait for review. Once only.
+  const goToProject = () => {
+    if (!recap.projectId || redirectedRef.current) return;
+    redirectedRef.current = true;
+    router.push(`/projects/${recap.projectId}?tab=tasks`);
+  };
 
   // Summary, chat indexing and promise matching follow a generated transcript,
   // for callers who can manage the meeting. Never blocks the download.
@@ -111,17 +148,17 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
     setSummarising(true);
     try {
       const result = await runMeetingPipeline(recap.id);
+      // Running: the server already creates it; the step list redirects.
+      if (result.status === "running") return;
       if (result.status === "processed") {
         toast.success("Summary created. Open the meeting to read it.");
       } else if (result.status === "failed") {
         toast.error(`${result.message}. Open the meeting and press Retry.`);
       }
+      goToProject();
     } finally {
       setSummarising(false);
     }
-    // A project meeting lands straight on the project's Tasks tab, where the
-    // new task proposals wait for review.
-    if (recap.projectId) router.push(`/projects/${recap.projectId}?tab=tasks`);
   };
 
   const stopPoll = () => {
@@ -150,14 +187,65 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
 
   // A finished call needs no click: start the transcript, summary and project
   // review items on arrival. Callers who cannot generate get a 403 and stay idle.
+  // When the server already transcribes (Stream webhook), watch instead.
   useEffect(() => {
     if (!isSignedIn || autoStartedRef.current) return;
     if (recap.status !== "ended") return;
     autoStartedRef.current = true;
     silentRef.current = true;
-    void executeDownload(false);
+    void (async () => {
+      const current = await fetchSteps(recap.id);
+      if (current?.transcript === "running") {
+        setSteps(current);
+        startWaiting("server");
+        return;
+      }
+      await executeDownload(false);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, recap.status]);
+
+  // The step list follows the server while anything is in flight and stops on
+  // a finished summary or a failed step.
+  // After the transcript, keep watching only while a summary may still come
+  // (a participant who cannot create one sees it waiting and the poll stops).
+  const watching =
+    Boolean(isSignedIn) &&
+    (gen === "generating" ||
+      gen === "pending" ||
+      summarising ||
+      ((gen === "done" || gen === "exists") && steps?.summary !== "waiting"));
+  const stepsSettled =
+    steps !== null &&
+    (steps.summary === "done" ||
+      steps.summary === "failed" ||
+      steps.transcript === "failed" ||
+      steps.recording === "failed");
+  useEffect(() => {
+    if (!watching || stepsSettled) return;
+    let cancelled = false;
+    const tick = async () => {
+      const next = await fetchSteps(recap.id);
+      if (!cancelled && next) setSteps(next);
+    };
+    void tick();
+    const id = setInterval(tick, STEPS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [watching, stepsSettled, stepsNonce, recap.id]);
+
+  // Redirect as soon as the summary is saved, whoever created it.
+  useEffect(() => {
+    if (steps?.summary === "done") goToProject();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steps?.summary]);
+
+  const stepsLoading = watching && steps === null;
+  const { timedOut: stepsTimedOut } = useLoadingTimeout(stepsLoading, {
+    retryNonce: stepsNonce,
+  });
 
   // When Stream hasn't finalized recordings yet, poll the download endpoint and
   // auto-retry once the transcript is ready. Capped at NO_RECORDING_POLL_CAP ticks
@@ -597,6 +685,14 @@ const AfterMeetingRecap = ({ recap }: { recap: MeetingRecap }) => {
                 {recap.projectId ? "Go to Project" : "Go back to Dashboard"}
               </Link>
             </div>
+            {gen !== "idle" && steps && <PipelineSteps steps={steps} />}
+            {stepsLoading && stepsTimedOut && (
+              <LoadError
+                compact
+                message="Couldn't load the progress steps."
+                onRetry={() => setStepsNonce((n) => n + 1)}
+              />
+            )}
             {gen === "generating" && (
               <p className="text-body-sm text-on-surface-variant">
                 Transcribing the recording. A long meeting can take a few

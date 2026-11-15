@@ -8,7 +8,15 @@ import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { StreamClient } from "@stream-io/node-sdk";
 import { supabaseServer } from "@/lib/supabase-server";
-import { generateStructuredWithFallback } from "@/agent/models";
+import {
+  generateStructuredWithFallback,
+  type StructuredModelUsed,
+} from "@/agent/models";
+import {
+  markPipelineStep,
+  stepStart,
+  type PipelineSource,
+} from "@/lib/pipeline-steps";
 import { z } from "zod";
 import {
   WhisperHttpError,
@@ -50,9 +58,13 @@ const WHISPER_MODEL = "whisper-large-v3";
 const WHISPER_MAX_ATTEMPTS = 4;
 // Tracks transcribed at once. Groq free tier is 20 requests/min.
 const TRACK_CONCURRENCY = 2;
-// Stop starting new work after this long so the route can still answer before
-// its maxDuration kills it (route maxDuration is 300 s).
+// Default deadline when the caller passes none: stop starting new work after
+// this long so the route can still answer before its maxDuration (300 s).
 const GENERATION_BUDGET_MS = 250_000;
+// Cleanup is skipped when less than this is left before the deadline.
+const CLEANUP_MIN_TIME_LEFT_MS = 10_000;
+const DEADLINE_REASON =
+  "The meeting is long, so it ran out of time. Please try again.";
 // Cleanup batches: keeps every model output well under its token limit.
 const CLEANUP_BATCH_CHARS = 6_000;
 const CLEANUP_CONCURRENCY = 3;
@@ -173,10 +185,22 @@ const CLEANUP_PRIMARY_TIMEOUT_MS = 90_000;
  * Each batch keeps its raw lines when the cleanup fails, shrinks too far, or
  * renames/invents a speaker label.
  */
-export async function cleanupTranscript(raw: string): Promise<string> {
+export async function cleanupTranscript(
+  raw: string,
+  opts?: {
+    // Cap on each model call (the time left to the run deadline).
+    timeoutMs?: number;
+    // Called with the model that answered each batch (pipeline timings).
+    onModel?: (model: StructuredModelUsed) => void;
+  },
+): Promise<string> {
   if (raw.length < CLEANUP_SKIP_MAX_CHARS && !NON_LATIN_SCRIPT.test(raw)) {
     return raw;
   }
+  const timeoutMs = Math.min(
+    CLEANUP_PRIMARY_TIMEOUT_MS,
+    opts?.timeoutMs ?? CLEANUP_PRIMARY_TIMEOUT_MS,
+  );
   const batches = batchTranscriptLines(raw, CLEANUP_BATCH_CHARS);
   const out: string[] = new Array(batches.length);
   let next = 0;
@@ -186,7 +210,7 @@ export async function cleanupTranscript(raw: string): Promise<string> {
     while (next < batches.length) {
       const i = next++;
       const batch = batches[i];
-      const cleaned = await cleanupBatch(batch);
+      const cleaned = await cleanupBatch(batch, timeoutMs, opts?.onModel);
       out[i] = speakerLabelsPreserved(batch, cleaned) ? cleaned : batch;
     }
   };
@@ -196,13 +220,18 @@ export async function cleanupTranscript(raw: string): Promise<string> {
   return out.join("\n");
 }
 
-async function cleanupBatch(raw: string): Promise<string> {
+async function cleanupBatch(
+  raw: string,
+  timeoutMs: number,
+  onModel?: (model: StructuredModelUsed) => void,
+): Promise<string> {
   try {
-    const { object } = await generateStructuredWithFallback({
+    const { object, model } = await generateStructuredWithFallback({
       schema: cleanupSchema,
       prompt: buildCleanupPrompt(raw),
-      primaryTimeoutMs: CLEANUP_PRIMARY_TIMEOUT_MS,
+      timeoutMs,
     });
+    onModel?.(model);
 
     const cleaned = object.cleanedTranscript?.trim() ?? "";
     if (!cleaned) {
@@ -224,8 +253,9 @@ async function cleanupBatch(raw: string): Promise<string> {
       const retry = await generateStructuredWithFallback({
         schema: cleanupSchema,
         prompt: buildTranslateOnlyPrompt(raw),
-        primaryTimeoutMs: CLEANUP_PRIMARY_TIMEOUT_MS,
+        timeoutMs,
       });
+      onModel?.(retry.model);
       const cleanedRetry = retry.object.cleanedTranscript?.trim() ?? "";
       if (cleanedRetry && !isMostlyNonEnglish(cleanedRetry)) {
         console.log(
@@ -568,7 +598,7 @@ async function prepareAudio(
 type TrackOutcome =
   | { kind: "ok"; segments: Segment[] }
   | { kind: "silent" }
-  | { kind: "error"; reason: string };
+  | { kind: "error"; reason: string; deadline?: boolean };
 
 async function processTrack(
   downloadUrl: string,
@@ -578,6 +608,7 @@ async function processTrack(
   client: StreamClient,
   callType: string,
   callId: string,
+  deadline: number,
   language?: string,
 ): Promise<TrackOutcome> {
   try {
@@ -607,6 +638,10 @@ async function processTrack(
     // per-minute limit.
     const segments: Segment[] = [];
     for (let i = 0; i < prepared.chunks.length; i++) {
+      // Never start a chunk past the run deadline (spec 0005, AC-8).
+      if (Date.now() > deadline) {
+        return { kind: "error", reason: DEADLINE_REASON, deadline: true };
+      }
       const result = await transcribeWithRetry(prepared.chunks[i], i, language);
       const offset = i * SEGMENT_SECONDS;
       const rawSegments = result.segments;
@@ -647,6 +682,8 @@ export async function generateTranscriptForMeeting({
   streamCallType,
   enforceOwner = true,
   language,
+  deadline: deadlineIn,
+  source,
 }: {
   userId: string;
   meetingId: string;
@@ -663,6 +700,10 @@ export async function generateTranscriptForMeeting({
    * Whisper call. Undefined = auto-detect (current behavior).
    */
   language?: string;
+  /** Epoch ms after which no new track, chunk, or cleanup call starts. */
+  deadline?: number;
+  /** Who started the run, saved with the pipeline timings. */
+  source?: PipelineSource;
 }): Promise<GenerateResult> {
   const supabase = supabaseServer();
 
@@ -712,9 +753,17 @@ export async function generateTranscriptForMeeting({
     };
   }
 
-  try {
-    const deadline = Date.now() + GENERATION_BUDGET_MS;
+  const deadline = deadlineIn ?? Date.now() + GENERATION_BUDGET_MS;
+  const whisperStart = stepStart();
+  await markPipelineStep(
+    supabase,
+    meetingId,
+    "whisper",
+    { status: "running", startedAt: whisperStart },
+    source,
+  );
 
+  try {
     const outcomes = await mapWithConcurrency(
       individuals,
       TRACK_CONCURRENCY,
@@ -722,10 +771,7 @@ export async function generateTranscriptForMeeting({
         if (Date.now() > deadline) {
           return {
             rec,
-            outcome: {
-              kind: "error",
-              reason: "The meeting is long, so it ran out of time. Please try again.",
-            },
+            outcome: { kind: "error", reason: DEADLINE_REASON, deadline: true },
           };
         }
         const streamUserId = parseStreamUserId(rec.filename);
@@ -738,6 +784,7 @@ export async function generateTranscriptForMeeting({
           client,
           streamCallType,
           streamCallId,
+          deadline,
           language,
         );
         return { rec, outcome };
@@ -746,9 +793,11 @@ export async function generateTranscriptForMeeting({
 
     const allSegments: Segment[] = [];
     const errors: string[] = [];
+    let hitDeadline = false;
     for (const { rec, outcome } of outcomes) {
       if (outcome.kind === "error") {
         errors.push(outcome.reason);
+        if (outcome.deadline) hitDeadline = true;
       } else if (outcome.kind === "ok") {
         // F-merge: shift this track's segments by its own recording start so a
         // participant who joined later is placed at their true speaking time.
@@ -764,8 +813,29 @@ export async function generateTranscriptForMeeting({
     // Never hand back a silently partial transcript: one failed track means a
     // participant is missing, so report it and let the user retry.
     if (errors.length > 0) {
-      return { status: "failed", message: errors[0] };
+      await markPipelineStep(
+        supabase,
+        meetingId,
+        "whisper",
+        {
+          status: "failed",
+          startedAt: whisperStart,
+          reason: hitDeadline ? "deadline" : "track",
+        },
+        source,
+      );
+      return {
+        status: "failed",
+        message: hitDeadline ? DEADLINE_REASON : errors[0],
+      };
     }
+    await markPipelineStep(
+      supabase,
+      meetingId,
+      "whisper",
+      { status: "done", startedAt: whisperStart },
+      source,
+    );
     // No speech anywhere → too short / silent meeting.
     if (allSegments.length === 0) return { status: "too_short" };
 
@@ -775,14 +845,74 @@ export async function generateTranscriptForMeeting({
 
     // F8 + F9: AI accuracy clean and translation into English, in batches.
     // Graceful: any failure returns the raw lines so the download never blocks.
-    const transcript = await cleanupTranscript(rawTranscript);
+    const transcript = await runCleanupStep(
+      supabase,
+      meetingId,
+      rawTranscript,
+      deadline,
+      source,
+    );
 
     return { status: "ok", transcript, rawTranscript, language: "en" };
   } catch (err) {
     console.error("[transcript-generation] fatal:", err);
+    await markPipelineStep(
+      supabase,
+      meetingId,
+      "whisper",
+      { status: "failed", startedAt: whisperStart, reason: "error" },
+      source,
+    );
     return {
       status: "failed",
       message: "Transcript generation failed, try manual upload",
     };
   }
+}
+
+// Cleanup with its pipeline timing. Skipped (raw kept) when the deadline leaves
+// too little time; each model call is capped by the time left.
+async function runCleanupStep(
+  supabase: ReturnType<typeof supabaseServer>,
+  meetingId: string,
+  raw: string,
+  deadline: number,
+  source?: PipelineSource,
+): Promise<string> {
+  const startedAt = stepStart();
+  const timeLeft = deadline - Date.now();
+  if (timeLeft < CLEANUP_MIN_TIME_LEFT_MS) {
+    await markPipelineStep(
+      supabase,
+      meetingId,
+      "cleanup",
+      { status: "skipped", startedAt, reason: "deadline" },
+      source,
+    );
+    return raw;
+  }
+  await markPipelineStep(
+    supabase,
+    meetingId,
+    "cleanup",
+    { status: "running", startedAt },
+    source,
+  );
+  const models = new Set<StructuredModelUsed>();
+  const text = await cleanupTranscript(raw, {
+    timeoutMs: timeLeft,
+    onModel: (m) => models.add(m),
+  });
+  await markPipelineStep(
+    supabase,
+    meetingId,
+    "cleanup",
+    {
+      status: "done",
+      startedAt,
+      model: models.size > 0 ? [...models].sort().join(",") : undefined,
+    },
+    source,
+  );
+  return text;
 }

@@ -7,8 +7,10 @@ import { generateTranscriptForMeeting } from "@/agent/transcript-generation";
 import {
   claimTranscriptGeneration,
   isMissingColumn,
+  isNoRecordingFinal,
   setTranscriptState,
 } from "@/lib/transcript-state";
+import { markPipelineStep, stepStart } from "@/lib/pipeline-steps";
 import {
   accessErrorResponse,
   checkMeetingAccess,
@@ -23,9 +25,8 @@ export const runtime = "nodejs";
 // starting new work at 250 s so it can still answer.
 export const maxDuration = 300;
 
-// Once a call ended this long ago and Stream still lists no individual
-// recording, there never will be one (recording was off), so say so for good.
-const NO_RECORDING_FINAL_AFTER_MS = 20 * 60 * 1000;
+// One deadline for the whole run: maxDuration minus a 20 s margin to answer.
+const RUN_BUDGET_MS = 280_000;
 
 /**
  * Participant transcript download. Any signed in participant of the meeting can
@@ -36,6 +37,7 @@ const NO_RECORDING_FINAL_AFTER_MS = 20 * 60 * 1000;
  * Upload Transcript flow (Dashboard → Upload Transcript).
  */
 export async function POST(request: Request) {
+  const requestStart = Date.now();
   const { userId } = await auth();
 
   if (!userId) {
@@ -161,6 +163,7 @@ export async function POST(request: Request) {
     }
 
     // No cache: generate the merged transcript for any signed in participant.
+    const recordingStart = stepStart();
     const result = await generateTranscriptForMeeting({
       userId,
       meetingId,
@@ -168,7 +171,20 @@ export async function POST(request: Request) {
       streamCallType: callTypeOfRow(meeting),
       enforceOwner: false,
       language: language && language.trim() ? language.trim() : undefined,
+      deadline: requestStart + RUN_BUDGET_MS,
+      source: "page",
     });
+    // The page path has no settle wait: the recording step is done as soon as
+    // Stream listed the individual recordings.
+    if (result.status !== "no_recording") {
+      await markPipelineStep(
+        supabase,
+        meetingId,
+        "recording",
+        { status: "done", startedAt: recordingStart },
+        "page",
+      );
+    }
 
     if (result.status === "ok") {
       const rawText = result.transcript.trim();
@@ -243,10 +259,7 @@ export async function POST(request: Request) {
       } catch {
         /* best-effort */
       }
-      const endedAt = meeting.ended_at ? Date.parse(meeting.ended_at) : NaN;
-      const final =
-        Number.isFinite(endedAt) &&
-        Date.now() - endedAt > NO_RECORDING_FINAL_AFTER_MS;
+      const final = isNoRecordingFinal(meeting.ended_at);
       return NextResponse.json({
         status: "no_recording",
         final,

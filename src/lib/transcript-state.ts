@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PipelineState } from "@/lib/pipeline-steps";
 
 // Shared lifecycle helper for the async transcript-generation pipeline.
 // A single `transcripts` row carries the state so clients can poll it and the
@@ -12,12 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 //   too_short    recording too short / silent to transcribe
 //   failed       a hard error — retryable from the client
 export type ProcessingState =
-  | "not_started"
-  | "pending"
-  | "ready"
-  | "failed"
-  | "no_recording"
-  | "too_short";
+  "not_started" | "pending" | "ready" | "failed" | "no_recording" | "too_short";
 
 /**
  * Upsert the processing state for a meeting's transcript row. Because
@@ -64,8 +60,8 @@ export function isMissingColumn(error: { code?: string }): boolean {
 }
 
 /**
- * Read the current processing state + whether insights exist. Returns
- * `not_started` when the row has not been created yet.
+ * Read the current processing state, whether insights exist, and the stored
+ * step timings. Returns `not_started` when the row has not been created yet.
  */
 export async function getTranscriptState(
   supabase: SupabaseClient,
@@ -74,11 +70,13 @@ export async function getTranscriptState(
   state: ProcessingState;
   rawText: string;
   hasInsights: boolean;
+  updatedAt: string | null;
+  pipeline: PipelineState | null;
 }> {
   const [{ data: row }, { data: insights }] = await Promise.all([
     supabase
       .from("transcripts")
-      .select("processing_state, raw_text")
+      .select("processing_state, raw_text, updated_at, pipeline")
       .eq("meeting_id", meetingId)
       .limit(1)
       .maybeSingle(),
@@ -94,6 +92,8 @@ export async function getTranscriptState(
     state: (row?.processing_state as ProcessingState) || "not_started",
     rawText: row?.raw_text ?? "",
     hasInsights: !!insights,
+    updatedAt: row?.updated_at ?? null,
+    pipeline: (row?.pipeline as PipelineState | null) ?? null,
   };
 }
 
@@ -108,6 +108,18 @@ export function isPendingStale(
   if (!updatedAt) return true;
   const t = Date.parse(updatedAt);
   return !Number.isFinite(t) || now - t > PENDING_STALE_MS;
+}
+
+// Once a call ended this long ago and Stream still lists no individual
+// recording, there never will be one (recording was off).
+export const NO_RECORDING_FINAL_AFTER_MS = 20 * 60 * 1000;
+
+export function isNoRecordingFinal(
+  endedAt: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  const t = endedAt ? Date.parse(endedAt) : NaN;
+  return Number.isFinite(t) && now - t > NO_RECORDING_FINAL_AFTER_MS;
 }
 
 /**

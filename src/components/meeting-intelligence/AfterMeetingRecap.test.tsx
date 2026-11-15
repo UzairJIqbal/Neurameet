@@ -7,7 +7,13 @@
 // the selector must be absent, the button present, and the download POST must
 // NOT carry a `language` field (the route falls back to auto-detect).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 import AfterMeetingRecap from "./AfterMeetingRecap";
 import type { MeetingRecap } from "@/lib/meeting-recap";
 
@@ -15,7 +21,10 @@ import type { MeetingRecap } from "@/lib/meeting-recap";
 // so no server-only / Supabase code is pulled into the jsdom test runtime.
 vi.mock("@/lib/meeting-recap", () => ({}));
 
-let mockUser = { id: "user_test", primaryEmailAddress: { emailAddress: "user_test@example.com" } };
+const mockUser = {
+  id: "user_test",
+  primaryEmailAddress: { emailAddress: "user_test@example.com" },
+};
 vi.mock("@clerk/nextjs", () => ({
   useUser: () => ({ isSignedIn: true, user: mockUser }),
   useClerk: () => ({ redirectToSignIn: vi.fn() }),
@@ -26,8 +35,9 @@ vi.mock("@/lib/meeting-pipeline-client", () => ({
   runMeetingPipeline: (id: string) => runPipeline(id),
 }));
 
+const routerPush = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: routerPush, refresh: vi.fn() }),
 }));
 
 const recap: MeetingRecap = {
@@ -61,26 +71,34 @@ describe("AfterMeetingRecap summary after generate", () => {
       screen.getByRole("button", { name: /generate transcript/i }),
     );
 
-  beforeEach(() => runPipeline.mockReset().mockResolvedValue({ status: "skipped" }));
+  beforeEach(() =>
+    runPipeline.mockReset().mockResolvedValue({ status: "skipped" }),
+  );
 
   it("runs the AI pipeline after a freshly generated transcript", async () => {
     stubDownload({ status: "ok", transcript: "A: hi", cached: false });
     render(<AfterMeetingRecap recap={recap} />);
     generate();
-    await waitFor(() => expect(runPipeline).toHaveBeenCalledWith("meeting_test"));
+    await waitFor(() =>
+      expect(runPipeline).toHaveBeenCalledWith("meeting_test"),
+    );
   });
 
   it("still asks the pipeline for a cached transcript (it skips when a summary exists)", async () => {
     stubDownload({ status: "ok", transcript: "A: hi", cached: true });
     render(<AfterMeetingRecap recap={recap} />);
     generate();
-    await waitFor(() => expect(runPipeline).toHaveBeenCalledWith("meeting_test"));
+    await waitFor(() =>
+      expect(runPipeline).toHaveBeenCalledWith("meeting_test"),
+    );
   });
 });
 
 describe("AfterMeetingRecap starts by itself after the call ended", () => {
   afterEach(cleanup);
-  beforeEach(() => runPipeline.mockReset().mockResolvedValue({ status: "skipped" }));
+  beforeEach(() =>
+    runPipeline.mockReset().mockResolvedValue({ status: "skipped" }),
+  );
   const ended: MeetingRecap = { ...recap, status: "ended" };
 
   it("generates and runs the pipeline with no click, without saving a file", async () => {
@@ -91,16 +109,25 @@ describe("AfterMeetingRecap starts by itself after the call ended", () => {
     }));
     vi.stubGlobal("fetch", fetchMock);
     const createUrl = vi.fn(() => "blob:mock");
-    vi.stubGlobal("URL", { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
+    vi.stubGlobal("URL", {
+      createObjectURL: createUrl,
+      revokeObjectURL: vi.fn(),
+    });
     render(<AfterMeetingRecap recap={ended} />);
-    await waitFor(() => expect(runPipeline).toHaveBeenCalledWith("meeting_test"));
+    await waitFor(() =>
+      expect(runPipeline).toHaveBeenCalledWith("meeting_test"),
+    );
     expect(createUrl).not.toHaveBeenCalled();
   });
 
   it("stays idle when the caller may not generate (403)", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({ ok: false, status: 403, json: async () => ({ error: "Not authorized" }) })),
+      vi.fn(async () => ({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "Not authorized" }),
+      })),
     );
     render(<AfterMeetingRecap recap={ended} />);
     await screen.findByRole("button", { name: /generate transcript/i });
@@ -334,7 +361,9 @@ describe("AfterMeetingRecap call timeline presence and talk time clarity", () =>
     ).toBeDefined();
 
     // Check that host presence bar is styled from 0% with 100% width
-    const presenceBar = document.querySelector(".bg-primary[style*='left']") as HTMLElement;
+    const presenceBar = document.querySelector(
+      ".bg-primary[style*='left']",
+    ) as HTMLElement;
     expect(presenceBar).toBeDefined();
     expect(presenceBar.style.left).toBe("0%");
     expect(presenceBar.style.width).toBe("100%");
@@ -359,7 +388,10 @@ describe("AfterMeetingRecap — no contradictory transcript messages (F-series r
 
     const noRecordingFetch = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ status: "no_recording", message: "no recordings yet" }),
+      json: async () => ({
+        status: "no_recording",
+        message: "no recordings yet",
+      }),
     }));
     vi.stubGlobal("fetch", noRecordingFetch);
     vi.stubGlobal("URL", {
@@ -370,7 +402,9 @@ describe("AfterMeetingRecap — no contradictory transcript messages (F-series r
     render(<AfterMeetingRecap recap={recap} />);
 
     // Click Generate — enters "pending" state and starts the poll.
-    fireEvent.click(screen.getByRole("button", { name: /generate transcript/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /generate transcript/i }),
+    );
 
     // Allow the initial fetch to resolve.
     await vi.runAllTimersAsync();
@@ -400,7 +434,11 @@ describe("AfterMeetingRecap polling never overlaps a running request", () => {
   it("skips poll ticks while a download request is still in flight", async () => {
     vi.useFakeTimers();
     let calls = 0;
-    const fetchMock = vi.fn(async () => {
+    // Counts only download requests; the step list status poll answers apart.
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("/api/transcript/status")) {
+        return { ok: true, json: async () => ({}) };
+      }
       calls += 1;
       if (calls === 1) {
         return {
@@ -415,14 +453,105 @@ describe("AfterMeetingRecap polling never overlaps a running request", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<AfterMeetingRecap recap={recap} />);
-    fireEvent.click(screen.getByRole("button", { name: /generate transcript/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /generate transcript/i }),
+    );
     await vi.advanceTimersByTimeAsync(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(1);
 
     // Tick 1 starts the slow request; ticks 2 and 3 land while it is running.
     await vi.advanceTimersByTimeAsync(45000);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(calls).toBe(2);
 
     vi.useRealTimers();
+  });
+});
+
+// Spec 0005 (AC-10, AC-11): the step list follows the status route, redirects
+// once the summary is saved, and the page watches a server run instead of
+// starting its own.
+describe("AfterMeetingRecap step list", () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    routerPush.mockReset();
+    runPipeline.mockReset().mockResolvedValue({ status: "running" });
+  });
+  const ended: MeetingRecap = { ...recap, status: "ended", projectId: "p1" };
+  const statusBody = (steps: object) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ steps }),
+  });
+
+  it("watches a server run, shows the steps, and redirects on a saved summary", async () => {
+    let summary = "running";
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("/api/transcript/status")) {
+        return statusBody(
+          summary === "done"
+            ? { recording: "done", transcript: "done", summary: "done" }
+            : { recording: "done", transcript: "running", summary: "waiting" },
+        );
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: "pending" }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AfterMeetingRecap recap={ended} />);
+
+    const row = await waitFor(() => {
+      const el = document.querySelector('[data-step="transcript"]');
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(row.getAttribute("data-state")).toBe("running");
+    // Watching: no download POST was sent on arrival.
+    expect(
+      fetchMock.mock.calls.some((c) =>
+        String(c[0]).includes("/api/transcript/download"),
+      ),
+    ).toBe(false);
+
+    summary = "done";
+    await waitFor(
+      () => expect(routerPush).toHaveBeenCalledWith("/projects/p1?tab=tasks"),
+      { timeout: 6000 },
+    );
+    expect(routerPush).toHaveBeenCalledTimes(1);
+  }, 10000);
+
+  it("does not redirect on a running pipeline result", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        String(url).includes("/api/transcript/status")
+          ? statusBody({
+              recording: "done",
+              transcript: "done",
+              summary: "running",
+            })
+          : {
+              ok: true,
+              status: 200,
+              json: async () => ({ status: "ok", transcript: "A: hi" }),
+            },
+      ),
+    );
+    render(<AfterMeetingRecap recap={{ ...recap, projectId: "p1" }} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /generate transcript/i }),
+    );
+    await waitFor(() => expect(runPipeline).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(
+        document
+          .querySelector('[data-step="summary"]')
+          ?.getAttribute("data-state"),
+      ).toBe("running"),
+    );
+    expect(routerPush).not.toHaveBeenCalled();
   });
 });

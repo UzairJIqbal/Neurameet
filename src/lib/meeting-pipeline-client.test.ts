@@ -3,10 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/user-prefs", () => ({
   readUserPrefs: () => ({ aiAutoSummary: true, emailNotifications: false }),
 }));
-const match = vi.fn();
-vi.mock("@/lib/ledger-match-client", () => ({
-  requestLedgerMatch: (id: string) => match(id),
-}));
 
 import { runMeetingPipeline } from "./meeting-pipeline-client";
 
@@ -17,7 +13,6 @@ describe("runMeetingPipeline", () => {
   const fetchMock = vi.fn();
   beforeEach(() => {
     fetchMock.mockReset();
-    match.mockReset().mockResolvedValue(true);
     vi.stubGlobal("fetch", fetchMock);
   });
 
@@ -32,21 +27,19 @@ describe("runMeetingPipeline", () => {
     expect(await runMeetingPipeline("m1")).toEqual({ status: "skipped" });
   });
 
-  it("runs embed alongside process, then match", async () => {
+  it("runs embed alongside process, with no browser side match", async () => {
     fetchMock
       .mockResolvedValueOnce(json(true, { insights: null }))
       .mockResolvedValue(json(true, {}));
     expect(await runMeetingPipeline("m1")).toEqual({
       status: "processed",
       embedded: true,
-      matched: true,
     });
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
       "/api/meetings/m1",
       "/api/ai/embed",
       "/api/ai/process",
     ]);
-    expect(match).toHaveBeenCalledWith("m1");
   });
 
   it("stops at a process failure with the server message", async () => {
@@ -61,10 +54,24 @@ describe("runMeetingPipeline", () => {
       status: "failed",
       message: "Quota hit",
     });
-    expect(match).not.toHaveBeenCalled();
   });
 
-  it("skips matching when embedding fails", async () => {
+  it("reports running when another run holds the summary step", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/meetings/m1"
+        ? json(true, { insights: null })
+        : url === "/api/ai/process"
+          ? ({
+              ok: false,
+              status: 409,
+              json: async () => ({ error: "Summary is already being created" }),
+            } as Response)
+          : json(true, {}),
+    );
+    expect(await runMeetingPipeline("m1")).toEqual({ status: "running" });
+  });
+
+  it("still reports processed when embedding fails", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       url === "/api/meetings/m1"
         ? json(true, { insights: null })
@@ -75,8 +82,6 @@ describe("runMeetingPipeline", () => {
     expect(await runMeetingPipeline("m1")).toEqual({
       status: "processed",
       embedded: false,
-      matched: false,
     });
-    expect(match).not.toHaveBeenCalled();
   });
 });

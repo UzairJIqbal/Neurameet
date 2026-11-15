@@ -1,11 +1,14 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { runDailyCron } from "@/lib/daily-cron";
+import { sweepStuckMeetings } from "@/agent/meeting-pipeline";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// The daily jobs answer within 60 s; the meeting sweep then runs after the
+// response (spec 0005, AC-9) and needs the full Hobby ceiling.
+export const maxDuration = 300;
 
 const digest = (text: string): Buffer =>
   createHash("sha256").update(text).digest();
@@ -23,8 +26,17 @@ export async function GET(req: Request) {
   if (!isCronCall(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const supabase = supabaseServer();
+  after(async () => {
+    try {
+      const swept = await sweepStuckMeetings(supabase);
+      console.log("[cron] meeting sweep", { swept });
+    } catch (err) {
+      console.error("[cron] meeting sweep failed:", err);
+    }
+  });
   try {
-    return NextResponse.json(await runDailyCron(supabaseServer()));
+    return NextResponse.json(await runDailyCron(supabase));
   } catch (err) {
     console.error("[cron] daily run failed:", err);
     return NextResponse.json({ error: "Cron run failed" }, { status: 500 });

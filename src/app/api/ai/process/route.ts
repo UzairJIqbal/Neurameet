@@ -1,59 +1,12 @@
-import { randomUUID } from "node:crypto";
 import { after, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { sendMeetingReadyEmail } from "@/lib/email";
-import { normalizeDueDate } from "@/lib/normalize-date";
-import { MEETING_CATEGORIES } from "@/lib/meeting-types";
-import { generateStructuredWithFallback } from "@/agent/models";
-import { extractionResultSchema } from "@/agent/types";
-import { LEDGER_MAX_ITEMS, writeLedgerItems } from "@/agent/ledger";
-import { setTranscriptState } from "@/lib/transcript-state";
-import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
-import { buildMinutesDraft, cutMinutes } from "@/agent/minutes";
-import { buildProposalRows, hasReviewedProposals } from "@/agent/proposals";
-import { notifyProposalsReady } from "@/lib/notification-events";
-import { rpcErrorCode } from "@/lib/projects";
-import { MAX_PROPOSALS_PER_MEETING } from "@/lib/tasks";
 import {
-  DISSENT_SUGGESTIONS_MAX,
-  MINUTES_MAX_DECISIONS,
-  MINUTES_MAX_KEY_POINTS,
-  MINUTES_MAX_QUOTES,
-  MINUTES_MAX_SUMMARY_POINTS,
-  type MinutesDraft,
-} from "@/lib/minutes-types";
-
-// Normalize the model's free-text category to a valid MEETING_CATEGORIES
-// member. The AI SDK returns an unconstrained string; mapping it (case-
-// insensitive) to the enum guarantees the Category tab badge + select never
-// show an invalid value (P11 (b)). Unrecognized input falls back to "General".
-function normalizeCategory(raw: string | null | undefined): string {
-  const trimmed = (raw ?? "").trim();
-  if (!trimmed) return "General";
-  const match = MEETING_CATEGORIES.find(
-    (c) => c.toLowerCase() === trimmed.toLowerCase(),
-  );
-  return match ?? "General";
-}
-
-// The meeting date (YYYY-MM-DD) the model resolves relative due dates against
-// ("Friday tak", "next week"). Spec 0001 AC-4: meetings.started_at, never today.
-function meetingDateFor(row: {
-  started_at: string | null;
-  created_at: string | null;
-}): string {
-  const raw = row.started_at ?? row.created_at;
-  const parsed = raw ? new Date(raw) : null;
-  if (parsed && !Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
-  }
-  console.warn("[ledger] meeting has no usable date, using today");
-  return new Date().toISOString().slice(0, 10);
-}
-
-const PROPOSALS_REVIEWED = { error: "Proposals were already reviewed" };
+  maybeRunLedgerMatch,
+  PROCESS_BUSY,
+  processMeeting,
+} from "@/agent/meeting-pipeline";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -64,10 +17,9 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { meetingId, emailNotifications, email } = body as {
+    const { meetingId, emailNotifications } = body as {
       meetingId?: string;
       emailNotifications?: boolean;
-      email?: string | null;
     };
 
     if (!meetingId) {
@@ -99,334 +51,37 @@ export async function POST(request: Request) {
       throw accessErr;
     }
 
-    // W4: a project meeting's action items are proposals. Once any was
-    // reviewed, a reprocess changes nothing (AC-34); fail before the AI call.
-    const projectId = owned.project_id ?? null;
-    if (projectId && (await hasReviewedProposals(supabase, meetingId))) {
-      return NextResponse.json(PROPOSALS_REVIEWED, { status: 409 });
-    }
-
-    // Tasdeeq AC-7: a meeting with a minutes review keeps its insights frozen.
-    const locked = await assertMinutesUnlocked(supabase, meetingId);
-    if (locked) return locked;
-
-    // Fetch the transcript for this meeting
-    const { data: transcript, error: transcriptError } = await supabase
-      .from("transcripts")
-      .select("raw_text")
-      .eq("meeting_id", meetingId)
-      .single();
-
-    if (transcriptError || !transcript) {
-      console.error("Transcript not found:", transcriptError);
-      return NextResponse.json(
-        { error: "Transcript not found" },
-        { status: 404 },
-      );
-    }
-
-    // Bound the input size before extraction. Long recordings (multiple 10-min
-    // chunks concatenated) can push the model's structured-output response past
-    // what it can complete, which makes the AI SDK throw
-    // "Provider stream ended without finish_reason" (truncated JSON). Capping
-    // the transcript keeps the summary/action-item extraction reliable.
-    const MAX_TRANSCRIPT_CHARS = 16000;
-    const rawText = transcript.raw_text ?? "";
-    const truncatedText =
-      rawText.length > MAX_TRANSCRIPT_CHARS
-        ? rawText.slice(0, MAX_TRANSCRIPT_CHARS) +
-          "\n[transcript truncated for processing]"
-        : rawText;
-
-    // Run AI extraction via Gemini (with Groq fallback). Both paths use the
-    // default json_schema structured-outputs mode, so the schema must avoid
-    // `.optional()` fields (use `.nullable()`) — see generateStructuredWithFallback.
-    const meetingDate = meetingDateFor(owned);
-    const { object: extracted } = await generateStructuredWithFallback({
-      schema: extractionResultSchema,
-      prompt: `Analyze the following meeting transcript and extract structured insights.
-
-Meeting date: ${meetingDate}
-
-Transcript:
-${truncatedText}
-
-Respond with a SINGLE JSON object only (no markdown, no prose), with exactly this structure:
-{
-  "insights": {
-    "summary": "A comprehensive summary of the meeting",
-    "category": "Product | Sales | Design | Operations | Engineering | General",
-    "detectedTopics": ["Specific topic", "Another topic"]
-  },
-  "minutes": {
-    "summaryPoints": [{ "text": "One summary point", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }],
-    "keyPoints": [{ "text": "Key point discussed", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }],
-    "decisions": [{ "text": "Decision that was made", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }]
-  },
-  "actionItems": [
-    { "title": "A clear, actionable task", "assignee": "Person responsible or null", "dueDate": "ISO date YYYY-MM-DD or null", "quotes": ["Exact words from one transcript line"] }
-  ],
-  "ledgerItems": [
-    { "kind": "decision | promise", "statement": "Plain English restatement", "quote": "Exact words from one transcript line", "quoteLanguage": "en | ur | mixed", "speaker": "Who said it or null", "assignee": "Who promised (promises only) or null", "dueDate": "ISO date YYYY-MM-DD or null", "actionItemIndex": 0 }
-  ],
-  "dissentSuggestions": [
-    { "speakerLabel": "Speaker name exactly as in the transcript", "topic": "What they objected to", "position": "Their view in one sentence", "quote": "Exact words from one transcript line", "relatedDecisionIndex": 0 }
-  ]
-}
-Extraction rules:
-- Summary: a comprehensive summary of the meeting, as one paragraph.
-- Minutes: summaryPoints (at most ${MINUTES_MAX_SUMMARY_POINTS}) restate the summary as short points; keyPoints (at most ${MINUTES_MAX_KEY_POINTS}) are the main points discussed; decisions (at most ${MINUTES_MAX_DECISIONS}) are explicit decisions that were made.
-  - speakers: who said the point, using the speaker names exactly as they appear in the transcript, or null.
-  - quotes: at most ${MINUTES_MAX_QUOTES} per point, each copied WORD FOR WORD from ONE transcript line, without the "Speaker:" label. Return no quote (null or an empty array) rather than invent or paraphrase one.
-- Category: choose the SINGLE most representative category from the list. Do NOT default to any one; pick the category that best matches what the meeting was actually about.
-- Detected topics: specific topics discussed.
-- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, a due date (ISO YYYY-MM-DD) if stated, and at most ${MINUTES_MAX_QUOTES} quotes copied word for word from one transcript line each (no "Speaker:" label; null when there is none).
-- Dates: resolve every relative date ("Friday", "Friday tak", "next week", "kal") against the meeting date above, never against today.
-- Ledger items: every decision that was made and every promise someone made (who will do what, by when). The transcript may be English, Urdu, or mixed Urdu English.
-  - quote: copy the words EXACTLY as they appear in the transcript, in the original language and script, from ONE transcript line at most. Do not translate, paraphrase, or include the "Speaker:" label.
-  - statement: a short plain English restatement.
-  - quoteLanguage: "en" for English, "ur" for Urdu (any script), "mixed" for code mixed Urdu English.
-  - assignee and dueDate apply to promises only; use null for decisions.
-  - actionItemIndex: the zero based index into the actionItems array you return when this promise is the same commitment, otherwise null.
-  - At most ${LEDGER_MAX_ITEMS} items, the most important first. Return an empty array when there are none.
-- Dissent suggestions: at most ${DISSENT_SUGGESTIONS_MAX}, only where a person clearly objected to or disagreed with something. speakerLabel is their name exactly as in the transcript, quote is their own words copied word for word from one line they said (no "Speaker:" label), relatedDecisionIndex is the zero based index into minutes.decisions the objection is about, or null. Return null or an empty array when nobody objected.`,
+    const outcome = await processMeeting(supabase, {
+      meeting: owned,
+      actorUserId: userId,
+      emailNotifications: emailNotifications === true,
+      source: "page",
     });
 
-    // W4 AC-30: at most 50 proposals per run, the first in model order. The
-    // minutes draft uses the same capped list so its rows exist.
-    const result = projectId
-      ? {
-          ...extracted,
-          actionItems: extracted.actionItems.slice(
-            0,
-            MAX_PROPOSALS_PER_MEETING,
-          ),
-        }
-      : extracted;
-
-    // Tasdeeq (spec 0003): action item ids are generated up front so the
-    // minutes draft, written with the insights, can name each action line's row.
-    const actionItemIds = result.actionItems.map(() => randomUUID());
-    const minutes = cutMinutes(result.minutes);
-    let minutesDraft: MinutesDraft | null = null;
-    try {
-      const built = buildMinutesDraft({
-        result,
-        rawText,
-        actionItemIds,
-        maxChars: MAX_TRANSCRIPT_CHARS,
-      });
-      minutesDraft = built.draft;
-      if (built.droppedSuggestions > 0) {
-        console.warn(
-          `[tasdeeq] dropped ${built.droppedSuggestions} dissent suggestions`,
-        );
-      }
-    } catch (draftErr) {
-      console.error("[tasdeeq] minutes draft failed:", draftErr);
+    if (outcome.status === "busy") {
+      return NextResponse.json({ error: PROCESS_BUSY }, { status: 409 });
     }
-
-    // The AI call above is long, so a review may have opened meanwhile. Check
-    // again before anything is deleted (AC-7).
-    const lockedNow = await assertMinutesUnlocked(supabase, meetingId);
-    if (lockedNow) return lockedNow;
-
-    // W4: proposals are swapped first, inside one locked SQL call, so a review
-    // that landed during the AI call wins and nothing below runs (AC-34).
-    let proposalsWritten = 0;
-    if (projectId) {
-      const rows = await buildProposalRows(supabase, {
-        meetingId,
-        projectId,
-        rawText,
-        items: result.actionItems,
-        ids: actionItemIds,
-      });
-      const { error: replaceErr } = await supabase.rpc(
-        "replace_meeting_proposals",
-        { p_meeting: meetingId, p_items: rows, p_actor: userId },
-      );
-      if (replaceErr) {
-        if (rpcErrorCode(replaceErr) === "proposals_reviewed") {
-          return NextResponse.json(PROPOSALS_REVIEWED, { status: 409 });
-        }
-        throw replaceErr;
-      }
-      proposalsWritten = rows.length;
-    }
-
-    // Idempotent retry: clear any prior insights, action items, and their
-    // follow-ups for this meeting before writing the new ones. This runs only
-    // after extraction succeeded, so a failed AI call keeps the old results. A retry (or any re-run
-    // of this route) must not create duplicate rows, since the detail API does
-    // a single-row fetch on meeting_insights. Safe no-op on first run.
-    {
-      const { error: delInsightsErr } = await supabase
-        .from("meeting_insights")
-        .delete()
-        .eq("meeting_id", meetingId);
-      if (delInsightsErr)
-        console.error("Failed to clear prior insights:", delInsightsErr);
-
-      // A project meeting's items were already swapped by the RPC above.
-      if (!projectId) {
-        const { data: priorItems } = await supabase
-          .from("action_items")
-          .select("id")
-          .eq("meeting_id", meetingId);
-        if (priorItems && priorItems.length > 0) {
-          const priorIds = priorItems.map((i) => i.id);
-          await supabase
-            .from("follow_ups")
-            .delete()
-            .in("action_item_id", priorIds);
-          await supabase.from("action_items").delete().in("id", priorIds);
-        }
-      }
-    }
-
-    // Write meeting insights
-    const processedAt = new Date().toISOString();
-    const { error: insightsError } = await supabase
-      .from("meeting_insights")
-      .insert({
-        meeting_id: meetingId,
-        summary: result.insights.summary,
-        key_points: minutes.keyPoints.map((p) => p.text),
-        decisions: minutes.decisions.map((p) => p.text),
-        category: normalizeCategory(result.insights.category),
-        detected_topics: result.insights.detectedTopics,
-        processed_at: processedAt,
-        minutes_draft: minutesDraft,
-      });
-
-    if (insightsError) {
-      console.error("Failed to write insights:", insightsError);
+    if (outcome.status === "error") {
       return NextResponse.json(
-        { error: "Failed to save insights" },
-        { status: 500 },
+        { error: outcome.error },
+        { status: outcome.httpStatus },
       );
     }
 
-    // Write action items (ids kept in insert order for ledger linking)
-    let insertedActionItemIds: string[] = projectId ? actionItemIds : [];
-    if (!projectId && result.actionItems.length > 0) {
-      const { data: insertedItems, error: actionItemsError } = await supabase
-        .from("action_items")
-        .insert(
-          result.actionItems.map((item, i) => ({
-            id: actionItemIds[i],
-            meeting_id: meetingId,
-            title: item.title,
-            assignee: item.assignee ?? null,
-            due_date: normalizeDueDate(item.dueDate),
-          })),
-        )
-        .select("id, meeting_id");
-
-      if (actionItemsError) {
-        console.error("Failed to write action items:", actionItemsError);
-        // Non-fatal — insights are saved, action items can be retried
-      } else if (insertedItems && insertedItems.length > 0) {
-        insertedActionItemIds = insertedItems.map((ai) => ai.id as string);
-        // Auto-generate a follow-up per action item (Step 7)
-        const { error: followUpError } = await supabase
-          .from("follow_ups")
-          .insert(
-            insertedItems.map((ai) => ({
-              action_item_id: ai.id,
-              meeting_id: ai.meeting_id,
-              status: "pending",
-              priority: "medium",
-              notes: null,
-              updated_at: new Date().toISOString(),
-            })),
-          );
-
-        if (followUpError) {
-          console.error("Failed to auto-generate follow-ups:", followUpError);
-          // Non-fatal — insights + action items are already saved
-        }
-      }
-    }
-
-    // Promise Ledger items (spec 0001). Line numbers are against the full
-    // raw_text; writeLedgerItems never throws, so a ledger failure cannot undo
-    // the insights and action items saved above.
-    await writeLedgerItems(supabase, {
-      meetingId,
-      rawText,
-      items: result.ledgerItems ?? [],
-      actionItemIds: insertedActionItemIds,
+    const { notify } = outcome;
+    after(async () => {
+      if (notify) await notify();
+      await maybeRunLedgerMatch(supabase, meetingId, "page");
     });
-
-    // Notify the owner by email when the "Email notifications" preference is ON.
-    // Non-fatal: any failure is logged and must not block the processing result.
-    let emailSent = false;
-    if (emailNotifications) {
-      try {
-        const clerkUser = await currentUser();
-        const clerkEmail = clerkUser?.primaryEmailAddress?.emailAddress;
-        // Determine recipient email securely.
-        // Prefer Clerk owner email. If not available, look up the participant's email from attendance_events.
-        let participantEmail: string | null = null;
-        if (!clerkEmail) {
-          // Fetch participant email from attendance_events for this meeting and caller.
-          const { data: att } = await supabase
-            .from("attendance_events")
-            .select("participant_email")
-            .eq("meeting_id", meetingId)
-            .or(`user_id.eq.${userId},stream_user_id.eq.${userId}`)
-            .limit(1);
-          participantEmail = att && att[0] ? att[0].participant_email : null;
-        }
-        const to = clerkEmail ?? participantEmail ?? null;
-        if (to) {
-          const { data: meeting } = await supabase
-            .from("meetings")
-            .select("title")
-            .eq("id", meetingId)
-            .single();
-          emailSent = await sendMeetingReadyEmail({
-            to,
-            meetingTitle: meeting?.title ?? "Your meeting",
-            meetingId,
-          });
-        } else {
-          console.warn(
-            "[process] No recipient email found; skipping notification.",
-          );
-        }
-      } catch (emailErr) {
-        console.error("[process] Meeting-ready email failed:", emailErr);
-      }
-    }
-
-    // Mark the transcript fully ready now that AI insights + embeddings exist.
-    try {
-      await setTranscriptState(supabase, meetingId, "ready");
-    } catch {
-      // best-effort; AI work already succeeded.
-    }
-
-    if (projectId && proposalsWritten > 0) {
-      after(() =>
-        notifyProposalsReady(supabase, {
-          projectId,
-          meetingId,
-          meetingTitle: owned.title ?? "",
-          count: proposalsWritten,
-          processedAt,
-        }),
-      );
-    }
 
     return NextResponse.json({
       success: true,
-      insights: result.insights,
-      actionItemCount: result.actionItems.length,
-      emailSent,
-      ...(projectId ? { proposalCount: result.actionItems.length } : {}),
+      insights: outcome.insights,
+      actionItemCount: outcome.actionItemCount,
+      emailSent: outcome.emailSent,
+      ...(outcome.proposalCount !== undefined
+        ? { proposalCount: outcome.proposalCount }
+        : {}),
     });
   } catch (err) {
     console.error("AI processing error:", err);
