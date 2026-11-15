@@ -241,6 +241,8 @@ GET  /api/meetings                 → (extended) adds the same meeting fields; 
 POST /api/stream/webhook           → public, Stream signature only (verifyWebhook HMAC over the raw body, per the Stream skill); call.recording_ready for a saved meeting starts the server pipeline in after(), 200 otherwise with no work
 GET  /api/transcript/status        → (extended) adds steps { recording, transcript, summary }, each "waiting" | "running" | "done" | "failed"
 POST /api/ai/process               → (extended) 409 "Summary is already being created" while the process claim is held
+GET  /api/follow-ups               → (extended) adds meetingStartedAt (started_at, else created_at) so the page groups by meeting
+GET  /api/meetings/[id]            → (extended) on a personal meeting each action item adds followUpId and followUpStatus (null when none)
 ```
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 

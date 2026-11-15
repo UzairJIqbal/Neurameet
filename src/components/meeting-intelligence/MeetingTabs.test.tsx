@@ -23,6 +23,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/actions/meetings", () => ({
   updateMeetingCategory: () => Promise.resolve({ ok: true, error: "" }),
 }));
+// ActionItemsTab's follow-up tick imports @/actions/follow-ups (also `server-only`).
+vi.mock("@/actions/follow-ups", () => ({
+  updateFollowUpStatus: () => Promise.resolve({ ok: true }),
+}));
 
 // jsdom has no layout engine, so these assert the responsive tokens are present
 // (revert guards). The actual horizontal-scroll tab behavior and the Overview

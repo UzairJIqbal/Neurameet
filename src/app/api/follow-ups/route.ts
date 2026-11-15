@@ -19,7 +19,11 @@ interface FollowUpRow {
   updated_at: string;
   meeting_id: string;
   action_item_id: string;
-  meetings: Embedded<{ title: string | null }>;
+  meetings: Embedded<{
+    title: string | null;
+    started_at: string | null;
+    created_at: string | null;
+  }>;
   action_items: Embedded<{
     title: string | null;
     assignee: string | null;
@@ -44,6 +48,8 @@ function toItem(row: FollowUpRow): FollowUpItem {
     notes: row.notes,
     updatedAt: row.updated_at,
     meetingTitle: first(row.meetings)?.title ?? null,
+    meetingStartedAt:
+      first(row.meetings)?.started_at ?? first(row.meetings)?.created_at ?? null,
     actionTitle: first(row.action_items)?.title ?? null,
     assignee: first(row.action_items)?.assignee ?? null,
     dueDate: first(row.action_items)?.due_date ?? null,
@@ -83,7 +89,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("follow_ups")
       .select(
-        "id, status, priority, notes, updated_at, meeting_id, action_item_id, meetings(title), action_items(title, assignee, due_date)",
+        "id, status, priority, notes, updated_at, meeting_id, action_item_id, meetings(title, started_at, created_at), action_items(title, assignee, due_date)",
       )
       .in("meeting_id", meetingIds)
       .order("updated_at", { ascending: false });

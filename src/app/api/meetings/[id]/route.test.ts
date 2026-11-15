@@ -10,6 +10,7 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
     // Phase W: active project memberships (removed_at null).
     members: [] as Array<Record<string, unknown>>,
     transcript: { data: null as unknown, error: null as unknown },
+    followUps: { data: null as unknown, error: null as unknown },
     tables: [] as string[],
   };
   const makeClient = () => ({
@@ -24,7 +25,9 @@ const { store, mockAuth, mockSupabase } = vi.hoisted(() => {
               ? store.insights
               : table === "action_items"
                 ? store.actionItems
-                : { data: null, error: null };
+                : table === "follow_ups"
+                  ? store.followUps
+                  : { data: null, error: null };
       // attendance_events applies the eq filters, so a row for another
       // meeting or another user never counts as proof of participation.
       const filters: Array<[string, unknown]> = [];
@@ -137,6 +140,7 @@ describe("GET /api/meetings/[id] authorization", () => {
       error: null,
     };
     store.actionItems = { data: [], error: null };
+    store.followUps = { data: null, error: null };
     store.members = [];
   });
 
@@ -180,6 +184,46 @@ describe("GET /api/meetings/[id] authorization", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Meeting not found");
+  });
+
+  it("attaches each action item's follow-up on a personal meeting", async () => {
+    store.meetings = { data: meetingRow("u1"), error: null };
+    store.actionItems = {
+      data: [
+        {
+          id: "a1",
+          title: "Ship",
+          assignee: null,
+          due_date: null,
+          review_state: "confirmed",
+        },
+        {
+          id: "a2",
+          title: "Test",
+          assignee: null,
+          due_date: null,
+          review_state: "confirmed",
+        },
+      ],
+      error: null,
+    };
+    store.followUps = {
+      data: [{ id: "f1", action_item_id: "a1", status: "completed" }],
+      error: null,
+    };
+    const body = await (await call("u1", "m1")).json();
+    expect(body.actionItems).toEqual([
+      expect.objectContaining({
+        id: "a1",
+        followUpId: "f1",
+        followUpStatus: "completed",
+      }),
+      expect.objectContaining({
+        id: "a2",
+        followUpId: null,
+        followUpStatus: null,
+      }),
+    ]);
   });
 
   it("returns 404 when the meeting does not exist (PGRST116)", async () => {
@@ -272,6 +316,17 @@ describe("GET /api/meetings/[id] on a project meeting", () => {
     const body = await (await call("u2", "m1")).json();
     expect(body).toMatchObject({ role: "admin", canManage: true });
     expect(body.actionItems).toHaveLength(1);
+  });
+
+  it("never reads follow-ups for a project meeting", async () => {
+    asMember("admin");
+    store.tables = [];
+    const body = await (await call("u2", "m1")).json();
+    expect(store.tables).not.toContain("follow_ups");
+    expect(body.actionItems[0]).toMatchObject({
+      followUpId: null,
+      followUpStatus: null,
+    });
   });
 
   it("does not let the creator manage once they are only a Developer", async () => {

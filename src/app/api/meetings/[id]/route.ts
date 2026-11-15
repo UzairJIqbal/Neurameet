@@ -13,6 +13,7 @@ import {
 import {
   ActionItem,
   ActionItemReviewState,
+  FollowUpStatus,
   GuestAdmissionMode,
   MeetingDetailData,
   MeetingDetailResponse,
@@ -34,6 +35,12 @@ interface ActionItemRow {
   assignee: string | null;
   due_date: string | null;
   review_state: ActionItemReviewState;
+}
+
+interface FollowUpRow {
+  id: string;
+  action_item_id: string;
+  status: FollowUpStatus;
 }
 
 // Personal meeting fallback: a recorded participant (by Clerk user id, by the
@@ -121,6 +128,7 @@ export async function GET(
       { data: project },
       { data: transcript },
       profiles,
+      { data: followUps, error: followUpsError },
     ] = await Promise.all([
       supabase
         .from("meeting_insights")
@@ -151,7 +159,22 @@ export async function GET(
           .eq("meeting_id", id)
           .maybeSingle(),
       lookupProfiles([meeting.user_id]),
+      // Personal meetings only: each action item's follow-up status. Project
+      // meetings use tasks and have no follow-ups.
+      access.projectId
+        ? Promise.resolve({ data: null, error: null })
+        : supabase
+          .from("follow_ups")
+          .select("id, action_item_id, status")
+          .eq("meeting_id", id),
     ]);
+
+    if (followUpsError) {
+      console.error("Failed to load follow-ups for meeting:", followUpsError);
+    }
+    const followUpByItem = new Map(
+      ((followUps ?? []) as FollowUpRow[]).map((f) => [f.action_item_id, f]),
+    );
 
     const meetingData: MeetingDetailData = {
       id: meeting.id,
@@ -190,6 +213,8 @@ export async function GET(
         assignee: row.assignee ?? null,
         dueDate: row.due_date ?? null,
         reviewState: row.review_state,
+        followUpId: followUpByItem.get(row.id)?.id ?? null,
+        followUpStatus: followUpByItem.get(row.id)?.status ?? null,
       }),
     );
 

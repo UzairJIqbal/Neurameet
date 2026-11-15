@@ -179,7 +179,11 @@ const MeetingTabs = ({
             {projectId && role && !isViewer && (
               <ProposalsPanel project={{ id: projectId }} meetingId={meetingId} onChanged={onProposalsChanged} />
             )}
-            <ActionItemsTab insights={insights} actionItems={listedItems} />
+            <ActionItemsTab
+              insights={insights}
+              actionItems={listedItems}
+              canManage={!projectId && isOwner}
+            />
           </div>
         )}
         {isOwner && active === "Recording" && <RecordingTab meeting={meeting} />}

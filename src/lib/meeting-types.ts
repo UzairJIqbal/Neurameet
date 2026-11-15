@@ -87,6 +87,9 @@ export interface ActionItem {
   assignee: string | null;
   dueDate: string | null;
   reviewState: ActionItemReviewState;
+  /** Personal meetings only: the follow-up made from this item, if any. */
+  followUpId?: string | null;
+  followUpStatus?: FollowUpStatus | null;
 }
 
 export interface MeetingDetailResponse {
@@ -142,6 +145,8 @@ export interface FollowUpItem {
   notes: string | null;
   updatedAt: string;
   meetingTitle: string | null;
+  /** started_at, falling back to created_at, so groups can be sorted. */
+  meetingStartedAt: string | null;
   actionTitle: string | null;
   assignee: string | null;
   dueDate: string | null;
@@ -149,7 +154,6 @@ export interface FollowUpItem {
 
 export interface FollowUpDetail extends FollowUpItem {
   meetingStatus: string | null;
-  meetingStartedAt: string | null;
 }
 
 export interface SpeakerInsight {

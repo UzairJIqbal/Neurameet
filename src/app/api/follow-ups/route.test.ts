@@ -36,17 +36,25 @@ describe("GET /api/follow-ups", () => {
           updated_at: "2026-11-01T10:00:00.000Z",
           meeting_id: "m1",
           action_item_id: "a1",
-          meetings: { title: "Standup" },
+          meetings: {
+            title: "Standup",
+            started_at: null,
+            created_at: "2026-11-01T09:00:00.000Z",
+          },
           action_items: { title: "Ship", assignee: null, due_date: null },
         },
       ]),
     );
 
     const res = await GET();
-    const body = (await res.json()) as { followUps: Array<{ id: string }> };
+    const body = (await res.json()) as {
+      followUps: Array<{ id: string; meetingStartedAt: string | null }>;
+    };
 
     expect(res.status).toBe(200);
     expect(body.followUps.map((f) => f.id)).toEqual(["f1"]);
+    // started_at is null, so the meeting date falls back to created_at.
+    expect(body.followUps[0].meetingStartedAt).toBe("2026-11-01T09:00:00.000Z");
     // Project meetings are filtered out of the meeting scope.
     expect(calls).toContainEqual({
       table: "meetings",
