@@ -529,4 +529,27 @@ describe("MeetingRoom guest approval single-click (G2 regression)", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(h.toast.dismiss).not.toHaveBeenCalledWith("gt-1");
   });
+
+  it("shows the pop up for a guest found by the pending poll while in the call", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () =>
+            url.startsWith("/api/guest/pending")
+              ? { pending: [{ guest_token: "gt-2", name: "Iqbal" }] }
+              : {},
+        }),
+      ),
+    );
+    render(<MeetingRoom />);
+    await waitFor(() => {
+      expect(h.toast).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ id: "gt-2" }),
+      );
+    });
+  });
 });
