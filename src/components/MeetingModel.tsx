@@ -27,6 +27,7 @@ import { getMeetingIdFromLink } from "@/lib/utils";
 import { createScheduledMeetingRow } from "@/actions/meetings";
 import { withStreamConnectionRetry } from "@/lib/streamRetry";
 import { DEFAULT_CALL_TYPE, type StreamCallType } from "@/lib/stream-call-type";
+import { GuestAdmissionToggle } from "@/components/GuestAdmissionToggle";
 import { ProjectPicker } from "@/components/ProjectPicker";
 import ParticipantsPicker from "@/components/ParticipantsPicker";
 import {
@@ -387,37 +388,7 @@ const MeetingModel = ({
                 disabled={creating}
               />
               {/* Guest admission mode — owner chooses before creating */}
-              <div className="flex flex-col gap-2">
-                <label className="text-base font-normal leading-[22.4px] text-on-surface-variant text-center">
-                  Guest Admission
-                </label>
-                <div className="flex gap-2 justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setGuestAdmissionMode("open")}
-                    disabled={guestAdmissionMode === "open"}
-                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
-                      guestAdmissionMode === "open"
-                        ? "bg-primary-container text-on-primary"
-                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
-                    } disabled:opacity-60`}
-                  >
-                    Anyone can join
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGuestAdmissionMode("approval")}
-                    disabled={guestAdmissionMode === "approval"}
-                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
-                      guestAdmissionMode === "approval"
-                        ? "bg-primary-container text-on-primary"
-                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
-                    } disabled:opacity-60`}
-                  >
-                    Approval required
-                  </button>
-                </div>
-              </div>
+              <GuestAdmissionToggle value={guestAdmissionMode} onChange={setGuestAdmissionMode} centered />
             </div>
           )}
           {type === "isJoinMeeting" && (
@@ -540,36 +511,8 @@ const MeetingModel = ({
                 />
               )}
               {/* Guest admission mode — owner chooses before scheduling */}
-              <div className="flex flex-col gap-2 mt-4">
-                <label className="text-base font-normal leading-[22.4px] text-on-surface-variant">
-                  Guest Admission
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGuestAdmissionMode("open")}
-                    disabled={guestAdmissionMode === "open"}
-                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
-                      guestAdmissionMode === "open"
-                        ? "bg-primary-container text-on-primary"
-                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
-                    } disabled:opacity-60`}
-                  >
-                    Anyone can join
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGuestAdmissionMode("approval")}
-                    disabled={guestAdmissionMode === "approval"}
-                    className={`rounded-lg px-4 py-2 text-body-md font-medium transition-colors ${
-                      guestAdmissionMode === "approval"
-                        ? "bg-primary-container text-on-primary"
-                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
-                    } disabled:opacity-60`}
-                  >
-                    Approval required
-                  </button>
-                </div>
+              <div className="mt-4">
+                <GuestAdmissionToggle value={guestAdmissionMode} onChange={setGuestAdmissionMode} />
               </div>
             </>
           )}
