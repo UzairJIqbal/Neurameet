@@ -9,7 +9,6 @@ const outcome = (over: Partial<Outcome> = {}): Outcome => ({
   said: { state: "typed" },
   task: { state: "none" },
   shipped: { state: "none" },
-  kept: { state: "none" },
   ...over,
 });
 
@@ -20,26 +19,21 @@ describe("OutcomeCard wording (AC-60)", () => {
     [{ said: { state: "typed" } }, "Typed by hand, no quote"],
     [{ said: { state: "no_quote" } }, "Confirmed without a quote"],
     [{ said: { state: "hidden" } }, "Hidden for viewers"],
-    [{ task: { state: "waiting" } }, "Waiting in proposals"],
-    [{ task: { state: "rejected" } }, "Proposal rejected"],
     [{ task: { state: "none" } }, "No task yet"],
-    [{ task: { state: "decision" } }, "No task, this is a decision"],
     [{ shipped: { state: "reverted" } }, "Reverted"],
     [{ shipped: { state: "manual" } }, "Completed by hand, no PR"],
-    [{ shipped: { state: "not_applicable" } }, "Not needed"],
     [{ shipped: { state: "merged" } }, "Merged"],
-    [{ kept: { state: "partial", keptCount: 1, total: 2 } }, "1 of 2 kept"],
-    [{ kept: { state: "reversed" } }, "Reversed"],
-    [{ kept: { state: "review" } }, "Waiting for review"],
-    [{ kept: { state: "no_promise" } }, "No promise linked"],
   ])("%j reads %s", (over, words) => {
     render(<OutcomeCard outcome={outcome(over)} />);
     expect(screen.getAllByText(words).length).toBeGreaterThan(0);
   });
 
-  it("reads Kept as the last step's value, beside its label", () => {
-    render(<OutcomeCard outcome={outcome({ kept: { state: "kept" } })} />);
-    expect(screen.getAllByText("Kept")).toHaveLength(2);
+  it("shows three steps and no Kept step (spec 0006)", () => {
+    render(<OutcomeCard outcome={outcome()} />);
+    for (const label of ["Said", "Task", "Shipped"]) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    expect(screen.queryByText("Kept")).toBeNull();
   });
 
   it("shows the quote, its speaker and line, and the count of others", () => {

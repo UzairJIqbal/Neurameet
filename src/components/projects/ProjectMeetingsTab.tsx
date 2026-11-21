@@ -219,7 +219,6 @@ const SummaryCard = ({ meeting }: { meeting: MeetingListItem }) => {
         {meeting.summaryExcerpt}
       </p>
       <p className="flex flex-wrap gap-x-3 text-xs text-on-surface-variant">
-        <span>{meeting.decisionCount ?? 0} decisions</span>
         <span>{meeting.actionItemCount ?? 0} action items</span>
         {reviewCount > 0 && (
           <span className="text-on-warning-container">

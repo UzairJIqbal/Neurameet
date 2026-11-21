@@ -60,27 +60,14 @@ Transcript Generation (new — sequential Steps F0 to F6, after Meeting Experien
   Step F6, Verify end-to-end with a real bilingual test meeting (English + Urdu).
   ZERO-COST RULE applies: Stream individual recording + Groq Whisper free tier only. No paid API, paid transcription service, or second provider.
 
-Signature Feature: Promise Ledger (new — Steps S0+, after Product Final Polishing, before Deploy):
-  The one feature meant to make NeuraMeet stand out (chosen 2026-10-30 from `reports/NeuraMeet unique FYP feature.md`). After each meeting, extract every decision and promise (who, what, by when) in English, Urdu, or mixed Urdu English; on later meetings mark each kept, open, overdue, or reversed with the exact quote and timestamp as proof; the owner confirms or rejects each match. Runs post-meeting on existing transcripts.
-  Step S0, Architect: `/architect promise ledger` decides the data model, extraction inside `/api/ai/process` (extend, don't duplicate), cross-meeting matching via existing pgvector, and any new API route (add it to the API Contracts list before coding). Workflow tier GA.
-  Steps S1+, Build: filled from the S0 spec.
-  ZERO-COST RULE applies: Gemini + Groq + pgvector only. Claim wording stays narrow ("none of the major platforms or notetakers we reviewed").
-
-Signature Feature: Live Ledger (new — Steps LL0+, after the Promise Ledger, before Deploy):
-  Takes the Promise Ledger into the live call (chosen 2026-11-02 from `reports/NeuraMeet second signature feature.md`). Promise Check-in: the owner raises an open or overdue promise and every participant sees it as a quote card; the owner marks it Kept, Still open, or Reversed live. Agreement Check: the host types a decision, participants tap Agree or Not yet, saved to the ledger as "agreed by N of M".
-  Step LL0, Architect: `/architect live ledger` decides the routes (add them to the API Contracts list before coding), live marks storage and post call reconcile into `ledger_items` / `ledger_links`, the server side custom event shape (Stream 5 KB cap), owner only rules, and throttling. Verify every Stream API via the `stream-react` skill first. Workflow tier GA.
-  Steps LL1+, Build: filled from the LL0 spec. A speech trigger is a stretch step only.
-  ZERO-COST RULE applies: Stream free tier custom events + existing Gemini/Groq/pgvector only. No paid captions, no extra Whisper calls, no new provider.
-
-Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5, built in code, live run pending, before Deploy):
-  Every attendee confirms, corrects, or records a dissent ("Record my view") on the AI minutes lines attributed to them; each line links to its supporting transcript lines; minutes seal on quorum or deadline (SHA-256 chain + Ed25519 signature, server only key) so any later change is detectable. Spec `docs/specs/0003-tasdeeq-verified-minutes/index.md`, scope #19, GA. Say "tamper evident", never "legally binding".
+Signature Features Promise Ledger, Live Ledger, and Tasdeeq (Steps S, LL, T): built, then removed 2026-11-21 by spec `docs/specs/0006-remove-ledger-and-minutes/`. Do not rebuild them unless asked.
 
 Phase W, Project Workspace: Conversations to Code (new — Steps W-pre, W0 to W9, after the Signature Features, before Deploy):
-  Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview` and `reports/Conversations to code workspace.md`. NeuraMeet becomes a project workspace that connects conversations with code. Centre of gravity is the Proof Chain: a spoken promise (code verified quote, speaker, timestamp) → human reviewed task → PR merged into the default branch → promise marked kept, visible from the meeting and the Promise Ledger. Claim stays narrow ("none of the products we reviewed"); Huly, Linear, Jira + Loom/Rovo already ship the individual screens.
-  Step W-pre: commit in flight Live Ledger + Tasdeeq work; run LL5 and the Tasdeeq live run.
+  Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview` and `reports/Conversations to code workspace.md`. NeuraMeet becomes a project workspace that connects conversations with code. Centre of gravity is the Proof Chain: a spoken promise (code verified quote, speaker, timestamp) → human reviewed task → PR merged into the default branch (Said, Task, Shipped on the task's Outcome card). Claim stays narrow ("none of the products we reviewed"); Huly, Linear, Jira + Loom/Rovo already ship the individual screens.
+  Step W-pre: done (LL5 and the Tasdeeq live run cancelled by spec 0006).
   Step W0, Architect: `/architect conversations to code` decides the role matrix (Owner, Admin, Developer, Viewer), offboarding and retention, GitHub linking rules, whether a merge completes a task directly or pending owner confirm, repo sharing, the Resend sending domain, and every new API route (add to the API Contracts list before coding) and new secret (add to Security). Workflow tier GA.
-  Steps W1 to W9 (scope #20 to #27): W1 projects, members, shared server role check (replaces per route `meetings.user_id` owner checks; `meetings.project_id` nullable so personal meetings keep working); W2 invitations (hashed single use tokens, expiry, owner approval, Resend email + copy link fallback); W3 project meetings + consent notice; W4 review gate (no auto created follow ups; quote verified, own track assignee rule, pgvector duplicate check) + keyed tasks + Kanban; W5 GitHub App (raw body HMAC `X-Hub-Signature-256`, `X-GitHub-Delivery` dedupe, `after()` processing, strict completion rules, revert reopens, Sync reconcile); W6 Proof Chain surfaces (Decisions and Promises tab on `ledger_items`, code evidence, Outcome card, Activity timeline); W7 project assistant (extend `/api/ai/chat` + `/api/search` with project scope, filter by project inside SQL, code built citations, untrusted data wrapping); W8 workspace shell + personal views + notifications + Ctrl K; W9 security suite + bilingual end to end run.
-  Decisions locked 2026-11-02: projects, members, roles, and invites live in our own Supabase tables (not Clerk Organizations); the PDF is used for layout and information architecture only and the tokens in `context/ui-tokens.md` apply (success and warning added at W8; the palette was replaced by DotTime on 2026-11-08); live captions leave the core (paid on Stream, no Urdu) and are an optional post W9 Web Speech experiment; Promise Ledger, Live Ledger, and Tasdeeq stay (Decisions and Promises tab, live meeting panel, optional Verify minutes step before task confirmation).
+  Steps W1 to W9 (scope #20 to #27): W1 projects, members, shared server role check (replaces per route `meetings.user_id` owner checks; `meetings.project_id` nullable so personal meetings keep working); W2 invitations (hashed single use tokens, expiry, owner approval, Resend email + copy link fallback); W3 project meetings + consent notice; W4 review gate (no auto created follow ups; quote verified, own track assignee rule, pgvector duplicate check) + keyed tasks + Kanban; W5 GitHub App (raw body HMAC `X-Hub-Signature-256`, `X-GitHub-Delivery` dedupe, `after()` processing, strict completion rules, revert reopens, Sync reconcile); W6 Proof Chain surfaces (Outcome card, Activity timeline); W7 project assistant (extend `/api/ai/chat` + `/api/search` with project scope, filter by project inside SQL, code built citations, untrusted data wrapping); W8 workspace shell + personal views + notifications + Ctrl K; W9 security suite + bilingual end to end run.
+  Decisions locked 2026-11-02: projects, members, roles, and invites live in our own Supabase tables (not Clerk Organizations); the PDF is used for layout and information architecture only and the tokens in `context/ui-tokens.md` apply (success and warning added at W8; the palette was replaced by DotTime on 2026-11-08); live captions leave the core (paid on Stream, no Urdu) and are an optional post W9 Web Speech experiment; Promise Ledger, Live Ledger, and Tasdeeq were removed on 2026-11-21 (spec 0006).
   Cut: the PDF's development simulator, Contributors tab and per developer contribution views, a global assistant outside projects, sprints, raw commit ingestion beyond PR linked commits.
   ZERO-COST RULE applies: free GitHub App + webhooks, Supabase, Vercel Hobby (`after()`, once a day cron), Gemini/Groq/pgvector, Stream free tier, Clerk free, Resend free. No paid captions, no Clerk paid roles, no new AI provider.
 
@@ -131,36 +118,12 @@ GET  /api/transcript/status          → poll transcript generation state (not_s
 DELETE /api/meetings/[id]           → cascade delete a meeting + transcripts + chunks + action items + follow-ups + attendance (owner-only)
 DELETE /api/recordings/[id]         → delete a Stream recording via call.deleteRecording (owner-only)
 DELETE /api/follow-ups/[id]         → delete a follow-up (owner-only)
-POST /api/ai/process               → (extended) also extracts up to 15 ledger items into ledger_items
 POST /api/transcript/upload        → (extended) optional meetingDate (YYYY-MM-DD) sets started_at on new meetings only
-POST /api/ledger/match             → owner only: match this meeting's transcript against earlier open ledger items, store suggested links
-GET  /api/ledger                   → owner only: ?meetingId=&today=YYYY-MM-DD, this meeting's items + links, incoming links, reversal count
-POST /api/ledger/links/[id]/review → personal meeting owner, or project Owner or Admin: { decision: "confirm" | "reject" | "reset" }
-POST /api/prep                     → (extended) adds a deterministic ledgerItems list (top 5 open or overdue)
-GET  /api/ledger/live/checkin      → owner only: ?callId=&today=YYYY-MM-DD, up to 20 open/overdue items from the owner's other meetings (deterministic, no AI)
-GET  /api/ledger/live              → participant: ?callId=&today=YYYY-MM-DD (+ guestStreamToken for guests), open card + open agreement with tallies and the caller's vote
-POST /api/ledger/live/card         → owner only: { callId, itemId, action: "raise" | "mark" | "close", mark?, today? (YYYY-MM-DD, raise) }, stores the live mark, sends a ledger.card* event
-POST /api/ledger/live/agreement    → owner only: { callId, action: "open" | "close", statement?, agreementId? }, close writes a decision ledger item "agreed by N of M"
-POST /api/ledger/live/vote         → participant: { callId, agreementId, vote: "agree" | "not_yet", guestStreamToken? }, one vote per voter, sends a tally event (best effort: the vote is stored even if the event fails)
-GET  /api/ledger                   → (extended) items carry source, agreedCount, totalCount, liveMark
-POST /api/ledger/match             → (extended) live marks join the candidates; a verdict matching the live mark is stored as confirmed
-GET  /api/minutes                 → owner or recorded participant: ?meetingId=, draft (owner, before open) or review state, lines, evidence, claims, my answers, all answers, my suggestions, progress, seal
-POST /api/minutes/review          → owner only: { meetingId, action: "open" | "cancel", deadlineDays?: 3 | 7 }, open freezes lines and attesters and sends "Review open" emails
-POST /api/minutes/claim           → attester: { meetingId, action: "claim" | "assign" | "clear", speakerLabel, userId? (assign) }, assign and clear are owner only
-POST /api/minutes/attest          → attester: { meetingId, action: "confirm" | "correct" | "view" | "finish", lineId?, note?, suggestionId? }, latest answer wins, late flagged
-POST /api/minutes/suggestion      → holder of the label: { meetingId, suggestionId, action: "dismiss" }
-POST /api/minutes/seal            → owner only: { meetingId }, signed chained SHA-256 seal, sends "Minutes sealed" emails
-GET  /api/minutes/verify          → public: ?sealId= (&hash=), intact or altered, hash, title, date, status text, never the minutes text
-GET  /api/minutes/pdf             → attester, after seal: ?meetingId=, application/pdf with Content-Disposition attachment
-POST /api/ai/process              → (extended) also writes minutes_draft; 409 while a minutes review exists
-POST /api/transcript/upload       → (extended) 409 when meetingId has a minutes review
-POST /api/transcript/download     → (extended) 409 when generation would rewrite a transcript under a minutes review
-DELETE /api/meetings/[id]         → (extended) 409 "Sealed minutes can't be deleted" when sealed
 POST /api/projects                 → create a project { name, taskPrefix (2 to 5 capital letters) }, caller becomes Owner
 GET  /api/projects                 → projects you are an active member of, with your role
 GET  /api/projects/[id]            → member: project, your role, counts
 PATCH /api/projects/[id]           → owner only: { name }
-DELETE /api/projects/[id]          → owner only: { confirmName }, deletes the project and its meetings; 409 while any meeting has sealed minutes
+DELETE /api/projects/[id]          → owner only: { confirmName }, deletes the project and its meetings
 GET  /api/projects/[id]/members    → member: active members with role
 PATCH /api/projects/[id]/members/[userId]  → owner or admin: { role }; only the owner grants or removes admin; never your own role
 DELETE /api/projects/[id]/members/[userId] → owner or admin removes, or you leave; open tasks go Unassigned; the owner must transfer first
@@ -172,7 +135,7 @@ GET  /api/invitations/preview      → signed in: ?token=, project name, role, k
 POST /api/invitations/accept       → signed in: { token }; email kind joins, link kind creates a pending join request
 GET  /api/projects/[id]/join-requests      → owner or admin: pending join requests
 POST /api/projects/[id]/join-requests/[requestId] → owner or admin: { decision: "approve" | "deny" }
-POST /api/meetings/[id]/project    → meeting creator with developer or higher in the target: { projectId }, moves a personal meeting in; 409 under a minutes review
+POST /api/meetings/[id]/project    → meeting creator with developer or higher in the target: { projectId }, moves a personal meeting in
 POST /api/meetings/[id]/consent    → member: { noticeVersion }, stores the consent tick before joining a project call
 GET  /api/meetings/by-call/[callId] → (extended) adds callType ("default" | "project")
 POST /api/guest/request-join       → (extended) on a project meeting requires { consented: true }; response adds callType
@@ -189,10 +152,6 @@ POST /api/projects/[id]/github/repos       → owner only: { repoId } from your 
 DELETE /api/projects/[id]/github/repos/[repoId] → owner only: unlink
 POST /api/projects/[id]/github/sync        → owner or admin: read PR state again for open links and apply the same rules
 GET  /api/tasks/[id]               → (extended) prLinks holds the real PR links; Viewers get state, merged, and reverted only, never repo name, PR title, or URL
-GET  /api/ledger                   → (extended) links carry evidenceKind, nullable evidenceMeetingId and lineNumber, and pr { repoFullName, prNumber, prUrl, reverted } on a code link
-POST /api/ledger/links/[id]/review → (extended) 409 "This PR was reverted" on confirm or reset when a code link's PR was reverted
-GET  /api/projects/[id]/ledger     → member: Decisions and Promises across the project's meetings (?kind=&status=&cursor=), redacted for viewers
-POST /api/ledger/links/[id]/review → (extended) accepts code links; on a project meeting owner or admin
 GET  /api/projects/[id]/activity   → member: Activity timeline (?before=)
 POST /api/ai/chat                  → (extended) { projectId } project assistant, developer or higher, project filtered in SQL, citations built in code
 POST /api/ai/process               → (extended) on a project meeting writes proposals, never follow ups; 409 once any proposal was reviewed
@@ -200,15 +159,12 @@ GET  /api/meetings                 → (extended) adds project meetings from you
 GET  /api/meetings/[id]            → (extended) adds projectId, projectName, role, canManage (false for Developer and Viewer); Viewers get no transcript fields and only confirmed action items
 (all owner only meeting routes)    → (extended) on a project meeting the project Owner or Admin passes; meeting delete stays Owner only
 POST /api/search                   → (extended) { query, projectId? } scopes to one project where you are developer or higher
-GET  /api/projects/[id]/ledger     → (extended) items carry outcome; adds nextCursor, canReview, needsReview, reviewCount; a bad cursor is 422
 GET  /api/projects/[id]/activity   → (extended) ?before= is a timestamp|id cursor; rows are allowlisted for every role; adds nextBefore
 GET  /api/tasks/[id]               → (extended) adds outcome
-GET  /api/ledger                   → (extended) adds outcome on project meetings; a Viewer's items and links omit quote, speaker, and line
-POST /api/ledger/links/[id]/review → (extended) records decided_by
-GET  /api/projects/search          → signed in: Ctrl K palette (?q=), title and key match across your active projects and your personal meetings, plus decision statements, no embeddings
+GET  /api/projects/search          → signed in: Ctrl K palette (?q=), title and key match across your active projects and your personal meetings, no embeddings
 POST /api/projects                 → (extended) adds description?, projectType?, icon?, color?
 GET  /api/projects                 → (extended) adds the My Projects card fields, private repos hidden from Viewers
-GET  /api/projects/[id]            → (extended) adds project details, task totals, openTaskCount, overdueTaskCount, upcomingMeetingCount, decisionCount, linkedPrCount, github { connected, repos, lastSyncedAt } (public repos only for Viewers)
+GET  /api/projects/[id]            → (extended) adds project details, task totals, openTaskCount, overdueTaskCount, upcomingMeetingCount, linkedPrCount, github { connected, repos, lastSyncedAt } (public repos only for Viewers)
 PATCH /api/projects/[id]           → (extended) owner only: { name?, description?, status?, projectType?, icon?, color? }
 GET  /api/projects/[id]/members    → (extended) adds imageUrl, githubLogin, openTaskCount
 GET  /api/projects/[id]/github/summary → developer or higher: linked repos, last sync, linked PR counts and rows
@@ -224,7 +180,6 @@ POST /api/projects/[id]/invitations/[invitationId]/resend → owner or admin: ne
 GET  /api/invitations/preview      → (extended) adds inviter, project details, counts, dates; team names and invitationId only on a matching email invite; repo name only when public
 GET  /api/invitations/mine         → signed in: active email invites for your verified email, never a token
 POST /api/invitations/mine/[id]    → signed in, matching email: { decision: "accept" | "decline" }
-GET  /api/projects/[id]/ledger     → (extended) ?meetingId=&q=&tag=; q matches statement only; items add tag, participants
 GET  /api/projects/[id]/activity   → (extended) ?category=&actorId=; adds categoryCounts
 GET  /api/my-tasks                 → signed in: your open tasks across active projects capped at 200, your latest 50 completed, with truncated
 GET  /api/my-counts                → signed in: openTasks, upcomingMeetings, unread, prReviews for the sidebar
@@ -247,7 +202,7 @@ GET  /api/meetings/[id]            → (extended) on a personal meeting each act
 Never invent alternate paths or flip a method between sessions — this list is the contract.
 
 ## Security
-Never expose to the browser: `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `STREAM_SECRET_KEY`, `CLERK_SECRET_KEY`, `MINUTES_SIGNING_PRIVATE_KEY`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_CLIENT_SECRET`, `CRON_SECRET`.
+Never expose to the browser: `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `STREAM_SECRET_KEY`, `CLERK_SECRET_KEY`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_CLIENT_SECRET`, `CRON_SECRET`.
 Never run from the browser: embedding generation, RAG retrieval, LLM calls, Supabase service-role writes. All of the above go through API routes only, using the Supabase server client and AI SDK server-side.
 
 ## Code Standards

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { callTypeOfRow } from "@/lib/stream-call-type-server";
-import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { generateTranscriptForMeeting } from "@/agent/transcript-generation";
 import {
   claimTranscriptGeneration,
@@ -134,10 +133,6 @@ export async function POST(request: Request) {
     if (access.role && !NEED_ROLES.manage.includes(access.role)) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
-
-    // Tasdeeq AC-7: generation would rewrite a transcript under a minutes review.
-    const locked = await assertMinutesUnlocked(supabase, meetingId);
-    if (locked) return locked;
 
     // No ready cache: take the generation lock. A fresh `pending` row means
     // another request is already transcribing, so answer `pending` and let the

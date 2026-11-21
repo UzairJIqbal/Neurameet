@@ -13,7 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { relativeTime } from "@/lib/chatHistory";
-import { deleteProject, listMembers, removeMember, syncGitHub } from "@/lib/project-client";
+import {
+  deleteProject,
+  listMembers,
+  removeMember,
+  syncGitHub,
+} from "@/lib/project-client";
 import { syncSummary } from "@/lib/github-types";
 import { canManageInvites, type ProjectFull } from "@/lib/project-types";
 import {
@@ -169,13 +174,17 @@ const DeleteDialog = ({
         aria-labelledby="delete-project-title"
         className="flex w-full max-w-md flex-col gap-4 rounded-card bg-surface-container-lowest p-6 shadow-lg"
       >
-        <h2 id="delete-project-title" className="text-headline-sm text-on-surface">
+        <h2
+          id="delete-project-title"
+          className="text-headline-sm text-on-surface"
+        >
           Delete this project?
         </h2>
         <p className="text-body-md text-on-surface-variant">
-          This deletes the project and all {project.meetingCount} of its meetings, with their
-          transcripts, insights, and ledger. Type{" "}
-          <span className="font-medium text-on-surface">{project.name}</span> to confirm.
+          This deletes the project and all {project.meetingCount} of its
+          meetings, with their transcripts and insights. Type{" "}
+          <span className="font-medium text-on-surface">{project.name}</span> to
+          confirm.
         </p>
         <input
           type="text"
@@ -185,7 +194,12 @@ const DeleteDialog = ({
           className="rounded-xl border border-surface-variant bg-surface-container-lowest px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none"
         />
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={onCancel} disabled={busy} className={outlineButton}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className={outlineButton}
+          >
             Cancel
           </button>
           <button
@@ -336,7 +350,9 @@ const ProjectHeader = ({
         </DropdownMenu>
       </div>
 
-      {deleting && <DeleteDialog project={project} onCancel={() => setDeleting(false)} />}
+      {deleting && (
+        <DeleteDialog project={project} onCancel={() => setDeleting(false)} />
+      )}
 
       {leaving && (
         <LeaveDialog

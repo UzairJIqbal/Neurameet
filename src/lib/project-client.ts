@@ -40,14 +40,10 @@ import type {
   GitHubSummaryResponse,
   GitHubSyncResult,
 } from "@/lib/github-types";
-import type {
-  ActivityResponse,
-  ProjectLedgerResponse,
-} from "@/lib/proof-types";
+import type { ActivityResponse } from "@/lib/proof-types";
 import type {
   MeetingListItem,
   MeetingPrepSuggestions,
-  PrepLedgerItem,
 } from "@/lib/meeting-types";
 
 export class ProjectClientError extends Error {
@@ -356,36 +352,10 @@ export function listProjectMeetings(id: string, signal?: AbortSignal) {
 
 /** Runs the AI only when you ask (AC-70b): call this from a click, never on load. */
 export function prepareMeeting(title: string) {
-  return request<{
-    suggestions: MeetingPrepSuggestions;
-    ledgerItems?: PrepLedgerItem[];
-  }>("/api/prep", { method: "POST", body: JSON.stringify({ title }) });
-}
-
-export function getProjectLedger(
-  id: string,
-  filters: {
-    kind?: string;
-    status?: string;
-    meetingId?: string;
-    q?: string;
-    tag?: string;
-    cursor?: string | null;
-  },
-  signal?: AbortSignal,
-) {
-  const params = new URLSearchParams();
-  if (filters.kind) params.set("kind", filters.kind);
-  if (filters.status) params.set("status", filters.status);
-  if (filters.meetingId) params.set("meetingId", filters.meetingId);
-  if (filters.q) params.set("q", filters.q);
-  if (filters.tag) params.set("tag", filters.tag);
-  if (filters.cursor) params.set("cursor", filters.cursor);
-  const query = params.toString();
-  return request<ProjectLedgerResponse>(
-    `${base(id)}/ledger${query ? `?${query}` : ""}`,
-    { signal },
-  );
+  return request<{ suggestions: MeetingPrepSuggestions }>("/api/prep", {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
 }
 
 export function listActivity(

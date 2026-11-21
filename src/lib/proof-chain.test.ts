@@ -2,19 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import {
-  keptForItem,
-  keptForTask,
-  saidForItem,
-  saidForTask,
-  shippedStep,
-  taskStepForItem,
-  type ProofLinkRow,
-} from "./proof-chain";
+import { saidForTask, shippedStep, type ProofLinkRow } from "./proof-chain";
 
 const item = {
   meetingId: "m1",
-  meetingTitle: "Standup",
   quote: "main Friday tak bhej dunga",
   speaker: "Ali",
   lineNumber: 4,
@@ -48,23 +39,53 @@ const branches = new Map([[1, "main"]]);
 const open = { completion_kind: null, completion_evidence: null };
 
 describe("Said", () => {
-  it("shows the quote, speaker, and line", () => {
-    expect(saidForItem(item, false)).toMatchObject({
+  it("shows the task's own quote, speaker, and line", () => {
+    const step = saidForTask(
+      {
+        ...said,
+        hasSource: true,
+        quote: item.quote,
+        quoteSpeaker: "Ali",
+        quoteLine: 4,
+        meetingId: "m1",
+        meetingTitle: "Standup",
+      },
+      false,
+    );
+    expect(step).toMatchObject({
       state: "quoted",
       quote: item.quote,
       speaker: "Ali",
       lineNumber: 4,
       meetingId: "m1",
+      meetingTitle: "Standup",
     });
   });
 
   it("hides the quote from a Viewer but keeps the meeting", () => {
-    const step = saidForItem(item, true);
+    const step = saidForTask(
+      {
+        ...said,
+        hasSource: true,
+        quote: item.quote,
+        meetingId: "m1",
+        meetingTitle: "Standup",
+      },
+      true,
+    );
     expect(step).toEqual({
       state: "hidden",
       meetingId: "m1",
       meetingTitle: "Standup",
     });
+  });
+
+  it("reads no quote when the earliest merged item has none", () => {
+    const step = saidForTask(
+      { ...said, mergedItems: [{ ...item, quote: null }] },
+      false,
+    );
+    expect(step).toMatchObject({ state: "no_quote", meetingId: "m1" });
   });
 
   it("reads typed for a task with no source", () => {
@@ -102,47 +123,6 @@ describe("Said", () => {
     const step = saidForTask({ ...said, mergedItems: [item] }, true);
     expect(step.state).toBe("hidden");
     expect(step.quote).toBeUndefined();
-  });
-});
-
-describe("Task", () => {
-  const task = { id: "t1", number: 3, status: "in_progress" };
-
-  it("reads a decision before anything else", () => {
-    expect(taskStepForItem("decision", task, null, "NM", false)).toEqual({
-      state: "decision",
-    });
-  });
-
-  it("links the task with its key", () => {
-    expect(
-      taskStepForItem("promise", task, "rejected", "NM", false),
-    ).toMatchObject({
-      state: "linked",
-      taskId: "t1",
-      key: "NM-3",
-    });
-  });
-
-  it("reads waiting and rejected from the proposal", () => {
-    expect(
-      taskStepForItem("promise", null, "proposed", null, false).state,
-    ).toBe("waiting");
-    expect(
-      taskStepForItem("promise", null, "rejected", null, false).state,
-    ).toBe("rejected");
-    expect(taskStepForItem("promise", null, null, null, false).state).toBe(
-      "none",
-    );
-  });
-
-  it("gives a Viewer no proposal state", () => {
-    expect(taskStepForItem("promise", null, "proposed", null, true).state).toBe(
-      "none",
-    );
-    expect(taskStepForItem("promise", null, "rejected", null, true).state).toBe(
-      "none",
-    );
   });
 });
 
@@ -225,42 +205,5 @@ describe("Shipped", () => {
     expect(
       shippedStep({ completion_kind: "manual" }, [], branches, false).state,
     ).toBe("manual");
-  });
-});
-
-describe("Kept", () => {
-  it("follows the item's status and its review state", () => {
-    expect(keptForItem("kept", false).state).toBe("kept");
-    expect(keptForItem("reversed", true).state).toBe("reversed");
-    expect(keptForItem("open", true).state).toBe("review");
-    expect(keptForItem("open", false).state).toBe("none");
-  });
-
-  const open1 = { status: "open" as const, hasSuggested: false };
-  const kept1 = { status: "kept" as const, hasSuggested: false };
-
-  it("reads no promise on a task with no items", () => {
-    expect(keptForTask([]).state).toBe("no_promise");
-  });
-
-  it("reads 1 of 2 kept for a merged proposal", () => {
-    expect(keptForTask([kept1, open1])).toEqual({
-      state: "partial",
-      keptCount: 1,
-      total: 2,
-    });
-  });
-
-  it("reads kept only when every item is kept", () => {
-    expect(keptForTask([kept1, kept1]).state).toBe("kept");
-  });
-
-  it("lets a reversal win, then a review", () => {
-    expect(
-      keptForTask([kept1, { status: "reversed", hasSuggested: false }]).state,
-    ).toBe("reversed");
-    expect(
-      keptForTask([kept1, { status: "open", hasSuggested: true }]).state,
-    ).toBe("review");
   });
 });

@@ -18,7 +18,6 @@ import {
 import { LoadError } from "@/components/ui/load-error";
 import { activitySentence } from "@/lib/activity-text";
 import {
-  getProjectLedger,
   listActivity,
   listMembers,
   listProjectMeetings,
@@ -321,14 +320,8 @@ const OverviewTab = ({ project, onSchedule, onAddMember }: Props) => {
   const review = useCardLoad(
     useCallback(
       async (signal: AbortSignal) => {
-        const [proposals, ledger] = await Promise.all([
-          listProposals(id, signal),
-          getProjectLedger(id, {}, signal),
-        ]);
-        return {
-          proposals: proposals.proposals.length,
-          promises: ledger.canReview ? ledger.reviewCount : 0,
-        };
+        const proposals = await listProposals(id, signal);
+        return { proposals: proposals.proposals.length };
       },
       [id],
     ),
@@ -450,22 +443,14 @@ const OverviewTab = ({ project, onSchedule, onAddMember }: Props) => {
           <h2 className={CARD_TITLE}>Waiting for review</h2>
           <CardBody load={review} label="what waits for review">
             {(data) =>
-              data.proposals === 0 && data.promises === 0 ? (
+              data.proposals === 0 ? (
                 <p className={MUTED}>Nothing waits for review.</p>
               ) : (
                 <div className="flex flex-wrap gap-4">
-                  {data.proposals > 0 && (
-                    <Link href={tabHref(id, "tasks")} className={LINK}>
-                      {data.proposals} pending proposal
-                      {data.proposals === 1 ? "" : "s"}
-                    </Link>
-                  )}
-                  {data.promises > 0 && (
-                    <Link href={tabHref(id, "promises")} className={LINK}>
-                      {data.promises} promise{data.promises === 1 ? "" : "s"} to
-                      review
-                    </Link>
-                  )}
+                  <Link href={tabHref(id, "tasks")} className={LINK}>
+                    {data.proposals} pending proposal
+                    {data.proposals === 1 ? "" : "s"}
+                  </Link>
                 </div>
               )
             }

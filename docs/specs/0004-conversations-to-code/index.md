@@ -6,6 +6,7 @@
 **Scope feature**: [docs/scope/scope.md, rows 20 to 27. Project Workspace](../../scope/scope.md)
 **Workflow tier**: GA
 **Build approach**: Extend, built as end to end slices (one W step at a time, each one shippable)
+**Removed by [0006](../0006-remove-ledger-and-minutes/index.md)**: the Kept step of the Outcome card, the Decisions and Promises tab, and code evidence on ledger links. The Proof Chain now ends at the merged PR (Said, Task, Shipped).
 **Builds on**: [0001. Promise Ledger](../0001-promise-ledger/index.md) · [0002. Live Ledger](../0002-live-ledger/index.md) · [0003. Tasdeeq, Verified Minutes](../0003-tasdeeq-verified-minutes/index.md)
 
 ## Structure

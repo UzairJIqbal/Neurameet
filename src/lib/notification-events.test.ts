@@ -14,7 +14,6 @@ import { client, queue, ok, resetQueues } from "@/test/supabase-queue-mock";
 import {
   notifyJoinApproved,
   notifyJoinRequest,
-  notifyKeptSuggestions,
   notifyMemberJoined,
   notifyProjectInvitation,
   notifyMemberRoleChanged,
@@ -192,32 +191,6 @@ describe("notifyRevertReopened", () => {
       title: "NM-7 reopened by a revert",
       dedupeKey: "task_reopened_by_revert:t1:12",
     });
-  });
-});
-
-describe("notifyKeptSuggestions", () => {
-  it("sends one notice per suggested ledger link", async () => {
-    queue("task_links", ok([{ id: "l1" }]));
-    queue("ledger_links", ok([{ id: "k1" }, { id: "k2" }]));
-    queueTask();
-    await notifyKeptSuggestions(supabase, "t1");
-    expect(sent().map((n) => (n as { dedupeKey: string }).dedupeKey)).toEqual([
-      "kept_suggestion:k1",
-      "kept_suggestion:k2",
-    ]);
-    expect(sent()[0]).toMatchObject({
-      userIds: ["owner", "admin"],
-      title: "A merge may keep a promise",
-      body: "NM-7: check it in Decisions and Promises.",
-      link: "/projects/p1?tab=promises",
-    });
-  });
-
-  it("does nothing without a suggested link", async () => {
-    queue("task_links", ok([{ id: "l1" }]));
-    queue("ledger_links", ok([]));
-    await notifyKeptSuggestions(supabase, "t1");
-    expect(notify).not.toHaveBeenCalled();
   });
 });
 

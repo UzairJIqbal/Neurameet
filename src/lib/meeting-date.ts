@@ -1,6 +1,17 @@
-// Optional "Meeting date" on transcript upload (Promise Ledger spec 0001,
-// AC-5). The date anchors relative due dates, so it becomes started_at on a new
-// meeting at noon UTC (noon keeps the calendar day stable in any time zone).
+// Optional "Meeting date" on transcript upload. The date anchors relative due
+// dates in action items, so it becomes started_at on a new meeting at noon UTC
+// (noon keeps the calendar day stable in any time zone).
+
+/** The app's display time zone: dates and "today" are shown in Pakistan time. */
+export const APP_TZ = "Asia/Karachi";
+
+/** Today in the browser's own time zone, as YYYY-MM-DD (the date input's max). */
+export const localToday = (): string => {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+};
 
 export type MeetingDateResult =
   { ok: true; startedAt: string | null } | { ok: false; error: string };

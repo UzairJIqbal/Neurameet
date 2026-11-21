@@ -4,7 +4,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const {
   mockClaim,
   mockMark,
-  mockMatch,
   mockGenerate,
   mockClaimGen,
   mockGetState,
@@ -12,7 +11,6 @@ const {
 } = vi.hoisted(() => ({
   mockClaim: vi.fn(),
   mockMark: vi.fn(),
-  mockMatch: vi.fn(),
   mockGenerate: vi.fn(),
   mockClaimGen: vi.fn(),
   mockGetState: vi.fn(),
@@ -24,7 +22,6 @@ vi.mock("@clerk/nextjs/server", () => ({ clerkClient: vi.fn() }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendMeetingReadyEmail: vi.fn() }));
 vi.mock("@/agent/embed", () => ({ embedAndStore: vi.fn() }));
-vi.mock("@/agent/ledger-match", () => ({ runLedgerMatch: mockMatch }));
 vi.mock("@stream-io/node-sdk", () => ({ StreamClient: vi.fn() }));
 vi.mock("@/agent/transcript-generation", () => ({
   generateTranscriptForMeeting: mockGenerate,
@@ -46,7 +43,6 @@ vi.mock("@/lib/pipeline-steps", async (importOriginal) => ({
 }));
 
 import {
-  maybeRunLedgerMatch,
   runServerPipeline,
   settleRecordings,
   SETTLE_CAP_MS,
@@ -74,67 +70,6 @@ function client(rows: Record<string, unknown>): SupabaseClient {
     },
   } as unknown as SupabaseClient;
 }
-
-const ready = {
-  meeting_insights: [{ meeting_id: "m1" }],
-  meeting_chunks: [{ meeting_id: "m1" }],
-  meetings: { user_id: "u1", project_id: null },
-  transcripts: { raw_text: "Ali: main Friday tak bhej dunga" },
-};
-
-describe("maybeRunLedgerMatch", () => {
-  beforeEach(() => {
-    mockClaim.mockReset().mockResolvedValue(true);
-    mockMark.mockReset();
-    mockMatch.mockReset().mockResolvedValue({});
-    vi.spyOn(console, "error").mockImplementation(() => {});
-  });
-
-  it("waits until both the summary and the chunks exist", async () => {
-    await maybeRunLedgerMatch(
-      client({ ...ready, meeting_chunks: [] }),
-      "m1",
-      "page",
-    );
-    expect(mockClaim).not.toHaveBeenCalled();
-    expect(mockMatch).not.toHaveBeenCalled();
-  });
-
-  it("claims without allowing a rerun, matches, and marks done", async () => {
-    await maybeRunLedgerMatch(client(ready), "m1", "webhook");
-    expect(mockClaim).toHaveBeenCalledWith(
-      expect.anything(),
-      "m1",
-      "ledger",
-      false,
-    );
-    expect(mockMatch).toHaveBeenCalledWith(expect.anything(), {
-      meetingId: "m1",
-      userId: "u1",
-      projectId: null,
-      rawText: ready.transcripts.raw_text,
-    });
-    expect(mockMark.mock.calls[0][3]).toMatchObject({ status: "done" });
-    expect(mockMark.mock.calls[0][4]).toBe("webhook");
-  });
-
-  it("skips when another run already holds the step", async () => {
-    mockClaim.mockResolvedValue(false);
-    await maybeRunLedgerMatch(client(ready), "m1");
-    expect(mockMatch).not.toHaveBeenCalled();
-  });
-
-  it("marks failed and never throws when matching fails", async () => {
-    mockMatch.mockRejectedValue(new Error("judge down"));
-    await expect(
-      maybeRunLedgerMatch(client(ready), "m1"),
-    ).resolves.toBeUndefined();
-    expect(mockMark.mock.calls[0][3]).toMatchObject({
-      status: "failed",
-      reason: "error",
-    });
-  });
-});
 
 // A fake clock: sleep moves time forward instead of waiting.
 function fakeDeps(
@@ -326,21 +261,6 @@ describe("sweepActionFor", () => {
   it("embeds when the summary exists but the chat index does not", () => {
     expect(sweepActionFor(base, { insights: true, chunks: false }, now)).toBe(
       "embed",
-    );
-  });
-
-  it("reruns a failed or stale ledger match", () => {
-    const failed = {
-      steps: { ledger: { status: "failed" as const, startedAt: old } },
-    };
-    const stale = {
-      steps: { ledger: { status: "running" as const, startedAt: old } },
-    };
-    expect(sweepActionFor({ ...base, pipeline: failed }, all, now)).toBe(
-      "ledger",
-    );
-    expect(sweepActionFor({ ...base, pipeline: stale }, all, now)).toBe(
-      "ledger",
     );
   });
 

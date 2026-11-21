@@ -1,50 +1,41 @@
-# Memory — Guest pop up fix + spec 0005 live testing
+# Memory — Follow ups grouped by meeting
 
-Last updated: 2026-11-15
+Last updated: 2026-11-16
 
 ## What was built
 
-All pushed to main except the last test (latest commit `b4d60d8`, deploy Ready).
+All pushed to main and deployed (Vercel production Ready). Commits `39afec7` (feature) and `414830c` (in call guest poll test + previous memory).
 
-- Spec 0005, faster after meeting pipeline (`aaf41c9`): ending a call goes to `/after-meeting/<callId>`. The Stream webhook `call.recording_ready` (POST `/api/stream/webhook`) runs `runServerPipeline` in `after()` (recording wait, Whisper, cleanup, process, embed, ledger match). The page shows 3 steps from GET `/api/transcript/status` and redirects once the summary is saved. If the webhook never fires, the page runs the pipeline itself; the daily cron picks up stuck meetings. Stream webhook is registered in the Stream dashboard.
-- Guest admission toggle clarity, hint line (`30217fd`).
-- Guest pop up on the setup screen (`b4d60d8`):
-  - New `src/hooks/useGuestRequests.tsx`: the owner Accept/Deny toast (id = `guest_token`, `duration: Infinity`, 10 min TTL), the `call.on("custom")` listener, the 5 s poll of GET `/api/guest/pending?meetingId=<callId>`, and a one time warning after 2 failed polls. Clerk `redirectToSignIn` is held in a ref so effect deps stay `[call, isOwner]`.
-  - `MeetingSetup.tsx`: `ProjectInfo.canManage` (from GET `/api/meetings/[id]`), calls `useGuestRequests(call, project?.canManage === true)`.
-  - `MeetingRoom.tsx`: the old inline guest effect was replaced by `useGuestRequests(call, isOwner)`.
-  - `GuestResponsive.test.tsx` G7.3 token checks now read the hook file. New `MeetingSetup.guest.test.ts` source guard.
-  - `context/ui-registry.md` and `context/progress-tracker.md` updated.
-- **Uncommitted:** `src/components/MeetingRoom.test.tsx` gained "shows the pop up for a guest found by the pending poll while in the call" (passes, 13/13).
+- Follow-ups page redesign (prompt `prompts/followups-grouped-by-meeting.md`):
+  - `src/components/follow-ups/FollowUpList.tsx` rewritten: one card per meeting (title links to `/meeting-intelligence/{id}`, "X of Y done" progress over all of that meeting's items), Open (default) / Completed / All tabs with counts, Overdue and Needs attention chips, Details link, delete. Exports `groupByMeeting`, `isOverdue`, `parseDay`.
+  - New `src/components/follow-ups/FollowUpCheck.tsx`: shared tick, optimistic, calls the `updateFollowUpStatus` server action, reverts with a toast on failure.
+  - `ActionItemsTab.tsx`: new `canManage` prop (from `MeetingTabs`: `!projectId && isOwner`); owner sees the tick, others a status chip; "See all follow-ups" link.
+  - API: GET `/api/follow-ups` adds `meetingStartedAt` (started_at else created_at); GET `/api/meetings/[id]` adds `followUpId`/`followUpStatus` on personal meeting action items (no follow_ups query for project meetings). Both added as "(extended)" lines in AGENTS.md.
+  - Types in `src/lib/meeting-types.ts`; tests updated/added; registry + tracker updated. vitest 1976 passing.
 
 ## Decisions made
 
-- The owner guest pop up lives in one shared hook, used on both the setup screen and in the call.
-- The setup screen gates on `canManage` from GET `/api/meetings/[id]` (no extra fetch).
-- Admitting a guest before the owner has joined the call is allowed.
+- No DB change, no new route. Follow ups stay personal meeting only; project meetings use Tasks.
+- In the Open view a meeting with nothing open left disappears (it shows under Completed / All).
 
 ## Problems solved
 
-- Pop up was missing because only MeetingRoom listened, while the owner was still on the setup screen. Custom events only arrive after joining, so the pending poll is what covers the setup screen.
-- `vercel ls neurameet` writes to stderr. Don't redirect `2>/dev/null` when grepping for "Ready".
-- DB inspection: a temporary `q.mjs` in the repo root with `@supabase/supabase-js` and the service role key, run with `node --env-file=.env.local q.mjs`, then deleted.
-- zsh: quote `--include="*.ts"` or it fails as a glob.
+- "Still seeing the old page": the user was viewing the deployed Vercel site, and the code was not yet pushed. A push to main auto deploys; check with `vercel ls` and `vercel inspect <url>` (status Ready). The local process on port 3100 belongs to `summit-roofing`, not NeuraMeet.
+- Any client component that imports `@/actions/follow-ups` (which imports `server-only`) needs `vi.mock("@/actions/follow-ups", ...)` in jsdom tests (done in `MeetingTabs.test.tsx`).
+- `npx eslint --fix` rewrites out of scope files; run `npx prettier --write` only on your own files instead.
 
 ## Current state
 
-- Setup screen pop up: confirmed working live by the user.
-- In call pop up: covered by the new test, not yet live tested (no request was made while the owner was in a call).
-- The user was mid live transcript test (recording on, English + Urdu, with a promise). Result not yet reported.
-- Old lint warning: unused `n` in `MeetingRoom.tsx` (about line 380), predates this session.
+- Follow ups redesign live; the user has not yet confirmed it after a hard refresh.
+- Carried over: in call guest pop up not live tested; bilingual transcript (spec 0005) live test result not reported; old unused `n` lint warning in `MeetingRoom.tsx`; pre-existing prettier errors in `MeetingTabs.test.tsx` and `src/app/api/meetings/[id]/members/*`.
 - Never commit `neurameet-source.zip` or `reports/tasdeeq-seed-*.json`.
 
 ## Next session starts with
 
-1. Ask for the transcript test result. If it failed or was stuck over 5 minutes, get the end time and inspect `transcripts.pipeline` for that meeting.
-2. Ask the user to live test the in call guest pop up (owner joined, guest requests from another browser).
-3. Ask whether to commit the `MeetingRoom.test.tsx` addition.
+1. Ask the user to hard refresh `/follow-ups` and confirm the grouped cards, tick, and Action Items tab sync work live.
+2. Ask for the transcript test result and the in call guest pop up test result.
 
 ## Open questions
 
-- Does the in call pop up work live?
-- Is the bilingual (English + Urdu) transcript good enough, and does spec 0005 finish within a reasonable time live?
-- Carried over: does Gemini accept `thinkingBudget: 0`; leftovers cleanup (`ProjectSettingsTab.tsx`, `DecisionsTab.tsx`, email invite dead code); live GitHub `KEY-1` PR test; LL5 and Tasdeeq live runs.
+- Does the follow ups redesign feel clear enough live?
+- Carried over: Gemini `thinkingBudget: 0`; leftovers cleanup (`ProjectSettingsTab.tsx`, `DecisionsTab.tsx`, email invite dead code); live GitHub `KEY-1` PR test; LL5 and Tasdeeq live runs.

@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 import PrepPage from "./PrepPage";
 
 // jsdom has no layout engine, so these assert the responsive class tokens are
@@ -68,71 +74,33 @@ describe("Prep page responsive (P13.8)", () => {
   });
 });
 
-describe("Prep page Promise Ledger section (AC-15)", () => {
+describe("Prep page without the ledger (spec 0006)", () => {
   afterEach(cleanup);
 
-  const ledgerItem = {
-    id: "li-1",
-    kind: "promise",
-    statement: "Ali sends the survey",
-    quote: "main Friday tak survey bhej dunga",
-    assignee: "Ali",
-    dueDate: "2026-10-03",
-    derivedStatus: "overdue",
-    sourceMeeting: {
-      id: "m1",
-      title: "Survey kickoff",
-      startedAt: "2026-10-01T12:00:00.000Z",
-    },
-  };
-
-  const respond = (suggestions: Record<string, string[]>) =>
+  it("shows the empty state when every list is empty", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
         ok: true,
-        json: async () => ({ suggestions, ledgerItems: [ledgerItem] }),
+        json: async () => ({
+          suggestions: {
+            context: [],
+            openActionItems: [],
+            discussionPoints: [],
+            questionsToAsk: [],
+          },
+        }),
       })),
     );
-
-  const submit = () => {
     const { container } = render(<PrepPage />);
     fireEvent.change(screen.getByLabelText(/upcoming meeting title/i), {
       target: { value: "Survey sync" },
     });
     fireEvent.submit(container.querySelector("form") as HTMLElement);
-  };
-
-  it("lists open items with the overdue badge and a source meeting link", async () => {
-    respond({
-      context: ["Know the roadmap"],
-      openActionItems: [],
-      discussionPoints: [],
-      questionsToAsk: [],
-    });
-    submit();
 
     await waitFor(() => {
-      expect(screen.getByText(/open promises and decisions/i)).toBeTruthy();
+      expect(screen.getByText(/no prep suggestions yet/i)).toBeTruthy();
     });
-    expect(screen.getByText("Ali sends the survey")).toBeTruthy();
-    expect(screen.getByText("Overdue")).toBeTruthy();
-    const link = screen.getByRole("link", { name: /from survey kickoff/i });
-    expect(link.getAttribute("href")).toBe("/meeting-intelligence/m1");
-  });
-
-  it("shows ledger items instead of the empty state when the LLM lists are empty", async () => {
-    respond({
-      context: [],
-      openActionItems: [],
-      discussionPoints: [],
-      questionsToAsk: [],
-    });
-    submit();
-
-    await waitFor(() => {
-      expect(screen.getByText(/open promises and decisions/i)).toBeTruthy();
-    });
-    expect(screen.queryByText(/no prep suggestions yet/i)).toBeNull();
+    expect(screen.queryByText(/open promises and decisions/i)).toBeNull();
   });
 });

@@ -27,7 +27,7 @@ export const NOTIFICATION_CATEGORIES = {
     "proposals_ready",
   ],
   meetings: ["meeting_scheduled"],
-  github: ["pr_review_requested", "kept_suggestion"],
+  github: ["pr_review_requested"],
   projects: [
     "join_request",
     "join_approved",

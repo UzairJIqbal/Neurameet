@@ -1,7 +1,7 @@
 // Citation rules for the project assistant (spec 0004, AC-66). Shared by the
 // route and the panel, so it carries no server only imports.
 
-export type ProjectSourceKind = "chunk" | "task" | "item";
+export type ProjectSourceKind = "chunk" | "task";
 
 export type ProjectSource = {
   marker: string;

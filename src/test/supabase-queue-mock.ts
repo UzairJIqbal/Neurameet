@@ -84,6 +84,6 @@ export function queue(table: string, ...results: QueryResult[]): void {
 
 export const ok = (data: unknown): QueryResult => ({ data, error: null });
 
-/** Calls of one method on one table, e.g. every update on minutes_reviews. */
+/** Calls of one method on one table, e.g. every update on tasks. */
 export const callsOf = (table: string, method: string): RecordedCall[] =>
   calls.filter((c) => c.table === table && c.method === method);

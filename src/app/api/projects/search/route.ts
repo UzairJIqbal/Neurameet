@@ -26,15 +26,6 @@ type TaskHit = {
   title: string;
 };
 type MeetingHit = { id: string; title: string; project_id: string | null };
-type DecisionHit = {
-  id: string;
-  statement: string;
-  meetings: MeetingHit | MeetingHit[] | null;
-};
-
-const one = <T>(value: T | T[] | null): T | null =>
-  Array.isArray(value) ? (value[0] ?? null) : value;
-
 async function readProjects(db: Db, userId: string): Promise<ProjectInfo[]> {
   const { data: members, error } = await db
     .from("project_members")
@@ -125,41 +116,11 @@ async function readMeetings(
   ].slice(0, PER_GROUP);
 }
 
-// Decisions match the statement only, never the quote (AC-78b).
-async function readDecisions(
-  db: Db,
-  userId: string,
-  projectIds: string[],
-  pattern: string,
-): Promise<DecisionHit[]> {
-  const base = () =>
-    db
-      .from("ledger_items")
-      .select("id, statement, meetings!inner(id, title, project_id)")
-      .eq("kind", "decision")
-      .ilike("statement", pattern)
-      .order("created_at", { ascending: false })
-      .limit(PER_GROUP);
-  const [personal, project] = await Promise.all([
-    base().is("meetings.project_id", null).eq("meetings.user_id", userId),
-    projectIds.length > 0
-      ? base().in("meetings.project_id", projectIds)
-      : Promise.resolve({ data: [] as DecisionHit[], error: null }),
-  ]);
-  if (personal.error) throw personal.error;
-  if (project.error) throw project.error;
-  return [
-    ...((personal.data ?? []) as unknown as DecisionHit[]),
-    ...((project.data ?? []) as unknown as DecisionHit[]),
-  ].slice(0, PER_GROUP);
-}
-
 function toGroups(
   projects: ProjectInfo[],
   q: string,
   tasks: TaskHit[],
   meetings: MeetingHit[],
-  decisions: DecisionHit[],
 ): PaletteGroups {
   const byId = new Map(projects.map((p) => [p.id, p]));
   const lower = q.toLowerCase();
@@ -191,30 +152,14 @@ function toGroups(
       (m.project_id && byId.get(m.project_id)?.name) || "Personal meeting",
     href: `/meeting-intelligence/${m.id}`,
   }));
-  const decisionRows: PaletteRow[] = decisions.flatMap((d) => {
-    const meeting = one(d.meetings);
-    if (!meeting) return [];
-    const projectId = meeting.project_id;
-    return [
-      {
-        id: d.id,
-        title: d.statement,
-        subtitle: meeting.title,
-        href: projectId
-          ? `/projects/${projectId}?tab=promises&meetingId=${meeting.id}`
-          : `/meeting-intelligence/${meeting.id}`,
-      },
-    ];
-  });
   return {
     projects: projectRows,
     tasks: taskRows,
     meetings: meetingRows,
-    decisions: decisionRows,
   };
 }
 
-// Ctrl K palette: title, key, and statement text only, never embeddings (AC-78).
+// Ctrl K palette: title and key text only, never embeddings (AC-78).
 export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId)
@@ -233,12 +178,11 @@ export async function GET(request: Request) {
     const projects = await readProjects(db, userId);
     const projectIds = projects.map((p) => p.id);
     const pattern = likePattern(q);
-    const [tasks, meetings, decisions] = await Promise.all([
+    const [tasks, meetings] = await Promise.all([
       readTasks(db, projects, q, pattern),
       readMeetings(db, userId, projectIds, pattern),
-      readDecisions(db, userId, projectIds, pattern),
     ]);
-    return NextResponse.json(toGroups(projects, q, tasks, meetings, decisions));
+    return NextResponse.json(toGroups(projects, q, tasks, meetings));
   } catch (err) {
     console.error("Palette search failed:", err);
     return NextResponse.json(

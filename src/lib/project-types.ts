@@ -115,7 +115,6 @@ export interface ProjectFull extends ProjectDetail, ProjectDetails {
   overdueTaskCount: number | null;
   upcomingMeetingCount: number | null;
   processedMeetingCount: number | null;
-  decisionCount: number | null;
   /** Never sent to a Viewer. */
   linkedPrCount: number | null;
   github: {

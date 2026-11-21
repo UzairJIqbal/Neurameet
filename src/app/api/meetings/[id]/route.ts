@@ -86,22 +86,22 @@ export async function GET(
     // Project meeting: any active member (spec 0004, need "read").
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, guest_admission_mode, project_id, description, scheduled_end_at, meeting_type, invited_user_ids")
+      .select(
+        "id, title, status, stream_call_id, started_at, ended_at, created_at, user_id, guest_admission_mode, project_id, description, scheduled_end_at, meeting_type, invited_user_ids",
+      )
       .eq("id", id)
       .single();
 
     if (meetingError || !meeting) {
       console.error("Meeting not found:", meetingError);
-      return NextResponse.json(
-        { error: "Meeting not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
 
     let access: MeetingAccess;
     try {
       access = await checkMeetingAccess(supabase, userId, meeting, "read", {
-        personalFallback: () => isRecordedParticipant(supabase, meeting.id, userId),
+        personalFallback: () =>
+          isRecordedParticipant(supabase, meeting.id, userId),
         personalDenied: { status: 404, message: "Meeting not found" },
       });
     } catch (err) {
@@ -145,28 +145,28 @@ export async function GET(
       // W3: the join screen shows the project name in the recording notice.
       access.projectId
         ? supabase
-          .from("projects")
-          .select("name")
-          .eq("id", access.projectId)
-          .maybeSingle()
+            .from("projects")
+            .select("name")
+            .eq("id", access.projectId)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
       // AC-70v: no transcript query at all for a Viewer.
       isViewer
         ? Promise.resolve({ data: null })
         : supabase
-          .from("transcripts")
-          .select("raw_text")
-          .eq("meeting_id", id)
-          .maybeSingle(),
+            .from("transcripts")
+            .select("raw_text")
+            .eq("meeting_id", id)
+            .maybeSingle(),
       lookupProfiles([meeting.user_id]),
       // Personal meetings only: each action item's follow-up status. Project
       // meetings use tasks and have no follow-ups.
       access.projectId
         ? Promise.resolve({ data: null, error: null })
         : supabase
-          .from("follow_ups")
-          .select("id, action_item_id, status")
-          .eq("meeting_id", id),
+            .from("follow_ups")
+            .select("id, action_item_id, status")
+            .eq("meeting_id", id),
     ]);
 
     if (followUpsError) {
@@ -185,7 +185,8 @@ export async function GET(
       endedAt: meeting.ended_at,
       createdAt: meeting.created_at,
       user_id: meeting.user_id,
-      guestAdmissionMode: (meeting.guest_admission_mode ?? "approval") as GuestAdmissionMode,
+      guestAdmissionMode: (meeting.guest_admission_mode ??
+        "approval") as GuestAdmissionMode,
       description: meeting.description ?? null,
       scheduledEndAt: meeting.scheduled_end_at ?? null,
       meetingType: (meeting.meeting_type ?? null) as ProjectMeetingType | null,
@@ -195,28 +196,28 @@ export async function GET(
 
     const insightsData: MeetingInsights | null = insights
       ? (() => {
-        const row = insights as InsightsRow;
-        return {
-          summary: row.summary ?? null,
-          keyPoints: row.key_points ?? [],
-          decisions: row.decisions ?? [],
-          category: row.category ?? null,
-          detectedTopics: row.detected_topics ?? [],
-        };
-      })()
+          const row = insights as InsightsRow;
+          return {
+            summary: row.summary ?? null,
+            keyPoints: row.key_points ?? [],
+            decisions: row.decisions ?? [],
+            category: row.category ?? null,
+            detectedTopics: row.detected_topics ?? [],
+          };
+        })()
       : null;
 
-    const actionItemsData: ActionItem[] = ((actionItems ?? []) as ActionItemRow[]).map(
-      (row) => ({
-        id: row.id,
-        title: row.title,
-        assignee: row.assignee ?? null,
-        dueDate: row.due_date ?? null,
-        reviewState: row.review_state,
-        followUpId: followUpByItem.get(row.id)?.id ?? null,
-        followUpStatus: followUpByItem.get(row.id)?.status ?? null,
-      }),
-    );
+    const actionItemsData: ActionItem[] = (
+      (actionItems ?? []) as ActionItemRow[]
+    ).map((row) => ({
+      id: row.id,
+      title: row.title,
+      assignee: row.assignee ?? null,
+      dueDate: row.due_date ?? null,
+      reviewState: row.review_state,
+      followUpId: followUpByItem.get(row.id)?.id ?? null,
+      followUpStatus: followUpByItem.get(row.id)?.status ?? null,
+    }));
 
     const response: MeetingDetailResponse = {
       meeting: meetingData,
@@ -230,20 +231,20 @@ export async function GET(
       ...(isViewer
         ? {}
         : {
-          transcriptText:
-            (transcript as { raw_text?: string | null } | null)?.raw_text ?? null,
-        }),
+            transcriptText:
+              (transcript as { raw_text?: string | null } | null)?.raw_text ??
+              null,
+          }),
     };
 
     return NextResponse.json(response);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to load meeting";
+    const message =
+      err instanceof Error ? err.message : "Failed to load meeting";
     console.error("Meeting detail error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
-const SEALED = { error: "Sealed minutes can't be deleted" };
 
 // Owner-only delete. FK constraints on every child table use
 // `on delete cascade`, so removing the meetings row removes the transcript,
@@ -271,10 +272,7 @@ export async function DELETE(
       .single();
 
     if (findError || !meeting) {
-      return NextResponse.json(
-        { error: "Meeting not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
 
     // Personal meeting: the creator only. Project meeting: the project Owner
@@ -289,27 +287,11 @@ export async function DELETE(
       throw err;
     }
 
-    // Tasdeeq AC-7: sealed minutes are permanent. An open review is removed
-    // with the meeting (cascade); minutes_seals is `on delete restrict`.
-    const { data: seal, error: sealError } = await supabase
-      .from("minutes_seals")
-      .select("id")
-      .eq("meeting_id", id)
-      .limit(1);
-    if (sealError) throw sealError;
-    if (seal && seal.length > 0) {
-      return NextResponse.json(SEALED, { status: 409 });
-    }
-
     const { error: deleteError } = await supabase
       .from("meetings")
       .delete()
       .eq("id", id);
 
-    // A seal that landed after the pre check trips the foreign key restrict.
-    if (deleteError?.code === "23503") {
-      return NextResponse.json(SEALED, { status: 409 });
-    }
     if (deleteError) {
       console.error("Failed to delete meeting:", deleteError);
       return NextResponse.json(
@@ -320,7 +302,8 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to delete meeting";
+    const message =
+      err instanceof Error ? err.message : "Failed to delete meeting";
     console.error("Meeting delete error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }

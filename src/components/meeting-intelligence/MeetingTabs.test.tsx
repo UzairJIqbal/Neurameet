@@ -1,13 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  cleanup,
-  waitFor,
-  fireEvent,
-} from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import MeetingTabs from "./MeetingTabs";
 import type {
   MeetingDetailData,
@@ -66,99 +60,12 @@ describe("Meeting Intelligence tabs responsive (P13.4)", () => {
   });
 });
 
-describe("Ledger tab reversal badge (spec 0001 AC-11)", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  const stubLedger = (reversalCount: number) =>
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ items: [], incoming: [], reversalCount }),
-      })),
-    );
-
-  it("shows the reversed count on the Ledger tab for owners", async () => {
-    stubLedger(2);
-    render(<MeetingTabs {...baseProps} />);
-    expect(await screen.findByLabelText("2 reversed")).toBeTruthy();
-  });
-
-  it("shows no badge when nothing was reversed", async () => {
-    stubLedger(0);
-    render(<MeetingTabs {...baseProps} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
-    expect(screen.queryByLabelText(/reversed/)).toBeNull();
-  });
-});
-
-describe("Ledger tab is owner only (spec 0001 AC-12)", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("hides the Ledger tab and skips the ledger fetch for a participant", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
+describe("Removed tabs (spec 0006)", () => {
+  it("shows no Decisions and Promises or Minutes tab, and no Recording for a participant", async () => {
     render(<MeetingTabs {...baseProps} isOwner={false} />);
-
     expect(await screen.findByText("Attendance Report")).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: /Decisions and Promises/ }),
-    ).toBeNull();
     expect(screen.queryByText("Decisions and Promises")).toBeNull();
-    expect(
-      fetchMock.mock.calls.some(([u]) => String(u).includes("/api/ledger")),
-    ).toBe(false);
-  });
-
-  it("shows the Ledger tab for the owner", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ items: [], incoming: [], reversalCount: 0 }),
-      })),
-    );
-    render(<MeetingTabs {...baseProps} />);
-    expect(await screen.findByText("Decisions and Promises")).toBeTruthy();
-  });
-
-  // Spec 0004 AC-58b: on a project meeting every member reads the tab.
-  it("shows the Ledger tab to a non creator on a project meeting", async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ items: [], incoming: [], reversalCount: 0 }),
-    }));
-    vi.stubGlobal("fetch", fetchMock);
-    render(
-      <MeetingTabs
-        {...baseProps}
-        isOwner={false}
-        projectId="p1"
-        canManage={false}
-      />,
-    );
-    expect(await screen.findByText("Decisions and Promises")).toBeTruthy();
-    await waitFor(() =>
-      expect(
-        fetchMock.mock.calls.some((args: unknown[]) =>
-          String(args[0]).includes("/api/ledger"),
-        ),
-      ).toBe(true),
-    );
-    expect(screen.queryByText("Recording")).toBeNull();
-  });
-
-  it("shows the Minutes tab to a participant but not Ledger or Recording (spec 0003)", async () => {
-    vi.stubGlobal("fetch", vi.fn());
-    render(<MeetingTabs {...baseProps} isOwner={false} />);
-    expect(await screen.findByRole("button", { name: "Minutes" })).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: /Decisions and Promises/ }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Minutes" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Recording" })).toBeNull();
   });
 });
@@ -175,7 +82,7 @@ describe("Meeting Details tabs (spec 0004 AC-70v, AC-70w)", () => {
             ? { proposals: [], canReview: true }
             : String(url).includes("/members")
               ? { members: [], myRole: "owner", me: "u1" }
-              : { items: [], incoming: [], reversalCount: 0 },
+              : {},
       })),
     );
 
@@ -192,11 +99,9 @@ describe("Meeting Details tabs (spec 0004 AC-70v, AC-70w)", () => {
           "Overview",
           "AI Summary",
           "Transcript",
-          "Decisions and Promises",
           "Action Items",
           "Recording",
           "Category",
-          "Minutes",
           "Engagement",
           "AI Chat",
         ].includes(t ?? ""),
@@ -209,11 +114,9 @@ describe("Meeting Details tabs (spec 0004 AC-70v, AC-70w)", () => {
       "Overview",
       "AI Summary",
       "Transcript",
-      "Decisions and Promises",
       "Action Items",
       "Recording",
       "Category",
-      "Minutes",
       "Engagement",
       "AI Chat",
     ]);
@@ -244,16 +147,22 @@ describe("Meeting Details tabs (spec 0004 AC-70v, AC-70w)", () => {
     fireEvent.click(screen.getByRole("button", { name: "AI Summary" }));
     expect(screen.getByText(/No transcript yet/)).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Open meeting recap" }).getAttribute("href"),
+      screen
+        .getByRole("link", { name: "Open meeting recap" })
+        .getAttribute("href"),
     ).toBe("/after-meeting/call1");
-    expect(screen.queryByRole("button", { name: "Retry summary generation" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Retry summary generation" }),
+    ).toBeNull();
   });
 
   it("AI Summary tab keeps Retry when a transcript exists but the summary is missing", () => {
     stubFetch();
     render(<MeetingTabs {...baseProps} transcriptText="Ali: hello" />);
     fireEvent.click(screen.getByRole("button", { name: "AI Summary" }));
-    expect(screen.getByRole("button", { name: "Retry summary generation" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Retry summary generation" }),
+    ).toBeTruthy();
   });
 
   it("shows the transcript text on its tab", async () => {

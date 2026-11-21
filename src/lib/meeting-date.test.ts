@@ -3,7 +3,7 @@ import { parseMeetingDate } from "./meeting-date";
 
 const NOW = new Date("2026-10-30T20:00:00.000Z");
 
-describe("parseMeetingDate (Promise Ledger AC-5)", () => {
+describe("parseMeetingDate", () => {
   it("treats a missing or empty date as no date", () => {
     expect(parseMeetingDate(undefined, NOW)).toEqual({
       ok: true,

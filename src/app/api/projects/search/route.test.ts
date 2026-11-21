@@ -36,7 +36,6 @@ describe("GET /api/projects/search", () => {
       projects: [],
       tasks: [],
       meetings: [],
-      decisions: [],
     });
     expect(callsOf("project_members", "select")).toHaveLength(0);
   });
@@ -44,7 +43,6 @@ describe("GET /api/projects/search", () => {
   it("returns nothing from projects you are not an active member of", async () => {
     queue("project_members", ok([]));
     queue("meetings", ok([]), ok([]));
-    queue("ledger_items", ok([]));
     const body = await (await get("alpha")).json();
     expect(body.tasks).toEqual([]);
     expect(callsOf("tasks", "select")).toHaveLength(0);
@@ -59,7 +57,6 @@ describe("GET /api/projects/search", () => {
       ok([{ id: "t1", project_id: P1, number: 12, title: "Ship it" }]),
     );
     queue("meetings", ok([]), ok([]));
-    queue("ledger_items", ok([]), ok([]));
     const body = await (await get("ABC-12")).json();
     expect(body.tasks).toEqual([
       {
@@ -76,7 +73,6 @@ describe("GET /api/projects/search", () => {
     queue("projects", ok([{ id: P1, name: "Alpha", task_prefix: "ABC" }]));
     queue("tasks", ok([]));
     queue("meetings", ok([]), ok([]));
-    queue("ledger_items", ok([]), ok([]));
     const body = await (await get("XYZ-12")).json();
     expect(body.tasks).toEqual([]);
     expect(
@@ -84,29 +80,17 @@ describe("GET /api/projects/search", () => {
     ).toHaveLength(0);
   });
 
-  it("escapes a % literal and matches decision statements only", async () => {
+  it("escapes a % literal in meeting titles and returns no decisions group", async () => {
     queue("project_members", ok([{ project_id: P1 }]));
     queue("projects", ok([{ id: P1, name: "Alpha", task_prefix: "ABC" }]));
     queue("tasks", ok([]));
     queue("meetings", ok([]), ok([]));
-    queue(
-      "ledger_items",
-      ok([]),
-      ok([
-        {
-          id: "d1",
-          statement: "Use 50% rollout",
-          meetings: { id: "m1", title: "Sync", project_id: P1 },
-        },
-      ]),
-    );
     const body = await (await get("50%")).json();
-    expect(body.decisions[0].href).toBe(
-      `/projects/${P1}?tab=promises&meetingId=m1`,
-    );
-    const ilikes = callsOf("ledger_items", "ilike");
+    expect(body).not.toHaveProperty("decisions");
+    const ilikes = callsOf("meetings", "ilike");
     expect(
-      ilikes.every((c) => c.args[0] === "statement" && c.args[1] === "%50\\%%"),
+      ilikes.every((c) => c.args[0] === "title" && c.args[1] === "%50\\%%"),
     ).toBe(true);
+    expect(callsOf("ledger_items", "select")).toHaveLength(0);
   });
 });

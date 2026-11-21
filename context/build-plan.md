@@ -2,7 +2,7 @@
 
 Order matters — each step depends on the one before it being real, not assumed. Each step gets its own `/architect` pass (where noted), its own approved prompt in `prompts/`, and its own verification before moving on.
 
-The plan is in these phases: Core NeuraMeet Pipeline (Steps 0 to 9, built), FYP Polish Pass (Step 9.5, built), Advanced Pipeline Features (Steps A0 to C3, built), **Meeting Experience Polish (Steps D0 to D3+, built, before Deploy)**, **Transcript Generation (Steps F0 to F8, built, before Deploy)**, **Guest Join with Owner Approval (Steps G0 to G1.5, G2 to G4, G8 integration audit, G9 manual walkthrough, new, before Deploy)**, Product Final Polishing (Steps P0 to P13), **Signature Feature: Promise Ledger (Steps S0+, built, before Deploy)**, **Signature Feature: Live Ledger (Steps LL0+, new, before Deploy)**, **Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5, new, before Deploy)**, **Project Workspace: Conversations to Code (Steps W-pre, W0 to W9, new, before Deploy)**, then Deploy (Step 11). Every third party tool in every phase must be zero cost.
+The plan is in these phases: Core NeuraMeet Pipeline (Steps 0 to 9, built), FYP Polish Pass (Step 9.5, built), Advanced Pipeline Features (Steps A0 to C3, built), **Meeting Experience Polish (Steps D0 to D3+, built, before Deploy)**, **Transcript Generation (Steps F0 to F8, built, before Deploy)**, **Guest Join with Owner Approval (Steps G0 to G1.5, G2 to G4, G8 integration audit, G9 manual walkthrough, new, before Deploy)**, Product Final Polishing (Steps P0 to P13), Signature Features Promise Ledger, Live Ledger, and Tasdeeq (built, then removed 2026-11-21 by spec 0006), **Project Workspace: Conversations to Code (Steps W-pre, W0 to W9, new, before Deploy)**, then Deploy (Step 11). Every third party tool in every phase must be zero cost.
 
 ---
 
@@ -616,7 +616,9 @@ An audit first, then a fix pass over responsiveness across the entire app, so th
 
 ---
 
-## Signature Feature: Promise Ledger (Steps S0+, new, before Deploy)
+## Signature Feature: Promise Ledger (Steps S0+) — REMOVED
+
+**Removed 2026-11-21 by spec 0006** (`docs/specs/0006-remove-ledger-and-minutes/index.md`): the code is deleted; the tables are dropped in phase 2 after deploy. Open steps below are cancelled. Kept as history.
 
 The one feature meant to make NeuraMeet stand out to the FYP panel. Research and reasoning: `reports/NeuraMeet unique FYP feature.md`. Scope row: `docs/scope/scope.md` #17 (workflow tier GA: verify, test, a fresh review, then document).
 
@@ -632,7 +634,9 @@ The one feature meant to make NeuraMeet stand out to the FYP panel. Research and
 
 ---
 
-## Signature Feature: Live Ledger (Steps LL0+, new, before Deploy)
+## Signature Feature: Live Ledger (Steps LL0+) — REMOVED
+
+**Removed 2026-11-21 by spec 0006** (`docs/specs/0006-remove-ledger-and-minutes/index.md`): the code is deleted; the tables are dropped in phase 2 after deploy. Open steps below are cancelled. Kept as history.
 
 Takes the Promise Ledger into the live call: Promise Check-in (raise an open promise as a quote card for everyone, owner marks it live) and Agreement Check (one tap Agree or Not yet, saved to the ledger as "agreed by N of M"). Research and reasoning: `reports/NeuraMeet second signature feature.md`. Scope row: `docs/scope/scope.md` #18 (workflow tier GA).
 
@@ -664,7 +668,9 @@ Takes the Promise Ledger into the live call: Promise Check-in (raise an open pro
 
 ---
 
-## Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5, new, before Deploy)
+## Signature Feature: Tasdeeq, Verified Minutes (Steps T1 to T5) — REMOVED
+
+**Removed 2026-11-21 by spec 0006** (`docs/specs/0006-remove-ledger-and-minutes/index.md`): the code is deleted; the tables are dropped in phase 2 after deploy. Open steps below are cancelled. Kept as history.
 
 Spec `docs/specs/0003-tasdeeq-verified-minutes/index.md`, scope row #19, workflow tier GA.
 
@@ -712,10 +718,10 @@ Project and participant picker in the schedule dialog, `meeting_participants`, p
 Install callback stores installation and repo ids; webhook route verifies `X-Hub-Signature-256` over the raw body (`await req.text()`, `timingSafeEqual`), dedupes on `X-GitHub-Delivery`, replies within 10 s and processes in `after()`; completion only on closing reference + `merged == true` + base is the default branch + all linked PRs done; drafts stay In Progress; closed unmerged does nothing; revert reopens; "Sync GitHub" reconciles missed deliveries (GitHub does not retry). Exit: forged webhook rejected; partial, draft, unmerged, non default, and revert PRs each behave correctly.
 
 ### Step W6 — Proof Chain surfaces 🟡 (build in progress 2026-11-07)
-Project Decisions and Promises tab on `ledger_items` (project scoped; Owner/Admin review), code evidence on promises (owner confirms), meeting Outcome card, Activity timeline as a SQL view, Live Ledger check in scoped to the project. Exit: one demo promise traced in the UI from quote to merge.
+Project Decisions and Promises tab on `ledger_items` (project scoped; Owner/Admin review), code evidence on promises (owner confirms), meeting Outcome card, Activity timeline as a SQL view, Live Ledger check in scoped to the project. Exit: one demo promise traced in the UI from quote to merge. **Spec 0006 (2026-11-21):** the Decisions and Promises tab, code evidence, and the Kept step are removed; the Outcome card is Said, Task, Shipped.
 
 ### Step W7 — Project AI assistant 🟡 (built 2026-11-07, verify and test pending)
-`match_project_chunks` RPC filtering by project inside SQL; retrieval over meetings, ledger items, and task titles; citations built in code from record ids; transcripts, PR text, and commits wrapped as untrusted data; read only; "not found in this project's records" fallback. Extend `/api/ai/chat` and `/api/search` with `projectId` rather than adding routes. Exit: a cross project question returns nothing from other projects; injected transcript, task, and ledger text does not change answers (PR text does not reach the model in W7, see the spec Follow-up).
+`match_project_chunks` RPC filtering by project inside SQL; retrieval over meetings and task titles (ledger items removed by spec 0006); citations built in code from record ids; transcripts, PR text, and commits wrapped as untrusted data; read only; "not found in this project's records" fallback. Extend `/api/ai/chat` and `/api/search` with `projectId` rather than adding routes. Exit: a cross project question returns nothing from other projects; injected transcript, task, and ledger text does not change answers (PR text does not reach the model in W7, see the spec Follow-up).
 
 ### Step W8 — Workspace shell, personal views, notifications, Ctrl K 🟡 (in progress, `prompts/step-W8-workspace-shell.md`)
 New sidebar from the PDF layout, My Dashboard, My Tasks with Overdue (Asia/Karachi day rule), notifications table and bell, one daily digest via the once a day Vercel Hobby cron, Ctrl K palette (`cmdk` recommended), success and warning tokens added to the Stitch set, an empty state in every project tab. Recordings fold into meeting detail, Prep into project overview, Search into Ctrl K. Exit: every tab renders a useful empty state in a fresh project.

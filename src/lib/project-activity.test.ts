@@ -5,7 +5,7 @@ vi.mock("@clerk/nextjs/server", () => ({ clerkClient: vi.fn() }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: vi.fn() }));
 
 import { toActivityRow, type ActivitySourceRow } from "./project-activity";
-import { activityDetail, activitySentence } from "./activity-text";
+import { activitySentence } from "./activity-text";
 
 const lookups = {
   names: new Map([
@@ -13,7 +13,6 @@ const lookups = {
     ["u2", "Ali"],
   ]),
   tasks: new Map([["t1", { key: "NM-3", title: "Ship the survey" }]]),
-  statements: new Map([["i1", "Ali sends the survey"]]),
   meetings: new Map([["m1", "Standup"]]),
 };
 
@@ -45,7 +44,7 @@ describe("Activity rows are built from the allowlist (AC-61a, AC-61b)", () => {
       lookups,
     );
     expect(JSON.stringify(built)).not.toMatch(/secret|a1/);
-    expect(activitySentence(built)).toBe("A promise was merged into NM-3");
+    expect(activitySentence(built)).toBe("A proposal was merged into NM-3");
   });
 
   it("carries no ref or email on a joined member", () => {
@@ -129,16 +128,12 @@ describe("Activity names", () => {
     ).toBe("Sara moved NM-3 from To Do to Completed");
   });
 
-  it("shows the promise under a confirmation", () => {
+  it("reads a removed ledger kind as Something changed (spec 0006)", () => {
     const built = toActivityRow(
-      row({
-        kind: "ledger.kept_confirmed",
-        subject_type: "ledger_item",
-        subject_id: "i1",
-      }),
+      row({ kind: "ledger.kept_confirmed", subject_id: "i1" }),
       lookups,
     );
-    expect(activitySentence(built)).toBe("Sara confirmed a promise as kept");
-    expect(activityDetail(built)).toBe("Ali sends the survey");
+    expect(activitySentence(built)).toBe("Something changed");
+    expect(built.actorName).toBeNull();
   });
 });

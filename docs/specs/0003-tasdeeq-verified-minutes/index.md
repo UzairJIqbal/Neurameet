@@ -1,6 +1,6 @@
 # 0003. Tasdeeq, Verified Minutes
 
-**Status**: In Progress
+**Status**: Removed by [0006](../0006-remove-ledger-and-minutes/index.md)
 **Date**: 2026-11-02
 **Mode**: FEATURE
 **Scope feature**: [docs/scope/scope.md, row 19. Tasdeeq, Verified Minutes](../../scope/scope.md)

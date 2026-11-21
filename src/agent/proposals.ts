@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { findQuoteLines, normalizeForMatch } from "@/agent/ledger";
+import { findQuoteLines, normalizeForMatch } from "@/agent/quote-match";
 import { embedTexts } from "@/agent/embed";
 import { lookupProfiles } from "@/lib/projects";
 import { normalizeDueDate } from "@/lib/normalize-date";
@@ -80,8 +80,8 @@ export function buildNameMatcher(
 }
 
 /**
- * Own track rule: the speaker label resolves to exactly one active member,
- * first through a Tasdeeq speaker claim, then through attendance names.
+ * Own track rule: the speaker label resolves to exactly one active member
+ * through attendance names.
  */
 export async function resolveSpeakerMember(
   supabase: SupabaseClient,
@@ -91,26 +91,6 @@ export async function resolveSpeakerMember(
 ): Promise<string | null> {
   const key = normalizeForMatch(label);
   if (!key) return null;
-
-  const { data: review } = await supabase
-    .from("minutes_reviews")
-    .select("id")
-    .eq("meeting_id", meetingId)
-    .maybeSingle();
-  const reviewId = (review as { id?: string } | null)?.id;
-  if (reviewId) {
-    const { data: claims } = await supabase
-      .from("minutes_speaker_claims")
-      .select("user_id")
-      .eq("review_id", reviewId)
-      .eq("speaker_label", key);
-    const ids = new Set(
-      ((claims ?? []) as Array<{ user_id: string }>)
-        .map((c) => c.user_id)
-        .filter((id) => activeIds.has(id)),
-    );
-    if (ids.size === 1) return [...ids][0];
-  }
 
   const { data: rows } = await supabase
     .from("attendance_events")

@@ -22,7 +22,6 @@ export type ActivitySourceRow = {
 export type ActivityLookups = {
   names: Map<string, string>;
   tasks: Map<string, { key: string; title: string }>;
-  statements: Map<string, string>;
   meetings: Map<string, string>;
 };
 
@@ -58,8 +57,6 @@ const KNOWN_KINDS = new Set([
   "task.commented",
   "meeting.created",
   "meeting.moved",
-  "ledger.kept_confirmed",
-  "ledger.reversed_confirmed",
   "project.created",
   "repo.linked",
   "repo.unlinked",
@@ -143,9 +140,6 @@ export function toActivityRow(
   if (row.kind === "meeting.moved") {
     return { ...base, meetingTitle: lookups.meetings.get(row.subject_id) };
   }
-  if (row.kind.startsWith("ledger.")) {
-    return { ...base, itemStatement: lookups.statements.get(row.subject_id) };
-  }
   if (MEMBER_KINDS.has(row.kind)) {
     return {
       ...base,
@@ -156,7 +150,7 @@ export function toActivityRow(
   return base;
 }
 
-/** Batched names, task keys, statements, and meeting titles for one page. */
+/** Batched names, task keys, and meeting titles for one page. */
 export async function loadActivityLookups(
   supabase: SupabaseClient,
   projectId: string,
@@ -202,22 +196,6 @@ export async function loadActivityLookups(
     }
   }
 
-  const statements = new Map<string, string>();
-  const itemIds = subjects((r) => r.subject_type === "ledger_item");
-  if (itemIds.length > 0) {
-    const { data, error } = await supabase
-      .from("ledger_items")
-      .select("id, statement")
-      .in("id", itemIds);
-    if (error) throw error;
-    for (const item of (data ?? []) as Array<{
-      id: string;
-      statement: string;
-    }>) {
-      statements.set(item.id, item.statement);
-    }
-  }
-
   const meetings = new Map<string, string>();
   const movedIds = subjects((r) => r.kind === "meeting.moved");
   if (movedIds.length > 0) {
@@ -234,5 +212,5 @@ export async function loadActivityLookups(
       meetings.set(m.id, m.title || "Untitled meeting");
     }
   }
-  return { names, tasks, statements, meetings };
+  return { names, tasks, meetings };
 }

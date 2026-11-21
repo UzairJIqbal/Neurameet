@@ -29,7 +29,6 @@ const client = vi.hoisted(() => ({
   updateProject: vi.fn(),
   listProjectMeetings: vi.fn(),
   listProposals: vi.fn(),
-  getProjectLedger: vi.fn(),
   listActivity: vi.fn(),
   listTasks: vi.fn(),
   prepareMeeting: vi.fn(),
@@ -72,7 +71,6 @@ const project: ProjectFull = {
   overdueTaskCount: 0,
   upcomingMeetingCount: 1,
   processedMeetingCount: 1,
-  decisionCount: 0,
   linkedPrCount: 0,
   github: { connected: false, repos: [], lastSyncedAt: null },
 };
@@ -129,10 +127,6 @@ beforeEach(() => {
   client.listMembers.mockResolvedValue(members);
   client.listProjectMeetings.mockResolvedValue({ meetings: [meeting({})] });
   client.listProposals.mockResolvedValue({ proposals: [], canReview: true });
-  client.getProjectLedger.mockResolvedValue({
-    canReview: true,
-    reviewCount: 0,
-  });
   client.listActivity.mockResolvedValue({ rows: [] });
   client.listTasks.mockResolvedValue({ tasks: [], truncated: {} });
 });

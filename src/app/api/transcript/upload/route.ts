@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { assertMinutesUnlocked } from "@/lib/minutes-lock";
 import { parseMeetingDate } from "@/lib/meeting-date";
 import {
   accessErrorResponse,
@@ -112,9 +111,6 @@ export async function POST(request: Request) {
         if (denied) return denied;
         throw err;
       }
-      // Tasdeeq AC-7: never rewrite a transcript under a minutes review.
-      const locked = await assertMinutesUnlocked(supabase, existing.id);
-      if (locked) return locked;
       meetingIdResolved = existing.id;
       // A project caller passed the manage check, so they may run processing.
       canProcess = access.projectId !== null || existing.user_id === userId;
@@ -126,8 +122,8 @@ export async function POST(request: Request) {
       // and the upload modal parses that back into a meetingId, so it takes the
       // branch above and attaches to the existing call — same flow, same outcome,
       // whether the user uploads from the recap page or the Dashboard.
-      // Optional meeting date (Promise Ledger AC-5): anchors relative due
-      // dates. Only a new meeting takes it; an attach ignores it entirely.
+      // Optional meeting date: anchors relative due dates in action items.
+      // Only a new meeting takes it; an attach ignores it entirely.
       const date = parseMeetingDate(meetingDate, new Date());
       if (!date.ok) {
         return NextResponse.json({ error: date.error }, { status: 400 });

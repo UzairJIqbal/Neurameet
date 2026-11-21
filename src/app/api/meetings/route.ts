@@ -22,7 +22,8 @@ interface MeetingRow {
   scheduled_end_at: string | null;
   meeting_type: ProjectMeetingType | null;
   invited_user_ids: string[] | null;
-  meeting_insights: { category: string | null; summary: string | null }[] | null;
+  meeting_insights:
+    { category: string | null; summary: string | null }[] | null;
 }
 
 const MEETING_COLUMNS =
@@ -52,7 +53,9 @@ function toListItem(
   roles: Map<string, ProjectRole>,
   organizerName: string | undefined,
 ): MeetingListItem {
-  const insights = Array.isArray(row.meeting_insights) ? row.meeting_insights : [];
+  const insights = Array.isArray(row.meeting_insights)
+    ? row.meeting_insights
+    : [];
   const projectId = row.project_id ?? null;
   return {
     id: row.id,
@@ -137,21 +140,28 @@ export async function GET(request: Request) {
     const rows = [...byId.values()].sort((a, b) =>
       a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
     );
-    const profiles = await lookupProfiles(rows.map((row) => row.user_id).filter(Boolean));
+    const profiles = await lookupProfiles(
+      rows.map((row) => row.user_id).filter(Boolean),
+    );
     const meetings = rows.map((row) =>
       toListItem(row, roles, profiles.get(row.user_id)?.name),
     );
     if (!onlyProject) return NextResponse.json({ meetings });
 
     const isViewer = roles.get(onlyProject) === "viewer";
-    const stats = await loadProjectMeetingStats(supabase, onlyProject, isViewer);
+    const stats = await loadProjectMeetingStats(
+      supabase,
+      onlyProject,
+      isViewer,
+    );
     return NextResponse.json({
       meetings: meetings.map((meeting, index) => {
         const counts = stats.get(meeting.id);
         return {
           ...meeting,
-          summaryExcerpt: summaryExcerpt(rows[index].meeting_insights?.[0]?.summary),
-          decisionCount: counts?.decisions ?? 0,
+          summaryExcerpt: summaryExcerpt(
+            rows[index].meeting_insights?.[0]?.summary,
+          ),
           actionItemCount: counts?.actionItems ?? 0,
           ...(isViewer ? {} : { proposalCount: counts?.proposals ?? 0 }),
         };
@@ -161,9 +171,6 @@ export async function GET(request: Request) {
     const message =
       err instanceof Error ? err.message : "Failed to load meetings";
     console.error("Meetings list error:", err);
-    return NextResponse.json(
-      { error: message, meetings: [] },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: message, meetings: [] }, { status: 500 });
   }
 }

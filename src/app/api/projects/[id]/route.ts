@@ -17,8 +17,6 @@ import { parseProjectName } from "@/lib/projects";
 
 type Params = { params: Promise<{ id: string }> };
 
-const SEALED = { error: "Sealed minutes can't be deleted" };
-
 async function loadProject(id: string): Promise<ProjectRow | null> {
   const { data, error } = await supabaseServer()
     .from("projects")
@@ -147,23 +145,10 @@ export async function DELETE(request: Request, { params }: Params) {
     const meetingIds = ((meetings ?? []) as { id: string }[]).map((m) => m.id);
 
     if (meetingIds.length > 0) {
-      const { data: seals, error: sealError } = await supabase
-        .from("minutes_seals")
-        .select("id")
-        .in("meeting_id", meetingIds)
-        .limit(1);
-      if (sealError) throw sealError;
-      if (seals && seals.length > 0)
-        return NextResponse.json(SEALED, { status: 409 });
-
       const { error: deleteMeetingsError } = await supabase
         .from("meetings")
         .delete()
         .eq("project_id", id);
-      // A seal that landed after the pre check trips the foreign key restrict.
-      if ((deleteMeetingsError as { code?: string } | null)?.code === "23503") {
-        return NextResponse.json(SEALED, { status: 409 });
-      }
       if (deleteMeetingsError) throw deleteMeetingsError;
     }
 

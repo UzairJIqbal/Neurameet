@@ -25,7 +25,6 @@ const GROUPS: Array<{ key: keyof PaletteGroups; heading: string }> = [
   { key: "projects", heading: "Projects" },
   { key: "tasks", heading: "Tasks" },
   { key: "meetings", heading: "Meetings" },
-  { key: "decisions", heading: "Decisions" },
 ];
 const ITEM =
   "flex cursor-pointer flex-col rounded-lg px-3 py-2 text-body-md text-on-surface data-[selected=true]:bg-surface-container-low";

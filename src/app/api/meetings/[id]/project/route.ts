@@ -12,7 +12,6 @@ type Params = { params: Promise<{ id: string }> };
 
 const NOT_FOUND = { error: "Meeting not found" };
 const CANT_LEAVE = { error: "Meetings can't leave a project" };
-const MINUTES_REVIEW = { error: "Finish or cancel the minutes review first" };
 
 // Meeting creator with Developer or higher in the target: move a personal
 // meeting into a project; its follow ups become proposals (W3 AC-24, AC-25).
@@ -58,8 +57,6 @@ export async function POST(request: Request, { params }: Params) {
     });
     if (rpcErr) {
       const code = rpcErrorCode(rpcErr);
-      if (code === "minutes_review")
-        return NextResponse.json(MINUTES_REVIEW, { status: 409 });
       if (code === "not_movable")
         return NextResponse.json(CANT_LEAVE, { status: 409 });
       throw rpcErr;

@@ -7,8 +7,8 @@ import { IconArrowRight, IconCheck, IconListCheck } from "@tabler/icons-react";
 
 const stats = [
   { value: "EN + UR", label: "Transcripts in English and Urdu" },
-  { value: "100%", label: "Decisions linked to a quote" },
-  { value: "SHA-256", label: "Tamper evident sealed minutes" },
+  { value: "100%", label: "Action items linked to a quote" },
+  { value: "GitHub", label: "A merged PR closes the task" },
 ];
 
 const LandingHero = () => {

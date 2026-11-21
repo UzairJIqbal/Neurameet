@@ -2,7 +2,7 @@
 import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { embedMeeting, maybeRunLedgerMatch } from "@/agent/meeting-pipeline";
+import { embedMeeting } from "@/agent/meeting-pipeline";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
 
 // True when the caller has an attendance row for the meeting. Guests may have
@@ -62,10 +62,7 @@ export async function POST(request: Request) {
 
     if (meetingError || !meeting) {
       console.error("Meeting not found:", meetingError);
-      return NextResponse.json(
-        { error: "Meeting not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
 
     // Personal meeting: owner or recorded participant (the fallback below).
@@ -94,8 +91,6 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-
-    after(() => maybeRunLedgerMatch(supabase, meetingId, "page"));
 
     return NextResponse.json({ success: true, chunkCount: outcome.chunkCount });
   } catch (err) {

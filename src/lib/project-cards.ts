@@ -341,7 +341,6 @@ export async function loadProjectFull(
     meetingCount,
     upcomingMeetingCount,
     processedMeetingCount,
-    decisionCount,
     linkedPrCount,
     tasks,
     synced,
@@ -366,16 +365,6 @@ export async function loadProjectFull(
           count: "exact",
           head: true,
         })
-        .eq("meetings.project_id", id),
-    ),
-    countOrNull(
-      supabase
-        .from("ledger_items")
-        .select("id, meetings!inner(project_id)", {
-          count: "exact",
-          head: true,
-        })
-        .eq("kind", "decision")
         .eq("meetings.project_id", id),
     ),
     role === "viewer"
@@ -411,7 +400,6 @@ export async function loadProjectFull(
     ...tasks,
     upcomingMeetingCount,
     processedMeetingCount,
-    decisionCount,
     linkedPrCount,
     github: {
       connected: repos.length > 0,

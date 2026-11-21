@@ -5,8 +5,7 @@ import type { Task, TaskEvent, TaskEventKind } from "@/lib/task-types";
 import type { PrState, TaskPrLink } from "@/lib/github-types";
 import { isTaskPriority, isTaskStatus, taskKey } from "@/lib/tasks";
 import { lookupProfiles } from "@/lib/projects";
-import { MINUTES_TZ } from "@/lib/minutes-types";
-import type { LedgerItem, LedgerLink } from "@/lib/meeting-types";
+import { APP_TZ } from "@/lib/meeting-date";
 
 // The one place that decides which task columns a role may read (AC-37).
 // `embedding` is in neither list, so no response ever carries it.
@@ -203,9 +202,9 @@ export async function activeMemberIds(
   );
 }
 
-/** Today in Pakistan, as YYYY-MM-DD. Decides overdue on the project ledger. */
+/** Today in Pakistan, as YYYY-MM-DD. Decides overdue on tasks. */
 export function pktToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: MINUTES_TZ }).format(
+  return new Intl.DateTimeFormat("en-CA", { timeZone: APP_TZ }).format(
     new Date(),
   );
 }
@@ -214,10 +213,8 @@ export function pktToday(): string {
 // a timestamp are never skipped or repeated (AC-57b). It never passes through a
 // JS Date, which would cut microseconds.
 const CURSOR_PATTERNS = {
-  ledger: /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|\+00:00)\|[0-9a-f-]{36}$/,
   notifications: /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|\+00:00)\|[0-9a-f-]{36}$/,
-  activity:
-    /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|\+00:00)\|(te|mt|ll|au):[0-9a-f-]{36}$/,
+  activity: /^\d{4}-\d{2}-\d{2}T[0-9:.]+(Z|\+00:00)\|(te|mt|au):[0-9a-f-]{36}$/,
 };
 
 export const PAGE_SIZE = 50;
@@ -258,109 +255,6 @@ export function pageOf<T>(
   if (rows.length <= size) return { page: rows, next: null };
   const page = rows.slice(0, size);
   return { page, next: cursorOf(page[size - 1]) };
-}
-
-// Hidden ledger columns are left out of a Viewer's query (AC-62). A code link
-// keeps the PR title in `quote`, so the Viewer list omits it for every kind.
-export const LEDGER_ITEM_SELECT_VIEWER =
-  "id, meeting_id, action_item_id, kind, statement, assignee, due_date, status, created_at, source, agreed_count, total_count";
-export const LEDGER_ITEM_SELECT_FULL = `${LEDGER_ITEM_SELECT_VIEWER}, quote, quote_language, speaker, line_number`;
-export const LEDGER_LINK_SELECT_VIEWER =
-  "id, item_id, evidence_kind, evidence_meeting_id, relation, confidence, state, decided_at, created_at";
-export const LEDGER_LINK_SELECT_FULL = `${LEDGER_LINK_SELECT_VIEWER}, evidence_task_link_id, quote, speaker, line_number`;
-
-export function ledgerItemSelectFor(role: ProjectRole | null): string {
-  return role === "viewer"
-    ? LEDGER_ITEM_SELECT_VIEWER
-    : LEDGER_ITEM_SELECT_FULL;
-}
-
-export function ledgerLinkSelectFor(role: ProjectRole | null): string {
-  return role === "viewer"
-    ? LEDGER_LINK_SELECT_VIEWER
-    : LEDGER_LINK_SELECT_FULL;
-}
-
-export type LedgerItemRow = {
-  id: string;
-  meeting_id: string;
-  action_item_id: string | null;
-  kind: LedgerItem["kind"];
-  statement: string;
-  quote?: string | null;
-  quote_language?: LedgerItem["quoteLanguage"];
-  speaker?: string | null;
-  assignee: string | null;
-  due_date: string | null;
-  line_number?: number | null;
-  status: LedgerItem["status"];
-  created_at: string;
-  source: LedgerItem["source"];
-  agreed_count: number | null;
-  total_count: number | null;
-};
-
-export type LedgerLinkRow = {
-  id: string;
-  item_id: string;
-  evidence_kind: LedgerLink["evidenceKind"];
-  evidence_meeting_id: string | null;
-  evidence_task_link_id?: string | null;
-  relation: LedgerLink["relation"];
-  quote?: string | null;
-  speaker?: string | null;
-  line_number?: number | null;
-  confidence: number;
-  state: LedgerLink["state"];
-  decided_at: string | null;
-  created_at: string;
-};
-
-export function toLedgerItem(
-  row: LedgerItemRow,
-  role: ProjectRole | null,
-): LedgerItem {
-  // Even if a wider select slipped through, a Viewer never gets these fields.
-  const open = role !== "viewer";
-  return {
-    id: row.id,
-    meetingId: row.meeting_id,
-    actionItemId: row.action_item_id,
-    kind: row.kind,
-    statement: row.statement,
-    quote: open ? (row.quote ?? null) : null,
-    quoteLanguage: open ? (row.quote_language ?? null) : null,
-    speaker: open ? (row.speaker ?? null) : null,
-    assignee: row.assignee,
-    dueDate: row.due_date,
-    lineNumber: open ? (row.line_number ?? null) : null,
-    status: row.status,
-    createdAt: row.created_at,
-    source: row.source,
-    agreedCount: row.agreed_count,
-    totalCount: row.total_count,
-  };
-}
-
-export function toLedgerLink(
-  row: LedgerLinkRow,
-  role: ProjectRole | null,
-): LedgerLink {
-  const open = role !== "viewer";
-  return {
-    id: row.id,
-    itemId: row.item_id,
-    evidenceKind: row.evidence_kind,
-    evidenceMeetingId: row.evidence_meeting_id,
-    relation: row.relation,
-    quote: open ? (row.quote ?? null) : null,
-    speaker: open ? (row.speaker ?? null) : null,
-    lineNumber: open ? (row.line_number ?? null) : null,
-    confidence: row.confidence,
-    state: row.state,
-    decidedAt: row.decided_at,
-    createdAt: row.created_at,
-  };
 }
 
 /** Which of these meetings sit in the project (AC-62b). */

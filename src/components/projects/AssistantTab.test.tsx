@@ -38,7 +38,6 @@ vi.mock("./ProposalsPanel", () => ({
   default: () => <div>proposals tab</div>,
 }));
 vi.mock("./GitHubTab", () => ({ default: () => <div>github tab</div> }));
-vi.mock("./DecisionsTab", () => ({ default: () => <div>decisions tab</div> }));
 vi.mock("./ActivityTab", () => ({ default: () => <div>activity tab</div> }));
 vi.mock("@/components/MeetingModel", () => ({ default: () => null }));
 
@@ -105,7 +104,6 @@ const project = (role: ProjectRole): ProjectFull => ({
   overdueTaskCount: 0,
   upcomingMeetingCount: 1,
   processedMeetingCount: 1,
-  decisionCount: 0,
   linkedPrCount: 0,
   github: { connected: false, repos: [], lastSyncedAt: null },
 });
@@ -225,7 +223,6 @@ describe("ProjectAssistant (AC-70n)", () => {
     id: "p1",
     name: "Billing",
     processedMeetingCount: 3,
-    decisionCount: 7,
     linkedPrCount: 2,
     taskTotals: { todo: 1, in_progress: 2, in_review: 0, done: 4 },
   } as unknown as ProjectFull;
@@ -269,7 +266,7 @@ describe("ProjectAssistant (AC-70n)", () => {
     expect(panel.getByText("Processed meetings").nextSibling?.textContent).toBe(
       "3",
     );
-    expect(panel.getByText("Decisions").nextSibling?.textContent).toBe("7");
+    expect(panel.queryByText("Decisions")).toBeNull();
     expect(panel.getByText("Tasks").nextSibling?.textContent).toBe("7");
     expect(panel.getByText("Linked PRs").nextSibling?.textContent).toBe("2");
     expect(panel.queryByText(/commit|issue/i)).toBeNull();

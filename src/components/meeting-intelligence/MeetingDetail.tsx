@@ -15,10 +15,6 @@ import {
   MeetingDetailData,
   MeetingInsights,
 } from "@/lib/meeting-types";
-import {
-  LEDGER_MATCH_FAILED_MESSAGE,
-  requestLedgerMatch,
-} from "@/lib/ledger-match-client";
 import MeetingHeader from "./MeetingHeader";
 import MeetingTabs from "./MeetingTabs";
 
@@ -29,8 +25,6 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
-  // Bumped after a retry re-runs matching, so the Decisions and Promises tab refetches.
-  const [ledgerVersion, setLedgerVersion] = useState(0);
   const { timedOut } = useLoadingTimeout(isLoading, {
     timeoutMs: 12000,
     retryNonce,
@@ -124,12 +118,12 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
     } finally {
       clearTimeout(timeoutId);
     }
-    await reindexAndMatch();
+    await reindex();
   };
 
-  // Retry re-extracts ledger items, so re-embed the transcript and run promise
-  // matching again. Both are non-fatal: the new summary is already saved.
-  const reindexAndMatch = async () => {
+  // Retry rewrites the insights, so re-embed the transcript. Non-fatal: the new
+  // summary is already saved.
+  const reindex = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
     let embedOk = false;
@@ -150,11 +144,7 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
       toast.error(
         "Meeting processed, but AI chat indexing failed. Re-upload the transcript to enable AI chat.",
       );
-    } else if (!(await requestLedgerMatch(meetingId))) {
-      toast.error(LEDGER_MATCH_FAILED_MESSAGE);
     }
-    // Processing replaced the ledger items, so the tab refetches either way.
-    setLedgerVersion((v) => v + 1);
   };
 
   if (timedOut) {
@@ -228,9 +218,7 @@ const MeetingDetail = ({ meetingId }: { meetingId: string }) => {
         isOwner={isOwner}
         onRetry={retrySummary}
         onMoved={data.projectId ? undefined : () => setRetryNonce((k) => k + 1)}
-        ledgerVersion={ledgerVersion}
         projectId={data.projectId ?? null}
-        canManage={data.projectId ? !!data.canManage : isOwner}
         role={data.role ?? null}
         transcriptText={data.transcriptText}
         onProposalsChanged={refreshDetail}

@@ -97,11 +97,11 @@ describe("claimPipelineStep", () => {
     });
   });
 
-  it("passes allowDone false for the ledger step", async () => {
+  it("passes allowDone false through", async () => {
     const client = rpcClient(async () => ({ data: false, error: null }));
-    await expect(
-      claimPipelineStep(client, "m1", "ledger", false),
-    ).resolves.toBe(false);
+    await expect(claimPipelineStep(client, "m1", "embed", false)).resolves.toBe(
+      false,
+    );
     expect(
       (vi.mocked(client.rpc).mock.calls[0][1] as { p_allow_done: boolean })
         .p_allow_done,

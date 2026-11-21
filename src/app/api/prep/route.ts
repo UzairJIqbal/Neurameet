@@ -32,13 +32,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { suggestions, ledgerItems } = await generatePrepSuggestions(
+    const { suggestions } = await generatePrepSuggestions(
       userId,
       title.trim(),
       notes?.trim() || undefined,
     );
 
-    return NextResponse.json({ suggestions, ledgerItems });
+    return NextResponse.json({ suggestions });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Prep generation failed";

@@ -144,7 +144,7 @@ describe("UploadTranscriptModal (hang fix regression)", () => {
   });
 });
 
-// Promise Ledger wiring (spec 0001): the meeting date field and the match step.
+// The meeting date field and the upload, process, embed order.
 const ok = (body: unknown) => ({
   ok: true,
   status: 200,
@@ -152,13 +152,12 @@ const ok = (body: unknown) => ({
 });
 
 // Answers each route in turn, so a test can fail one step at a time.
-function routeFetch(match: () => unknown) {
+function routeFetch() {
   const fn = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>(
     async (url) => {
       if (url === "/api/transcript/upload") return ok({ meetingId: "new-1" });
       if (url === "/api/ai/process") return ok({ success: true });
       if (url === "/api/ai/embed") return ok({ success: true });
-      if (url === "/api/ledger/match") return match();
       throw new Error(`unexpected ${url}`);
     },
   );
@@ -188,7 +187,7 @@ async function fillAndUpload() {
   });
 }
 
-describe("UploadTranscriptModal meeting date (AC-5)", () => {
+describe("UploadTranscriptModal meeting date", () => {
   it("shows the date field for a new meeting, capped at today", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 30, 10, 0));
@@ -207,7 +206,7 @@ describe("UploadTranscriptModal meeting date (AC-5)", () => {
   });
 
   it("sends the chosen date with a new meeting's upload", async () => {
-    const fn = routeFetch(() => ok({ matched: 0 }));
+    const fn = routeFetch();
     render(<UploadTranscriptModal onClose={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Meeting date (optional)"), {
       target: { value: "2026-10-01" },
@@ -219,7 +218,7 @@ describe("UploadTranscriptModal meeting date (AC-5)", () => {
   });
 
   it("leaves the date out when none was chosen", async () => {
-    const fn = routeFetch(() => ok({ matched: 0 }));
+    const fn = routeFetch();
     render(<UploadTranscriptModal onClose={vi.fn()} />);
 
     await fillAndUpload();
@@ -230,9 +229,9 @@ describe("UploadTranscriptModal meeting date (AC-5)", () => {
   });
 });
 
-describe("UploadTranscriptModal ledger match (AC-6, AC-14)", () => {
-  it("runs matching for the new meeting after embedding", async () => {
-    const fn = routeFetch(() => ok({ matched: 2 }));
+describe("UploadTranscriptModal steps", () => {
+  it("uploads, processes, then embeds the new meeting", async () => {
+    const fn = routeFetch();
     render(<UploadTranscriptModal onClose={vi.fn()} />);
 
     await fillAndUpload();
@@ -241,29 +240,10 @@ describe("UploadTranscriptModal ledger match (AC-6, AC-14)", () => {
       "/api/transcript/upload",
       "/api/ai/process",
       "/api/ai/embed",
-      "/api/ledger/match",
     ]);
-    expect(bodyOf(fn, "/api/ledger/match")).toEqual({ meetingId: "new-1" });
     expect(toast.success).toHaveBeenCalledWith(
       "Transcript processed successfully!",
     );
     expect(toast.error).not.toHaveBeenCalled();
-  });
-
-  it("still finishes the upload and toasts when matching fails", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    routeFetch(() => ({ ok: false, status: 502, json: async () => ({}) }));
-    const onClose = vi.fn();
-    render(<UploadTranscriptModal onClose={onClose} />);
-
-    await fillAndUpload();
-
-    expect(onClose).toHaveBeenCalled();
-    expect(toast.success).toHaveBeenCalledWith(
-      "Transcript processed successfully!",
-    );
-    const { LEDGER_MATCH_FAILED_MESSAGE } =
-      await import("@/lib/ledger-match-client");
-    expect(toast.error).toHaveBeenCalledWith(LEDGER_MATCH_FAILED_MESSAGE);
   });
 });

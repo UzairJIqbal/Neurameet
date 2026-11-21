@@ -8,7 +8,6 @@ const PAGE = 1000;
 const EXCERPT_LENGTH = 160;
 
 export type MeetingStats = {
-  decisions: number;
   actionItems: number;
   proposals: number;
 };
@@ -43,36 +42,27 @@ export async function loadProjectMeetingStats(
   projectId: string,
   isViewer: boolean,
 ): Promise<Map<string, MeetingStats>> {
-  const [decisions, actionItems] = await Promise.all([
-    readAll<{ meeting_id: string }>((from, to) =>
-      supabase
-        .from("ledger_items")
-        .select("id, meeting_id, meetings!inner(project_id)")
-        .eq("meetings.project_id", projectId)
-        .eq("kind", "decision")
-        .order("id")
-        .range(from, to),
-    ),
-    readAll<{ meeting_id: string; review_state: string }>((from, to) =>
-      supabase
-        .from("action_items")
-        .select("id, meeting_id, review_state, meetings!inner(project_id)")
-        .eq("meetings.project_id", projectId)
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
+  const actionItems = await readAll<{
+    meeting_id: string;
+    review_state: string;
+  }>((from, to) =>
+    supabase
+      .from("action_items")
+      .select("id, meeting_id, review_state, meetings!inner(project_id)")
+      .eq("meetings.project_id", projectId)
+      .order("id")
+      .range(from, to),
+  );
 
   const stats = new Map<string, MeetingStats>();
   const statsOf = (meetingId: string) => {
     let row = stats.get(meetingId);
     if (!row) {
-      row = { decisions: 0, actionItems: 0, proposals: 0 };
+      row = { actionItems: 0, proposals: 0 };
       stats.set(meetingId, row);
     }
     return row;
   };
-  for (const row of decisions) statsOf(row.meeting_id).decisions += 1;
   for (const { meeting_id: id, review_state: state } of actionItems) {
     if (state === "rejected") continue;
     if (isViewer && state !== "confirmed") continue;

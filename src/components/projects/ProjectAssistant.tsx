@@ -9,7 +9,7 @@ const SUGGESTIONS = [
   "What did we decide about the database?",
   "Who is responsible for the authentication module?",
   "Which tasks are still pending?",
-  "Which promises are overdue?",
+  "Which tasks are overdue?",
 ];
 
 // AC-70n: the W7 panel, with suggested questions and what it can answer from.
@@ -24,7 +24,6 @@ const ProjectAssistant = ({ project }: { project: ProjectFull }) => {
   );
   const memory = [
     ["Processed meetings", project.processedMeetingCount ?? 0],
-    ["Decisions", project.decisionCount ?? 0],
     ["Tasks", taskCount],
     ["Linked PRs", project.linkedPrCount ?? 0],
   ] as const;

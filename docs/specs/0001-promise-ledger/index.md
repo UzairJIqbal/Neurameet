@@ -1,6 +1,6 @@
 # 0001. Promise Ledger
 
-**Status**: Accepted
+**Status**: Removed by [0006](../0006-remove-ledger-and-minutes/index.md)
 **Date**: 2026-10-30
 **Mode**: FEATURE
 **Scope feature**: [docs/scope/scope.md, row 17. Promise Ledger](../../scope/scope.md)

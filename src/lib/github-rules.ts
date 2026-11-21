@@ -2,7 +2,6 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getTaskPrefix } from "@/lib/project-select";
 import {
-  notifyKeptSuggestions,
   notifyMergeCompleted,
   notifyPrReviewRequested,
   notifyRevertReopened,
@@ -490,9 +489,6 @@ async function completeTasks(
     if (data === "completed") {
       result.completed++;
       await notifyMergeCompleted(supabase, taskId);
-    }
-    if (data === "completed" || data === "already_completed") {
-      await notifyKeptSuggestions(supabase, taskId);
     }
   }
 }

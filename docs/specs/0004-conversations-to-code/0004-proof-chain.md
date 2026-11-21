@@ -1,5 +1,7 @@
 # W6. Proof Chain surfaces: Decisions and Promises, Outcome card, Activity
 
+**Removed by [0006](../0006-remove-ledger-and-minutes/index.md)**: the Kept step of the Outcome card, the Decisions and Promises tab, and code evidence on ledger links. The Proof Chain now ends at the merged PR (Said, Task, Shipped).
+
 Child of [0004. Conversations to Code](index.md). Creates the `project_activity` view and adds `ledger_links.decided_by`. The other `ledger_links` columns it reads (`evidence_kind`, `evidence_task_link_id`) shipped with W5.
 
 Updated 2026-11-07 at the W6 `/architect`: compared with the W4 and W5 code. New ACs carry letters (AC-57a) so W7 onward keep their numbers. The choices made are listed under *Decisions added at the W6 architect step*, and you may override any of them.

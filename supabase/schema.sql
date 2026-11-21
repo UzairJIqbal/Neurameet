@@ -1344,9 +1344,6 @@ begin
   update meetings set project_id = p_project
     where id = p_meeting and project_id is null and user_id = p_actor;
   if not found then raise exception 'not_movable'; end if;
-  if exists (select 1 from minutes_reviews where meeting_id = p_meeting) then
-    raise exception 'minutes_review';
-  end if;
   update action_items ai set review_state = 'proposed'
     from follow_ups f where f.action_item_id = ai.id and f.meeting_id = p_meeting
     and f.status <> 'completed';
@@ -1511,18 +1508,14 @@ begin
       and (v_reopened is null or l.merged_at > v_reopened)
     order by l.merged_at desc limit 1;
   if done.id is null then return 'no_qualifying_merge'; end if;
-  -- Completed by hand before the merge: the task stays manual, the promise still gets evidence.
-  if t.status = 'completed' then
-    perform add_code_ledger_links(p_task, done.id);
-    return 'already_completed';
-  end if;
+  -- Completed by hand before the merge: the task stays manual.
+  if t.status = 'completed' then return 'already_completed'; end if;
   update tasks set status = 'completed', completion_kind = 'merge',
     completion_evidence = done.pr_url, completed_at = now(), completed_by = null,
     version = version + 1, updated_at = now() where id = p_task;
   insert into task_events (task_id, project_id, actor_id, kind, from_value, to_value, detail)
     values (p_task, t.project_id, null, 'completed_by_merge', t.status, 'completed',
             jsonb_build_object('source', 'github', 'taskLinkId', done.id));
-  perform add_code_ledger_links(p_task, done.id);
   return 'completed';
 end $$;
 
@@ -1544,7 +1537,7 @@ end $$;
 -- A merged revert. Reopens only when this link is the merge that completed the task.
 create or replace function apply_merge_revert(p_link uuid, p_by_pr integer)
 returns text language plpgsql set search_path = public as $$
-declare l task_links; t tasks; r record;
+declare l task_links; t tasks;
 begin
   select * into l from task_links where id = p_link;
   if not found then return 'not_found'; end if;
@@ -1552,11 +1545,6 @@ begin
   select * into l from task_links where id = p_link;     -- read again under the lock
   if l.state <> 'merged' or l.reverted_at is not null then return 'skipped'; end if;
   update task_links set reverted_at = now(), reverted_by_pr = p_by_pr where id = p_link;
-  delete from ledger_links where evidence_task_link_id = p_link and state = 'suggested';
-  for r in update ledger_links set state = 'rejected', decided_at = now()
-           where evidence_task_link_id = p_link and state = 'confirmed' returning item_id loop
-    perform ledger_recompute_item_status(r.item_id);
-  end loop;
   if t.completion_kind is distinct from 'merge' or t.completion_evidence is distinct from l.pr_url then
     return 'reverted';
   end if;
@@ -1603,13 +1591,6 @@ create or replace view project_activity with (security_invoker = true) as
   select 'mt:' || m.id::text, m.project_id, m.created_at, m.user_id, 'meeting.created', 'meeting', m.id::text,
          jsonb_build_object('title', m.title)
     from meetings m where m.project_id is not null
-  union all
-  select 'll:' || ll.id::text, m.project_id, ll.decided_at, ll.decided_by,
-         'ledger.' || ll.relation || '_confirmed', 'ledger_item',
-         ll.item_id::text, jsonb_build_object('evidence', ll.evidence_kind)
-    from ledger_links ll join ledger_items li on li.id = ll.item_id
-    join meetings m on m.id = li.meeting_id
-    where m.project_id is not null and ll.state = 'confirmed' and ll.decided_at is not null
   union all
   select 'au:' || a.id::text, a.project_id, a.created_at, a.actor_id, a.action, a.target_type, a.target_id,
          a.detail - 'ref'
@@ -1874,7 +1855,7 @@ end $$;
 
 -- Claims one step: true when this caller may run it. A running step is held
 -- unless it started more than 5 minutes ago (stale). With p_allow_done false a
--- done step is never claimed again (ledger match runs once per meeting).
+-- done step is never claimed again.
 create or replace function claim_pipeline_step(p_meeting uuid, p_step text,
   p_allow_done boolean default true)
 returns boolean language plpgsql set search_path = public as $$

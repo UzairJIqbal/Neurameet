@@ -78,10 +78,10 @@ describe("isAppPath", () => {
 });
 
 describe("categories", () => {
-  it("places all 13 kinds exactly once", () => {
+  it("places all 12 kinds exactly once", () => {
     const all = Object.values(NOTIFICATION_CATEGORIES).flat();
-    expect(all).toHaveLength(13);
-    expect(new Set(all).size).toBe(13);
+    expect(all).toHaveLength(12);
+    expect(new Set(all).size).toBe(12);
   });
 });
 

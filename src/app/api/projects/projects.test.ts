@@ -436,27 +436,10 @@ describe("DELETE /api/projects/[id]", () => {
     expect(callsOf("projects", "delete")).toHaveLength(0);
   });
 
-  it("returns 409 when a project meeting has sealed minutes", async () => {
-    role("owner");
-    queue("projects", ok(project));
-    queue("meetings", ok([{ id: "m1" }]));
-    queue("minutes_seals", ok([{ id: "s1" }]));
-    const res = await deleteProject(
-      req({ confirmName: "Core" }, "DELETE"),
-      idParams,
-    );
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
-      error: "Sealed minutes can't be deleted",
-    });
-    expect(callsOf("meetings", "delete")).toHaveLength(0);
-  });
-
   it("deletes meetings, then the project, then writes the audit row", async () => {
     role("owner");
     queue("projects", ok(project));
     queue("meetings", ok([{ id: "m1" }, { id: "m2" }]));
-    queue("minutes_seals", ok([]));
     const res = await deleteProject(
       req({ confirmName: "Core" }, "DELETE"),
       idParams,

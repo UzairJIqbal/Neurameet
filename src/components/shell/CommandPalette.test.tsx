@@ -32,7 +32,6 @@ const groups = {
     },
   ],
   meetings: [],
-  decisions: [],
 };
 
 describe("CommandPalette", () => {

@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // so timings can never break the pipeline they measure.
 
 export type PipelineStep =
-  "recording" | "whisper" | "cleanup" | "process" | "embed" | "ledger";
+  "recording" | "whisper" | "cleanup" | "process" | "embed";
 
 export type PipelineSource = "webhook" | "page" | "cron";
 
@@ -98,7 +98,7 @@ export async function markPipelineStep(
 
 /**
  * Take the right to run one step. True when this caller runs it. With
- * allowDone false a finished step is never claimed again (ledger match).
+ * allowDone false a finished step is never claimed again.
  * Returns false on any error, so a broken claim never runs a step twice.
  */
 export async function claimPipelineStep(

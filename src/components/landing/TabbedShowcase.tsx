@@ -2,12 +2,7 @@
 
 import React, { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import {
-  IconCircleCheck,
-  IconFileText,
-  IconListCheck,
-  IconShieldCheck,
-} from "@tabler/icons-react";
+import { IconFileText, IconGitMerge, IconListCheck } from "@tabler/icons-react";
 import Reveal from "./Reveal";
 
 type Tab = {
@@ -56,37 +51,20 @@ const TABS: Tab[] = [
     },
   },
   {
-    id: "ledger",
-    label: "Promise Ledger",
-    icon: IconCircleCheck,
-    title: "Every promise, tracked to kept",
-    body: "Promises and decisions are matched against later meetings and merged pull requests, each with proof.",
+    id: "shipped",
+    label: "Shipped",
+    icon: IconGitMerge,
+    title: "From what was said to what shipped",
+    body: "Link a GitHub repo and a merged pull request closes the task it names, so every task traces back to the meeting it came from.",
     points: [
-      "Kept, open, overdue, reversed",
-      "Quote and timestamp as proof",
-      "Owner confirms each match",
+      "Said, task, shipped",
+      "PR merge closes the task",
+      "Revert reopens it",
     ],
     card: {
-      kind: "Promise",
+      kind: "Task",
       line: "Login API merged in PR #51.",
-      meta: "Marked kept · proof attached",
-    },
-  },
-  {
-    id: "minutes",
-    label: "Verified Minutes",
-    icon: IconShieldCheck,
-    title: "Minutes everyone has confirmed",
-    body: "Each attendee confirms, corrects, or records a dissent on their own lines. Sealed minutes show any later change.",
-    points: [
-      "Confirm, correct or dissent",
-      "Tamper evident seal",
-      "Public verify link",
-    ],
-    card: {
-      kind: "Minutes",
-      line: "4 of 5 attendees confirmed.",
-      meta: "Sealed · signature intact",
+      meta: "Done · closed by merge",
     },
   },
 ];
@@ -106,7 +84,7 @@ const TabbedShowcase = () => {
             <span className="text-primary-container">proof</span>
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-body-md text-on-surface-variant">
-            One meeting, four things your team can rely on.
+            One meeting, three things your team can rely on.
           </p>
         </div>
 

@@ -307,7 +307,7 @@ const DeleteCard = ({ project }: { project: ProjectFull }) => {
       <h2 className="text-headline-sm text-on-surface">Delete project</h2>
       <p className={MUTED}>
         This deletes the project and all {project.meetingCount} of its meetings,
-        with their transcripts, insights, and ledger. Type{" "}
+        with their transcripts and insights. Type{" "}
         <span className="font-medium text-on-surface">{project.name}</span> to
         confirm.
       </p>

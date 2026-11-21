@@ -43,15 +43,11 @@ export function activitySentence(row: ActivityRow): string {
     case "task.pr_state_changed":
       return `A PR on ${key} is now ${row.to ?? "changed"}`;
     case "task.proposal_merged":
-      return `A promise was merged into ${key}`;
+      return `A proposal was merged into ${key}`;
     case "meeting.created":
       return `${actor} added a meeting`;
     case "meeting.moved":
       return `${actor} moved a meeting into the project`;
-    case "ledger.kept_confirmed":
-      return `${actor} confirmed a promise as kept`;
-    case "ledger.reversed_confirmed":
-      return `${actor} confirmed a promise as reversed`;
     case "project.created":
       return `${actor} created the project`;
     case "project.ownership_transferred":
@@ -77,7 +73,6 @@ export function activitySentence(row: ActivityRow): string {
 
 /** The smaller line under a sentence, when the row has something to add. */
 export function activityDetail(row: ActivityRow): string | null {
-  if (row.itemStatement) return row.itemStatement;
   if (row.meetingTitle) return row.meetingTitle;
   if (row.taskTitle) return row.taskTitle;
   if (row.kind === "task.edited" && (row.from || row.to)) {

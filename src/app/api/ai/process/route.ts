@@ -2,11 +2,7 @@ import { after, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { accessErrorResponse, checkMeetingAccess } from "@/lib/project-auth";
-import {
-  maybeRunLedgerMatch,
-  PROCESS_BUSY,
-  processMeeting,
-} from "@/agent/meeting-pipeline";
+import { PROCESS_BUSY, processMeeting } from "@/agent/meeting-pipeline";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -69,10 +65,7 @@ export async function POST(request: Request) {
     }
 
     const { notify } = outcome;
-    after(async () => {
-      if (notify) await notify();
-      await maybeRunLedgerMatch(supabase, meetingId, "page");
-    });
+    if (notify) after(notify);
 
     return NextResponse.json({
       success: true,

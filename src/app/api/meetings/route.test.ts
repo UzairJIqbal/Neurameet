@@ -97,7 +97,6 @@ describe("GET /api/meetings", () => {
     it("adds the excerpt and counts, with proposals for a Developer", async () => {
       queue("project_members", ok([{ project_id: "p1", role: "developer" }]));
       queue("meetings", ok([processed]));
-      queue("ledger_items", ok([{ meeting_id: "m2" }]));
       queue(
         "action_items",
         ok([
@@ -108,7 +107,6 @@ describe("GET /api/meetings", () => {
       );
       const body = await (await list("u1", "?projectId=p1")).json();
       expect(body.meetings[0]).toMatchObject({
-        decisionCount: 1,
         actionItemCount: 2,
         proposalCount: 1,
       });
@@ -118,7 +116,6 @@ describe("GET /api/meetings", () => {
     it("counts confirmed items only and omits proposals for a Viewer", async () => {
       queue("project_members", ok([{ project_id: "p1", role: "viewer" }]));
       queue("meetings", ok([processed]));
-      queue("ledger_items", ok([]));
       queue(
         "action_items",
         ok([

@@ -10,11 +10,7 @@ import {
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { readUserPrefs } from "@/lib/user-prefs";
-import {
-  LEDGER_MATCH_FAILED_MESSAGE,
-  requestLedgerMatch,
-} from "@/lib/ledger-match-client";
-import { localToday } from "@/lib/ledger-client";
+import { localToday } from "@/lib/meeting-date";
 
 // A transcript generated from a real call is downloaded as
 // `meeting-<meetingId>-transcript.txt` (AfterMeetingRecap stamps the call's
@@ -231,19 +227,6 @@ const UploadTranscriptModal = ({
         console.error("Embedding request failed:", embedErr);
       }
 
-      // Step 4: Promise Ledger matching needs this meeting's chunks, so it runs
-      // only after embed succeeded. It has its own 2 minute budget; Cancel
-      // still aborts it through the shared controller.
-      let matchFailed = false;
-      if (!embedFailed) {
-        clearTimeout(timeoutId);
-        matchFailed = !(await requestLedgerMatch(
-          returnedMeetingId,
-          controller.signal,
-        ));
-        if (cancelledRef.current) return;
-      }
-
       onClose();
       router.push(`/meeting-intelligence/${returnedMeetingId}`);
 
@@ -254,7 +237,6 @@ const UploadTranscriptModal = ({
       } else {
         toast.success("Transcript processed successfully!");
       }
-      if (matchFailed) toast.error(LEDGER_MATCH_FAILED_MESSAGE);
     } catch (err) {
       // An aborted request (user Cancel, or the 2-minute timeout) is not a
       // generic failure. A user click stays quiet; an unexpected abort reads as
@@ -314,7 +296,7 @@ const UploadTranscriptModal = ({
                 />
               </div>
 
-              {/* Meeting date: only a new meeting takes it (Promise Ledger AC-5) */}
+              {/* Meeting date: only a new meeting takes it */}
               {!effectiveMeetingId ? (
                 <div className="flex flex-col gap-1.5">
                   <label

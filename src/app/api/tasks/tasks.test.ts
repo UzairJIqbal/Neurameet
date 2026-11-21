@@ -763,11 +763,12 @@ describe("POST /api/meetings/[id]/project", () => {
     expect((await move({ projectId: P })).status).toBe(403);
   });
 
-  it("returns 409 under a minutes review", async () => {
+  it("no longer maps a minutes review error to 409 (spec 0006)", async () => {
     meeting();
     role("developer");
+    vi.spyOn(console, "error").mockImplementation(() => {});
     queue("rpc:move_meeting_to_project", fail("minutes_review"));
-    expect((await move({ projectId: P })).status).toBe(409);
+    expect((await move({ projectId: P })).status).toBe(500);
   });
 
   it("moves the meeting", async () => {

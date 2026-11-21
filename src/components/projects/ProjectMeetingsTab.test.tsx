@@ -148,7 +148,6 @@ describe("ProjectMeetingsTab (AC-70d)", () => {
         startedAt: inHours(-24),
         proposalCount: 2,
         summaryExcerpt: "We agreed the plan.",
-        decisionCount: 1,
         actionItemCount: 3,
       }),
     ]);
@@ -163,7 +162,6 @@ describe("ProjectMeetingsTab (AC-70d)", () => {
         status: "ended",
         startedAt: inHours(-24),
         summaryExcerpt: "We agreed the plan.",
-        decisionCount: 1,
         actionItemCount: 1,
       }),
     ]);

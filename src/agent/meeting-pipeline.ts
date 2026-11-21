@@ -7,9 +7,7 @@ import { normalizeDueDate } from "@/lib/normalize-date";
 import { MEETING_CATEGORIES } from "@/lib/meeting-types";
 import { generateStructuredWithFallback } from "@/agent/models";
 import { extractionResultSchema } from "@/agent/types";
-import { LEDGER_MAX_ITEMS, writeLedgerItems } from "@/agent/ledger";
 import { embedAndStore } from "@/agent/embed";
-import { runLedgerMatch } from "@/agent/ledger-match";
 import { StreamClient } from "@stream-io/node-sdk";
 import { generateTranscriptForMeeting } from "@/agent/transcript-generation";
 import { callTypeOfRow } from "@/lib/stream-call-type-server";
@@ -20,28 +18,17 @@ import {
   isPendingStale,
   setTranscriptState,
 } from "@/lib/transcript-state";
-import { minutesLockError } from "@/lib/minutes-lock";
-import { buildMinutesDraft, cutMinutes } from "@/agent/minutes";
 import { buildProposalRows, hasReviewedProposals } from "@/agent/proposals";
 import { notifyProposalsReady } from "@/lib/notification-events";
 import { rpcErrorCode } from "@/lib/projects";
 import { MAX_PROPOSALS_PER_MEETING } from "@/lib/tasks";
 import {
   claimPipelineStep,
-  isStepStale,
   markPipelineStep,
   stepStart,
   type PipelineSource,
   type PipelineState,
 } from "@/lib/pipeline-steps";
-import {
-  DISSENT_SUGGESTIONS_MAX,
-  MINUTES_MAX_DECISIONS,
-  MINUTES_MAX_KEY_POINTS,
-  MINUTES_MAX_QUOTES,
-  MINUTES_MAX_SUMMARY_POINTS,
-  type MinutesDraft,
-} from "@/lib/minutes-types";
 import type { ExtractionResult } from "@/agent/types";
 
 // The after meeting AI steps (spec 0005), shared by the API routes, the Stream
@@ -56,6 +43,12 @@ import type { ExtractionResult } from "@/agent/types";
 const MAX_TRANSCRIPT_CHARS = 16000;
 // Smallest model timeout a deadline may leave the extraction call.
 const MIN_AI_TIMEOUT_MS = 5_000;
+
+// Caps on what the model returns, enforced here rather than in the schema so an
+// extra item never fails the whole extraction.
+const MAX_KEY_POINTS = 8;
+const MAX_DECISIONS = 8;
+const MAX_ACTION_QUOTES = 2;
 
 const PROPOSALS_REVIEWED = "Proposals were already reviewed";
 export const PROCESS_BUSY = "Summary is already being created";
@@ -74,7 +67,7 @@ function normalizeCategory(raw: string | null | undefined): string {
 }
 
 // The meeting date (YYYY-MM-DD) the model resolves relative due dates against
-// ("Friday tak", "next week"). Spec 0001 AC-4: meetings.started_at, never today.
+// ("Friday tak", "next week"): meetings.started_at, never today.
 function meetingDateFor(row: {
   started_at: string | null;
   created_at: string | null;
@@ -84,7 +77,7 @@ function meetingDateFor(row: {
   if (parsed && !Number.isNaN(parsed.getTime())) {
     return parsed.toISOString().slice(0, 10);
   }
-  console.warn("[ledger] meeting has no usable date, using today");
+  console.warn("[process] meeting has no usable date, using today");
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -106,40 +99,21 @@ Respond with a SINGLE JSON object only (no markdown, no prose), with exactly thi
   "insights": {
     "summary": "A comprehensive summary of the meeting",
     "category": "Product | Sales | Design | Operations | Engineering | General",
+    "keyPoints": ["Key point discussed"],
+    "decisions": ["Decision that was made"],
     "detectedTopics": ["Specific topic", "Another topic"]
-  },
-  "minutes": {
-    "summaryPoints": [{ "text": "One summary point", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }],
-    "keyPoints": [{ "text": "Key point discussed", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }],
-    "decisions": [{ "text": "Decision that was made", "speakers": ["Who said it"], "quotes": ["Exact words from one transcript line"] }]
   },
   "actionItems": [
     { "title": "A clear, actionable task", "assignee": "Person responsible or null", "dueDate": "ISO date YYYY-MM-DD or null", "quotes": ["Exact words from one transcript line"] }
-  ],
-  "ledgerItems": [
-    { "kind": "decision | promise", "statement": "Plain English restatement", "quote": "Exact words from one transcript line", "quoteLanguage": "en | ur | mixed", "speaker": "Who said it or null", "assignee": "Who promised (promises only) or null", "dueDate": "ISO date YYYY-MM-DD or null", "actionItemIndex": 0 }
-  ],
-  "dissentSuggestions": [
-    { "speakerLabel": "Speaker name exactly as in the transcript", "topic": "What they objected to", "position": "Their view in one sentence", "quote": "Exact words from one transcript line", "relatedDecisionIndex": 0 }
   ]
 }
 Extraction rules:
 - Summary: a comprehensive summary of the meeting, as one paragraph.
-- Minutes: summaryPoints (at most ${MINUTES_MAX_SUMMARY_POINTS}) restate the summary as short points; keyPoints (at most ${MINUTES_MAX_KEY_POINTS}) are the main points discussed; decisions (at most ${MINUTES_MAX_DECISIONS}) are explicit decisions that were made.
-  - speakers: who said the point, using the speaker names exactly as they appear in the transcript, or null.
-  - quotes: at most ${MINUTES_MAX_QUOTES} per point, each copied WORD FOR WORD from ONE transcript line, without the "Speaker:" label. Return no quote (null or an empty array) rather than invent or paraphrase one.
+- Key points: at most ${MAX_KEY_POINTS} main points discussed. Decisions: at most ${MAX_DECISIONS} explicit decisions that were made (an empty array when none).
 - Category: choose the SINGLE most representative category from the list. Do NOT default to any one; pick the category that best matches what the meeting was actually about.
 - Detected topics: specific topics discussed.
-- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, a due date (ISO YYYY-MM-DD) if stated, and at most ${MINUTES_MAX_QUOTES} quotes copied word for word from one transcript line each (no "Speaker:" label; null when there is none).
-- Dates: resolve every relative date ("Friday", "Friday tak", "next week", "kal") against the meeting date above, never against today.
-- Ledger items: every decision that was made and every promise someone made (who will do what, by when). The transcript may be English, Urdu, or mixed Urdu English.
-  - quote: copy the words EXACTLY as they appear in the transcript, in the original language and script, from ONE transcript line at most. Do not translate, paraphrase, or include the "Speaker:" label.
-  - statement: a short plain English restatement.
-  - quoteLanguage: "en" for English, "ur" for Urdu (any script), "mixed" for code mixed Urdu English.
-  - assignee and dueDate apply to promises only; use null for decisions.
-  - actionItemIndex: the zero based index into the actionItems array you return when this promise is the same commitment, otherwise null.
-  - At most ${LEDGER_MAX_ITEMS} items, the most important first. Return an empty array when there are none.
-- Dissent suggestions: at most ${DISSENT_SUGGESTIONS_MAX}, only where a person clearly objected to or disagreed with something. speakerLabel is their name exactly as in the transcript, quote is their own words copied word for word from one line they said (no "Speaker:" label), relatedDecisionIndex is the zero based index into minutes.decisions the objection is about, or null. Return null or an empty array when nobody objected.`;
+- Action items: commitments or tasks arising from the meeting. Extract them even when phrased informally (e.g. "we should…", "let's…", "I'll take care of…", "can you…"). Return an empty array ONLY if the meeting contains no commitments or tasks at all. For each, capture a clear task title, the responsible person if named, a due date (ISO YYYY-MM-DD) if stated, and at most ${MAX_ACTION_QUOTES} quotes copied word for word from one transcript line each (no "Speaker:" label; null when there is none).
+- Dates: resolve every relative date ("Friday", "Friday tak", "next week", "kal") against the meeting date above, never against today.`;
 }
 
 export type ProcessMeetingRow = {
@@ -221,8 +195,8 @@ async function sendReadyEmail(
 }
 
 /**
- * Summary, action items (or proposals on a project meeting), minutes draft,
- * and ledger items for one meeting. The caller has checked access. Returns
+ * Summary, key points, decisions, category, and action items (or proposals on
+ * a project meeting) for one meeting. The caller has checked access. Returns
  * "busy" when another run holds the process step.
  */
 export async function processMeeting(
@@ -249,10 +223,6 @@ export async function processMeeting(
   if (projectId && (await hasReviewedProposals(supabase, meetingId))) {
     return fail(409, PROPOSALS_REVIEWED);
   }
-
-  // Tasdeeq AC-7: a meeting with a minutes review keeps its insights frozen.
-  const locked = await minutesLockError(supabase, meetingId);
-  if (locked) return fail(locked.status, locked.error);
 
   const { data: transcript, error: transcriptError } = await supabase
     .from("transcripts")
@@ -294,8 +264,7 @@ export async function processMeeting(
       timeoutMs: timeoutFor(deadline),
     });
 
-    // W4 AC-30: at most 50 proposals per run, the first in model order. The
-    // minutes draft uses the same capped list so its rows exist.
+    // W4 AC-30: at most 50 proposals per run, the first in model order.
     const result = projectId
       ? {
           ...extracted,
@@ -306,35 +275,9 @@ export async function processMeeting(
         }
       : extracted;
 
-    // Tasdeeq (spec 0003): action item ids are generated up front so the
-    // minutes draft, written with the insights, can name each action line's row.
+    // Action item ids are generated up front so proposals and plain action
+    // items share one id list.
     const actionItemIds = result.actionItems.map(() => randomUUID());
-    const minutes = cutMinutes(result.minutes);
-    let minutesDraft: MinutesDraft | null = null;
-    try {
-      const built = buildMinutesDraft({
-        result,
-        rawText,
-        actionItemIds,
-        maxChars: MAX_TRANSCRIPT_CHARS,
-      });
-      minutesDraft = built.draft;
-      if (built.droppedSuggestions > 0) {
-        console.warn(
-          `[tasdeeq] dropped ${built.droppedSuggestions} dissent suggestions`,
-        );
-      }
-    } catch (draftErr) {
-      console.error("[tasdeeq] minutes draft failed:", draftErr);
-    }
-
-    // The AI call above is long, so a review may have opened meanwhile. Check
-    // again before anything is deleted (AC-7).
-    const lockedNow = await minutesLockError(supabase, meetingId);
-    if (lockedNow) {
-      await markFailed("locked");
-      return fail(lockedNow.status, lockedNow.error);
-    }
 
     // W4: proposals are swapped first, inside one locked SQL call, so a review
     // that landed during the AI call wins and nothing below runs (AC-34).
@@ -398,12 +341,11 @@ export async function processMeeting(
       .insert({
         meeting_id: meetingId,
         summary: result.insights.summary,
-        key_points: minutes.keyPoints.map((p) => p.text),
-        decisions: minutes.decisions.map((p) => p.text),
+        key_points: result.insights.keyPoints.slice(0, MAX_KEY_POINTS),
+        decisions: result.insights.decisions.slice(0, MAX_DECISIONS),
         category: normalizeCategory(result.insights.category),
         detected_topics: result.insights.detectedTopics,
         processed_at: processedAt,
-        minutes_draft: minutesDraft,
       });
 
     if (insightsError) {
@@ -412,8 +354,7 @@ export async function processMeeting(
       return fail(500, "Failed to save insights");
     }
 
-    // Write action items (ids kept in insert order for ledger linking)
-    let insertedActionItemIds: string[] = projectId ? actionItemIds : [];
+    // Write action items
     if (!projectId && result.actionItems.length > 0) {
       const { data: insertedItems, error: actionItemsError } = await supabase
         .from("action_items")
@@ -432,7 +373,6 @@ export async function processMeeting(
         console.error("Failed to write action items:", actionItemsError);
         // Non-fatal — insights are saved, action items can be retried
       } else if (insertedItems && insertedItems.length > 0) {
-        insertedActionItemIds = insertedItems.map((ai) => ai.id as string);
         // Auto-generate a follow-up per action item (Step 7)
         const { error: followUpError } = await supabase
           .from("follow_ups")
@@ -453,16 +393,6 @@ export async function processMeeting(
         }
       }
     }
-
-    // Promise Ledger items (spec 0001). Line numbers are against the full
-    // raw_text; writeLedgerItems never throws, so a ledger failure cannot undo
-    // the insights and action items saved above.
-    await writeLedgerItems(supabase, {
-      meetingId,
-      rawText,
-      items: result.ledgerItems ?? [],
-      actionItemIds: insertedActionItemIds,
-    });
 
     // Notify the owner by email when the "Email notifications" preference is ON.
     // Non-fatal: any failure is logged and must not block the processing result.
@@ -572,72 +502,6 @@ async function hasRow(
     .limit(1);
   if (error) throw error;
   return !!data && data.length > 0;
-}
-
-/**
- * Promise matching once both the summary and the chat index exist. Called after
- * process and after embed, so whichever finishes second runs it. A finished
- * match is never claimed again. Never throws.
- */
-export async function maybeRunLedgerMatch(
-  supabase: SupabaseClient,
-  meetingId: string,
-  source?: PipelineSource,
-): Promise<void> {
-  try {
-    const [hasSummary, hasChunks] = await Promise.all([
-      hasRow(supabase, "meeting_insights", meetingId),
-      hasRow(supabase, "meeting_chunks", meetingId),
-    ]);
-    if (!hasSummary || !hasChunks) return;
-
-    const [{ data: meeting }, { data: transcript }] = await Promise.all([
-      supabase
-        .from("meetings")
-        .select("user_id, project_id")
-        .eq("id", meetingId)
-        .maybeSingle(),
-      supabase
-        .from("transcripts")
-        .select("raw_text")
-        .eq("meeting_id", meetingId)
-        .maybeSingle(),
-    ]);
-    const rawText = (transcript?.raw_text as string | null | undefined) ?? "";
-    if (!meeting || !rawText.trim()) return;
-
-    if (!(await claimPipelineStep(supabase, meetingId, "ledger", false))) {
-      return;
-    }
-    const startedAt = stepStart();
-    try {
-      // The candidate owner is the meeting creator (same as the match route).
-      await runLedgerMatch(supabase, {
-        meetingId,
-        userId: meeting.user_id as string,
-        projectId: (meeting.project_id as string | null) ?? null,
-        rawText,
-      });
-      await markPipelineStep(
-        supabase,
-        meetingId,
-        "ledger",
-        { status: "done", startedAt },
-        source,
-      );
-    } catch (err) {
-      console.error("[ledger] auto match failed", { meetingId, err });
-      await markPipelineStep(
-        supabase,
-        meetingId,
-        "ledger",
-        { status: "failed", startedAt, reason: "error" },
-        source,
-      );
-    }
-  } catch (err) {
-    console.error("[ledger] auto match check failed", { meetingId, err });
-  }
 }
 
 // ===== Server run (spec 0005, AC-6 to AC-8): the Stream webhook and the cron
@@ -818,7 +682,6 @@ async function runAiSteps(
   if (embedded.status === "rejected") {
     console.error("[pipeline] server embed failed:", embedded.reason);
   }
-  await maybeRunLedgerMatch(supabase, meeting.id, source);
 }
 
 /**
@@ -930,7 +793,7 @@ export const SWEEP_MIN_AGE_MS = 60 * 60 * 1000;
 const SWEEP_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const SWEEP_SCAN_ROWS = 50;
 
-export type SweepAction = "regenerate" | "process" | "embed" | "ledger";
+export type SweepAction = "regenerate" | "process" | "embed";
 
 type SweepCandidate = {
   meeting_id: string;
@@ -952,8 +815,6 @@ export function sweepActionFor(
   if (!(row.raw_text ?? "").trim()) return null;
   if (!has.insights) return "process";
   if (!has.chunks) return "embed";
-  const ledger = row.pipeline?.steps?.ledger;
-  if (ledger?.status === "failed" || isStepStale(ledger, now)) return "ledger";
   return null;
 }
 
@@ -989,7 +850,6 @@ async function sweepOne(
   } else if (action === "embed") {
     await embedMeeting(supabase, { meetingId, source: "cron" });
   }
-  await maybeRunLedgerMatch(supabase, meetingId, "cron");
 }
 
 /**

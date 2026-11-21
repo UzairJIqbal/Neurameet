@@ -10,8 +10,7 @@
 		"test": "npx playwright test",
 		"test:unit": "vitest run",
 		"check:providers": "node scripts/check-providers.mjs",
-		"type": "",
-		"eval:ledger": "tsx scripts/ledger-eval.ts"
+		"type": ""
 	},
 	"dependencies": {
 		"@ai-sdk/google": "^4.0.39",

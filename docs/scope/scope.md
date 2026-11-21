@@ -72,9 +72,9 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | P11 | Meeting Intelligence tabs real-meeting audit: Attendance Report, Category, Action Items, Recording | Product Final Polishing | done |
 | P12 | Meeting pages updation: delete across meetings/recordings/follow-ups, fix stuck scroll, rework useless controls (Upcoming Start gated by time) | Product Final Polishing | done |
 | P13 | Responsive Polishing: audit + fix responsiveness across every screen at mobile/tablet/desktop | Product Final Polishing | done |
-| 17 | Promise Ledger: cross meeting memory of decisions and promises (kept, open, overdue, reversed) with quote evidence, Urdu English aware | Signature Feature | done |
-| 18 | Live Ledger: bring the Promise Ledger into the live call (Promise Check-in quote cards + one tap Agreement Check saved to the ledger) | Signature Feature | in-progress |
-| 19 | Tasdeeq, Verified Minutes: every attendee confirms, corrects, or records a dissent on the AI minutes attributed to them, then the confirmed minutes are sealed so any later change is detectable | Signature Feature | in-progress |
+| 17 | Promise Ledger: cross meeting memory of decisions and promises (kept, open, overdue, reversed) with quote evidence, Urdu English aware | Signature Feature | removed |
+| 18 | Live Ledger: bring the Promise Ledger into the live call (Promise Check-in quote cards + one tap Agreement Check saved to the ledger) | Signature Feature | removed |
+| 19 | Tasdeeq, Verified Minutes: every attendee confirms, corrects, or records a dissent on the AI minutes attributed to them, then the confirmed minutes are sealed so any later change is detectable | Signature Feature | removed |
 | 20 | Project workspaces, members, roles, and invitations (W1, W2) | Project Workspace | in-progress |
 | 21 | Project meetings with a consent notice (W3) | Project Workspace | in-progress |
 | 22 | Review gate plus project tasks on a Kanban board (W4) | Project Workspace | in-progress |
@@ -530,7 +530,8 @@ Audit every screen at mobile, tablet, and desktop, then fix responsiveness so th
 
 The Promise Ledger (#17) is the feature meant to make NeuraMeet stand out to the FYP panel and in the market; Live Ledger (#18) extends it into the live call. The Promise Ledger was chosen from the October 2026 research in `reports/NeuraMeet unique FYP feature.md`, which found that summaries, action items, chat, search, prep, and engagement insights already ship in Zoom, Teams, Otter, Read.ai, and Fireflies. It runs after the meeting on transcripts NeuraMeet already has. Live Ledger was chosen from the November 2026 research in `reports/NeuraMeet second signature feature.md` and reuses Stream custom events plus the existing ledger data. Tasdeeq, Verified Minutes (#19) was chosen from the third research pass in `reports/NeuraMeet third signature feature.md`. All three stay inside the zero cost rule.
 
-### 17. Promise Ledger · done · GA
+### 17. Promise Ledger · removed · GA
+**Removed (2026-11-21, [0006](../specs/0006-remove-ledger-and-minutes/index.md)).** The code is deleted and the tables are dropped after deploy. The text below is history.
 Pull every decision and every promise (who, what, by when) out of each meeting, in English, Urdu, or mixed Urdu English, and carry them forward. When a later meeting is processed, mark each one kept, still open, overdue, or reversed, always with the exact quote and timestamp as proof, and let the owner confirm or reject each match. Claim for the panel: no major meeting platform or mainstream notetaker in our review checks promise follow through across meetings, and none does it for Urdu English speech.
 **Done when:** after two or more related meetings, the ledger shows every extracted decision and promise with its status and a quote behind each verdict, a reversed decision raises a visible alert, the owner can confirm or reject a match, it works on a bilingual Urdu English meeting, and accuracy is measured on a small hand labelled set with Urdu English results reported separately.
 **Spec:** [0001](../specs/0001-promise-ledger/index.md)
@@ -546,7 +547,8 @@ Pull every decision and every promise (who, what, by when) out of each meeting, 
 - [x] Review it (fresh model): `/check review promise ledger`
 - [x] Document it: `/document promise ledger`
 
-### 18. Live Ledger · in-progress · GA
+### 18. Live Ledger · removed · GA
+**Removed (2026-11-21, [0006](../specs/0006-remove-ledger-and-minutes/index.md)).** The code is deleted and the tables are dropped after deploy. The text below is history.
 Bring the Promise Ledger into the call while it is still running. **Promise Check-in:** the owner sees a ranked panel of open and overdue promises, raises one so every participant sees it as a quote card, and marks it Kept, Still open, or Reversed on the spot. **Agreement Check:** the host types a decision, each participant taps Agree or Not yet, and it is saved to the ledger as "agreed by N of M". Chosen from `reports/NeuraMeet second signature feature.md`. Claim for the panel stays narrow: none of the platforms or notetakers we reviewed puts a past promise with its exact quote into a live call with owner confirmation and a logged agreement check.
 **Done when:** in a live call the owner can raise an open promise and every participant sees its quote card; the owner's live mark (kept, still open, reversed) lands in the ledger after the call; an Agreement Check collects votes and saves an "agreed by N of M" decision to the ledger; only the owner can raise or mark; it runs on the Stream free tier with no paid captions, no extra Whisper calls, and no new provider.
 Spec: [0002. Live Ledger](../specs/0002-live-ledger/index.md)
@@ -557,7 +559,8 @@ Spec: [0002. Live Ledger](../specs/0002-live-ledger/index.md)
 - [x] LL4 Post call reconcile plus Ledger tab badges
 - [ ] LL5 Live two person verify
 
-### 19. Tasdeeq, Verified Minutes · in-progress · GA
+### 19. Tasdeeq, Verified Minutes · removed · GA
+**Removed (2026-11-21, [0006](../specs/0006-remove-ledger-and-minutes/index.md)).** The code is deleted and the tables are dropped after deploy. The text below is history.
 After each meeting, every attendee (not just the host) reviews the AI minutes lines attributed to them and confirms, corrects, or taps "Record my view" to enter a formal dissent. Each minutes line links to the transcript lines behind it, and lines with no support are flagged. Once enough attendees confirm, or a deadline passes, the minutes are sealed and a fingerprint of the sealed version is sent to every attendee, so any later change can be detected. It fits Pakistan's official minutes practice (decisions only, individual views recorded on request, minutes confirmed by members). Chosen from `reports/NeuraMeet third signature feature.md`. Claim for the panel stays narrow: none of the meeting apps or AI notetakers we reviewed let each attendee confirm, correct, or record their own view against the AI minutes, then seal the result. Say "tamper evident", never "legally binding".
 **Done when:** every attendee can claim their speaker label and confirm, correct, or record a view on their own minutes lines; each line shows its supporting transcript lines and unsupported lines are flagged; reprocessing never overwrites minutes once review starts; minutes seal on quorum or deadline and a verify step detects any later change; a planted error study reports how many errors attendees catch; it adds no paid service and no new provider.
 Spec: [0003. Tasdeeq, Verified Minutes](../specs/0003-tasdeeq-verified-minutes/index.md)
@@ -575,7 +578,7 @@ Spec: [0003. Tasdeeq, Verified Minutes](../specs/0003-tasdeeq-verified-minutes/i
 
 ## Project Workspace: Conversations to Code (Steps W-pre to W9, after the Signature Features, before Deploy)
 
-Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview` and the research in `reports/Conversations to code workspace.md`. NeuraMeet grows from a meeting app into a project workspace that connects conversations with code. The research found every PDF screen already ships somewhere (Huly, Linear, Jira with Loom and Rovo, Fireflies), so the centre of this phase is the **Proof Chain**: a spoken promise, with its verified quote, speaker, and timestamp, becomes a reviewed task, is closed by a PR merged into the default branch, and shows as kept back on the meeting and in the Promise Ledger. Claim stays narrow: "none of the products we reviewed". The PDF is used for layout and information architecture only; the locked Stitch tokens stay (decision 2026-11-02). Live captions leave the core (deferred below). The three signature features stay and get permanent homes: the Promise Ledger becomes the project Decisions and Promises tab, Live Ledger the live meeting panel, Tasdeeq an optional Verify minutes step before tasks are confirmed.
+Adopted 2026-11-02 from the PDF `NeuraMeet UI Overview` and the research in `reports/Conversations to code workspace.md`. NeuraMeet grows from a meeting app into a project workspace that connects conversations with code. The research found every PDF screen already ships somewhere (Huly, Linear, Jira with Loom and Rovo, Fireflies), so the centre of this phase is the **Proof Chain**: a spoken promise, with its verified quote, speaker, and timestamp, becomes a reviewed task, is closed by a PR merged into the default branch, and shows as shipped on the task's Outcome card (the Kept step and the Promise Ledger were removed by [0006](../specs/0006-remove-ledger-and-minutes/index.md) on 2026-11-21). Claim stays narrow: "none of the products we reviewed". The PDF is used for layout and information architecture only; the locked Stitch tokens stay (decision 2026-11-02). Live captions leave the core (deferred below). The three signature features stay and get permanent homes: the Promise Ledger becomes the project Decisions and Promises tab, Live Ledger the live meeting panel, Tasdeeq an optional Verify minutes step before tasks are confirmed.
 
 Before any W step: commit the in flight Live Ledger and Tasdeeq work and run LL5 plus the Tasdeeq three person live run (W-pre).
 
@@ -641,8 +644,9 @@ Spec: [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md
 - [ ] Document it: `/document github integration`
 
 ### 24. Proof Chain: a promise traced from meeting quote to merged PR · in-progress · GA
+**Slimmed (2026-11-21, [0006](../specs/0006-remove-ledger-and-minutes/index.md)):** the Decisions and Promises tab, code evidence on ledger links, the Kept step, and the Live Ledger check in are removed. The chain is now Said, Task, Shipped.
 The project Decisions and Promises tab built on `ledger_items`; a qualifying merge adds code evidence to the linked promise (owner confirms, same flow as ledger links); the meeting gets an Outcome card showing the chain; an Activity timeline joins meetings, decisions, tasks, and PRs; Live Ledger check in is scoped to the project.
-**Done when:** one demo promise from a real Urdu English meeting is traced in the UI from quote to reviewed task to merged PR to kept.
+**Done when:** one demo promise from a real Urdu English meeting is traced in the UI from quote to reviewed task to merged PR.
 Spec: [0004-proof-chain](../specs/0004-conversations-to-code/0004-proof-chain.md), under [0004. Conversations to Code](../specs/0004-conversations-to-code/index.md)
 - [x] Design it (spec)
 - [x] Build it: `/develop proof chain`

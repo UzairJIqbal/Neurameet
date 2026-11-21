@@ -22,39 +22,26 @@ const del = (userId: string | null) => {
   );
 };
 const meeting = ok({ id: "m1", user_id: "owner" });
-const SEALED = { error: "Sealed minutes can't be deleted" };
 
-describe("DELETE /api/meetings/[id] with Tasdeeq minutes", () => {
+describe("DELETE /api/meetings/[id] personal", () => {
   beforeEach(() => {
     resetQueues();
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it("refuses to delete a meeting with sealed minutes", async () => {
-    queue("meetings", meeting);
-    queue("minutes_seals", ok([{ id: "seal-1" }]));
-    const res = await del("owner");
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual(SEALED);
-    expect(callsOf("meetings", "delete")).toHaveLength(0);
+  it("deletes the creator's meeting with no minutes check (spec 0006)", async () => {
+    queue("meetings", meeting, ok(null));
+    expect((await del("owner")).status).toBe(200);
+    expect(callsOf("meetings", "delete")).toHaveLength(1);
+    expect(callsOf("minutes_seals", "select")).toHaveLength(0);
   });
 
-  it("returns 409 when a seal lands after the check (foreign key restrict)", async () => {
+  it("answers 500 when the delete fails", async () => {
     queue("meetings", meeting, {
       data: null,
       error: { code: "23503", message: "restrict" },
     });
-    queue("minutes_seals", ok([]));
-    const res = await del("owner");
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual(SEALED);
-  });
-
-  it("deletes a meeting with no seal (an open review goes with it)", async () => {
-    queue("meetings", meeting, ok(null));
-    queue("minutes_seals", ok([]));
-    expect((await del("owner")).status).toBe(200);
-    expect(callsOf("meetings", "delete")).toHaveLength(1);
+    expect((await del("owner")).status).toBe(500);
   });
 });
 
@@ -102,7 +89,6 @@ describe("DELETE /api/meetings/[id] roles", () => {
   it("lets the project Owner delete", async () => {
     queue("meetings", projectMeeting, ok(null));
     queue("project_members", ok({ role: "owner" }));
-    queue("minutes_seals", ok([]));
     expect((await del("u2")).status).toBe(200);
     expect(callsOf("meetings", "delete")).toHaveLength(1);
   });

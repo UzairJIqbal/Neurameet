@@ -1,13 +1,10 @@
 import "server-only";
 import { embed } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { deriveLedgerStatus } from "@/agent/ledger";
 import { QUESTION_EMBEDDING, type CrossMeetingHit } from "@/agent/rag";
 import { dataBlock } from "@/lib/data-block";
-import type { LedgerItemStatus } from "@/lib/meeting-types";
-import { MINUTES_TZ } from "@/lib/minutes-types";
+import { APP_TZ } from "@/lib/meeting-date";
 import type { ProjectSource } from "@/lib/project-citations";
-import { pktToday } from "@/lib/project-select";
 import { lookupProfiles } from "@/lib/projects";
 import { taskKey } from "@/lib/tasks";
 
@@ -17,7 +14,6 @@ import { taskKey } from "@/lib/tasks";
 export const CHUNK_COUNT = 8;
 export const MIN_SIMILARITY = 0.3;
 export const MAX_TASKS = 10;
-export const MAX_ITEMS = 10;
 export const MAX_CHUNK_CHARS = 2000;
 export const MAX_ROW_CHARS = 500;
 export const NOT_FOUND = "Not found in this project's records.";
@@ -53,24 +49,11 @@ type TaskRow = {
   due_date: string | null;
 };
 
-type ItemRow = {
-  id: string;
-  kind: "decision" | "promise";
-  statement: string;
-  status: LedgerItemStatus;
-  assignee: string | null;
-  speaker: string | null;
-  due_date: string | null;
-  meeting_id: string;
-  meetings: { title: string | null; started_at: string | null };
-};
-
 export type ProjectRetrieval = {
   projectId: string;
   taskPrefix: string;
   chunks: ChunkRow[];
   tasks: Array<TaskRow & { assigneeName: string }>;
-  items: ItemRow[];
 };
 
 /** A source plus the line the model reads. The line never goes to the browser. */
@@ -147,23 +130,6 @@ async function loadTasks(
   return [...matched, ...rest].slice(0, MAX_TASKS);
 }
 
-async function loadItems(
-  supabase: SupabaseClient,
-  projectId: string,
-): Promise<ItemRow[]> {
-  const { data, error } = await supabase
-    .from("ledger_items")
-    .select(
-      "id, kind, statement, status, assignee, speaker, due_date, meeting_id, meetings!inner(title, started_at, project_id)",
-    )
-    .eq("meetings.project_id", projectId)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(MAX_ITEMS);
-  if (error) throw error;
-  return (data ?? []) as unknown as ItemRow[];
-}
-
 async function loadTaskPrefix(
   supabase: SupabaseClient,
   projectId: string,
@@ -183,10 +149,9 @@ export async function retrieveProjectSources(
   question: string,
 ): Promise<ProjectRetrieval> {
   const embedding = await embedQuestion(question);
-  const [chunks, tasks, items, taskPrefix] = await Promise.all([
+  const [chunks, tasks, taskPrefix] = await Promise.all([
     matchChunks(supabase, projectId, embedding, CHUNK_COUNT),
     loadTasks(supabase, projectId, embedding),
-    loadItems(supabase, projectId),
     loadTaskPrefix(supabase, projectId),
   ]);
 
@@ -200,7 +165,6 @@ export async function retrieveProjectSources(
     projectId,
     taskPrefix,
     chunks,
-    items,
     tasks: tasks.map((task) => ({
       ...task,
       assigneeName: task.assignee_id
@@ -230,7 +194,7 @@ export async function searchProjectChunks(
 
 // A calendar date in Pakistan time.
 function pktDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: MINUTES_TZ }).format(
+  return new Intl.DateTimeFormat("en-CA", { timeZone: APP_TZ }).format(
     new Date(iso),
   );
 }
@@ -242,12 +206,11 @@ const meetingWhen = (title: string | null, startedAt: string | null) => ({
 
 const dueText = (dueDate: string | null) => (dueDate ? `, due ${dueDate}` : "");
 
-/** Numbers chunks, then tasks, then items in one [S#] series. */
+/** Numbers chunks, then tasks, in one [S#] series. */
 export function buildProjectSources(
   retrieval: ProjectRetrieval,
-  today: string = pktToday(),
 ): BuiltSource[] {
-  const { projectId, taskPrefix, chunks, tasks, items } = retrieval;
+  const { projectId, taskPrefix, chunks, tasks } = retrieval;
 
   const fromChunks = chunks.map((chunk) => {
     const { title, date } = meetingWhen(chunk.meeting_title, chunk.started_at);
@@ -270,24 +233,7 @@ export function buildProjectSources(
     };
   });
 
-  const fromItems = items.map((item) => {
-    const { title, date } = meetingWhen(
-      item.meetings.title,
-      item.meetings.started_at,
-    );
-    const when = date ? `, ${date}` : "";
-    const kindLabel = item.kind === "decision" ? "Decision" : "Promise";
-    const status = deriveLedgerStatus(item.status, item.due_date, today);
-    const assignee = item.assignee || item.speaker || UNASSIGNED;
-    return {
-      kind: "item" as const,
-      label: `${kindLabel}, ${title}${when}`,
-      href: `/meeting-intelligence/${item.meeting_id}`,
-      text: `${kindLabel} (${status}, ${assignee}${dueText(item.due_date)}), from "${title}"${when}: ${item.statement.slice(0, MAX_ROW_CHARS)}`,
-    };
-  });
-
-  return [...fromChunks, ...fromTasks, ...fromItems].map((source, index) => ({
+  return [...fromChunks, ...fromTasks].map((source, index) => ({
     ...source,
     marker: `S${index + 1}`,
   }));

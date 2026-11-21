@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { notify, projectAdminIds } from "@/lib/notifications";
 import { findUserIdsByInviteEmail } from "@/lib/invitations";
 import { getProjectRole, NEED_ROLES } from "@/lib/project-auth";
-import { MINUTES_TZ } from "@/lib/minutes-types";
+import { APP_TZ } from "@/lib/meeting-date";
 import { ROLE_LABELS, type ProjectRole } from "@/lib/project-types";
 import { taskKey } from "@/lib/tasks";
 
@@ -217,44 +217,6 @@ export function notifyRevertReopened(
   });
 }
 
-/** One notice per suggested code link; the dedupe key stops repeats on Sync. */
-export function notifyKeptSuggestions(
-  supabase: SupabaseClient,
-  taskId: string,
-): Promise<void> {
-  return quietly("kept_suggestion", async () => {
-    const { data: links, error } = await supabase
-      .from("task_links")
-      .select("id")
-      .eq("task_id", taskId);
-    if (error) throw error;
-    const linkIds = (links ?? []).map((l: { id: string }) => l.id);
-    if (linkIds.length === 0) return;
-    const { data: suggested, error: ledgerErr } = await supabase
-      .from("ledger_links")
-      .select("id")
-      .in("evidence_task_link_id", linkIds)
-      .eq("state", "suggested");
-    if (ledgerErr) throw ledgerErr;
-    if (!suggested || suggested.length === 0) return;
-
-    const task = await loadTaskFacts(supabase, taskId);
-    if (!task) return;
-    const admins = await projectAdminIds(supabase, task.projectId);
-    for (const row of suggested as { id: string }[]) {
-      await notify(supabase, {
-        userIds: admins,
-        projectId: task.projectId,
-        kind: "kept_suggestion",
-        title: "A merge may keep a promise",
-        body: `${task.key}: check it in Decisions and Promises.`,
-        link: `/projects/${task.projectId}?tab=promises`,
-        dedupeKey: `kept_suggestion:${row.id}`,
-      });
-    }
-  });
-}
-
 /** AC-71b: only someone linked by GitHub id, and a Developer or higher there. */
 export function notifyPrReviewRequested(
   supabase: SupabaseClient,
@@ -395,7 +357,7 @@ export function notifyProjectInvitation(
 
 const startInPkt = (startsAt: string): string =>
   `${new Date(startsAt).toLocaleString("en-US", {
-    timeZone: MINUTES_TZ,
+    timeZone: APP_TZ,
     dateStyle: "medium",
     timeStyle: "short",
   })} PKT`;

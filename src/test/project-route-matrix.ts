@@ -188,12 +188,6 @@ export const MATRIX: MatrixRow[] = [
     body: { title: "A task" },
   },
   {
-    route: "projects/[id]/ledger",
-    method: "GET",
-    need: "member",
-    viewerReadable: true,
-  },
-  {
     route: "projects/[id]/activity",
     method: "GET",
     need: "member",
@@ -332,17 +326,6 @@ export function seedTables(): Seed {
         pr_url: "https://github.com/acme/secret/pull/7",
         repo_full_name: "acme/secret",
         state: "merged",
-      },
-    ],
-    ledger_items: [
-      {
-        id: "ledger-1",
-        meeting_id: M,
-        kind: "promise",
-        statement: "Fix login",
-        quote: "I will fix login by Friday",
-        speaker: "Ayesha",
-        line_number: 12,
       },
     ],
     meetings: [
